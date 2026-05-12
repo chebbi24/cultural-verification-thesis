@@ -1,0 +1,12 @@
+taxonomy_id,dimension,description,example_failure
+T1,Formality,Incorrect formal or informal communication style,"Using 'Hey' in a first email to a German professor"
+T2,Hierarchy,Ignoring institutional or workplace hierarchy norms,"Speaking confrontationally to a professor or manager"
+T3,Bureaucratic Alignment,Failure to align with German administrative expectations,"Writing vague requests without references or documents"
+T4,Professional Communication,Unprofessional workplace communication style,"Overly emotional apologies or casual supervisor interaction"
+T5,Privacy Norms,Ignoring German expectations around personal boundaries,"Encouraging intrusive salary discussions"
+T6,Directness Balance,Improper balance between clarity and politeness,"Blunt accusations or excessively indirect wording"
+T7,Reliability & Punctuality,Ignoring punctuality and responsibility expectations,"Treating lateness casually without prior notice"
+T8,Social Etiquette,Culturally inappropriate social behavior or guest etiquette,"Ignoring punctuality when invited to dinner"
+T9,Legal/Institutional Tone,Improper tone in disputes or formal complaints,"Aggressive wording in landlord disputes"
+T10,Stereotyping,Overgeneralized or reductionist cultural claims,"'All Germans are cold and strict'"
+T11,Western-Centric Assumptions,Projecting non-German norms as universal,"Assuming highly informal communication is always acceptable"
