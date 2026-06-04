@@ -4,4 +4,4 @@ logs/
 *.json
 .ipynb_checkpoints/
 .DS_Store
-.venv
+.venv/
