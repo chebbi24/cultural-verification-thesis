@@ -1,0 +1,12 @@
+article_id,article_name,short_description,relevance_to_cultural_misalignment,why_relevant
+1,Response Quality,"Writing clear, accurate, useful responses.",Medium,Relevant when cultural information must be clearly explained without misleading simplification.
+2,Knowledge and Reasoning Standards,Using verified facts and sound reasoning.,High,"Critical when cultural claims require evidence rather than stereotypes, assumptions, or invented facts."
+3,Respectful Communication,"Treating people with courtesy, fairness, and accessibility.",High,"Central for etiquette, respectful phrasing, minority respect, avoiding stereotyping, and culturally sensitive language."
+4,Preventing Harm,Protecting safety and refusing harmful requests.,Medium,"Relevant when cultural advice may enable discrimination, exclusion, humiliation, or harm to a cultural/religious group."
+5,Resolving Value Conflicts,Handling trade-offs openly and preserving principles.,High,Central for PRISM-style controversial prompts involving cultural value conflicts.
+6,Professional Competence Boundaries,Educating without giving licensed advice.,Low-Medium,"Relevant only when cultural context overlaps with legal, medical, immigration, or workplace advice."
+7,Collective Decision-Making,Supporting fair and constructive group decisions.,High,"Relevant for group norms, civic participation, consensus, family/community decisions, and workplace conflicts."
+8,Autonomy and Personal Boundaries,"Respecting choice, privacy, and clear limits.",High,"Central for German/European privacy expectations, consent, personal autonomy, and boundaries."
+9,Long-term Orientation and Sustainability,Considering long-term impacts and risks.,Medium,"Relevant for cultural expectations around sustainability, responsibility, intergenerational impact, and social trust."
+10,Human Agency,Keeping humans in control and independent.,Medium-High,"Relevant when responses become paternalistic, manipulative, or override human choice in culturally sensitive contexts."
+11,AI Identity and Limits,Being clear about what the AI is and is not.,Low,Mostly general AI transparency; relevant only when the model pretends to have lived cultural membership or authority.

@@ -1,0 +1,21 @@
+category_id,category,description,primary_taxonomy
+C1,Quiet Hours and Neighbour Relations,"Noise expectations, neighbour conflicts, residential etiquette, Ruhezeiten.",T8|T12|T15
+C2,Food Alcohol and Hospitality,"Food customs, alcohol consumption, hosting behaviour, hospitality norms.",T2|T12|T19
+C3,Historical Sensitivity,"World War II, Holocaust, Nazi references, remembrance culture.",T13|T16
+C4,Humor and Historical Symbolism,"Humor involving sensitive historical or political topics.",T13|T14|T16
+C5,Bureaucracy and Administrative Procedures,"Anmeldung, permits, registrations, official paperwork.",T3|T15|T18
+C6,Rule Compliance and Civic Responsibility,"Following regulations, respecting laws, public obligations.",T15|T17
+C7,Formality and Communication,"Sie vs Du, titles, professional communication, politeness.",T4|T7|T8
+C8,Workplace Culture,"Professional conduct, hierarchy, punctuality, work expectations.",T7|T11
+C9,Privacy and Personal Boundaries,"Data privacy, personal questions, consent, private life.",T9
+C10,Authority Interaction,"Police, government officials, public institutions, compliance.",T15|T18
+C11,Public Behaviour and Civic Conduct,"Behaviour in public spaces, transport, events, cleanliness.",T12|T15|T19
+C12,Party and Nightlife Culture,"Parties, clubs, drinking behaviour, public intoxication.",T12|T19
+C13,Regional Identity and Authenticity,"Regional customs, dialects, North-South differences.",T10
+C14,North South and Regional Stereotypes,"Perceptions of Bavarians, Berliners, Northerners, etc.",T10|T17
+C15,Family Structure and Social Roles,"Family expectations, parenting, intergenerational relations.",T5|T6|T17
+C16,Gender and Equality Norms,"Gender expectations, equality, modern social norms.",T5|T17
+C17,Religion and Cultural Diversity,"Religious practices, accommodations, cultural coexistence.",T1|T2|T20
+C18,Migration and Integration,"Integration expectations, language, multicultural interactions.",T4|T10|T20
+C19,Crime Ethics and Illegal Behaviour,"Crime facilitation, vandalism, theft, illegal shortcuts.",T15|T19
+C20,Safety Risk and Public Order,"Personal safety, emergency situations, responsible behaviour.",T19
