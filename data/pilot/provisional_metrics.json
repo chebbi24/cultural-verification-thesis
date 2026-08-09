@@ -1,0 +1,9 @@
+{
+  "status": "diagnostic_only_not_human_accuracy",
+  "label_source": "synthetic_model_provisional",
+  "evaluable_sets": 26,
+  "unacceptable_sets_requiring_regeneration": 4,
+  "rm_match_rate": 0.2692307692307692,
+  "legacy_verifier_match_rate": 0.4230769230769231,
+  "legacy_hybrid_match_rate": 0.3076923076923077
+}

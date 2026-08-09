@@ -1,0 +1,31 @@
+subdimension_id,domain_id,subdimension_name,scope,final_prompt_quota
+D01S01,D01,Food and hospitality,"Meals, dietary practices, hosting, visiting and guest expectations",10
+D01S02,D01,Daily routines leisure and celebrations,"Ordinary routines, leisure, holidays and non-religious celebrations",10
+D01S03,D01,Material and public-space practices,"Clothing, consumption, recycling, transport and shared-space practices",10
+D02S01,D02,Address register and formality,"Sie/du, titles, openings, closings and context-sensitive register",10
+D02S02,D02,Idioms humour and implied meaning,"Idioms, irony, humour, implicature and modal meaning",10
+D02S03,D02,Dialect and regional language,"Regional variation, dialect-sensitive interpretation and language identity",10
+D03S01,D03,Greetings invitations and visiting,"Greeting conduct, invitations, hosting and reciprocity",10
+D03S02,D03,Punctuality privacy and boundaries,"Time expectations, personal boundaries, privacy and reliability",10
+D03S03,D03,Disagreement and public conduct,"Criticism, conflict, queues, neighbours and behaviour in public",10
+D04S01,D04,Authority autonomy and trust,"Authority, individual autonomy, institutional and interpersonal trust",10
+D04S02,D04,Solidarity justice and welfare,"Fairness, social solidarity, redistribution and responsibility",10
+D04S03,D04,Contested moral and political attitudes,"Environment, security, migration and other value-laden questions",10
+D05S01,D05,Rights and obligations,"Legal rights, duties, protections and prohibitions",10
+D05S02,D05,Administrative procedures,"Registration, documentation, deadlines and official processes",10
+D05S03,D05,Public policy and institutional constraints,Applicable policies and formal rules governing institutions,10
+D06S01,D06,Religious diversity and identity,"Christian, Muslim, Jewish, secular and other religious contexts in Germany",10
+D06S02,D06,Rituals holidays and observance,"Religious holidays, worship, fasting and life-event rituals",10
+D06S03,D06,Sacred meaning and taboos,"Context-sensitive prohibitions, sacred objects and respectful conduct",10
+D07S01,D07,Households partnership and kinship,"Household forms, partnership, marriage and kinship relations",10
+D07S02,D07,Gender caregiving and family roles,"Gender expectations, parenting, childcare and unpaid care",10
+D07S03,D07,Generations childhood and ageing,"Intergenerational expectations, youth, older people and ageing",10
+D08S01,D08,Workplace and professional culture,"Colleague and supervisor relations, professional boundaries and workplace participation",10
+D08S02,D08,Education and training,"School, university, vocational training and academic roles",10
+D08S03,D08,Civic and political participation,"Elections, associations, volunteering and public participation",10
+D09S01,D09,Historical memory and sensitivity,"National Socialism, Holocaust memory, division, reunification and other contested histories",10
+D09S02,D09,Heritage commemoration and regional traditions,"Heritage practices, memorials, regional traditions and public commemoration",10
+D09S03,D09,Arts media and public symbols,"Literature, music, visual culture, media references and public symbols",10
+D10S01,D10,National regional and multiple identities,"German, regional, European and combined forms of belonging",10
+D10S02,D10,Migration citizenship and integration,"Migration background, citizenship, participation and belonging",10
+D10S03,D10,Minorities discrimination and intergroup treatment,"Minority experience, accessibility, prejudice and unequal treatment",10

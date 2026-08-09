@@ -1,0 +1,86 @@
+{
+  "manifest_version": "1",
+  "generated_from": "August 2026 project workspace snapshot",
+  "files": [
+    {
+      "path": "data/benchmark/lineage.csv",
+      "bytes": 52910,
+      "sha256": "8e269c42cf55fbcc8bd91f448f4012c30ce89744f49b838443caca5499a1af2a"
+    },
+    {
+      "path": "data/benchmark/prompts.csv",
+      "bytes": 60040,
+      "sha256": "45af8b745a3f26a37069255652cb35171d6e1aeb7633e60690ef62ca5a5cafd9"
+    },
+    {
+      "path": "data/benchmark/splits.csv",
+      "bytes": 17578,
+      "sha256": "86a829e747e8b0b7eeefcc43b758a2e3b9a0733250c14bc74239c7825f16bb23"
+    },
+    {
+      "path": "data/evidence/reference_claims.csv",
+      "bytes": 296156,
+      "sha256": "b8ce09a83f1ff0d2158d656c18d757e3376488dea55a176fcb199d3e9d42dc34"
+    },
+    {
+      "path": "data/evidence/source_registry.csv",
+      "bytes": 158,
+      "sha256": "2c387fcefa91c63e74851b0bc0a479564ec6dcf4fa493aae9dc6a85c88579fe4"
+    },
+    {
+      "path": "data/pilot/candidates.csv",
+      "bytes": 134781,
+      "sha256": "5e52b444fb3eb462d65c808f6f20b14c2874b8902c32e7b498483afdba7f5231"
+    },
+    {
+      "path": "data/pilot/legacy_candidate_scores.csv",
+      "bytes": 19430,
+      "sha256": "bcd89d15a714825d13442d9c2e33e7aa4e43fefb1096df7bacd9dab727c225cb"
+    },
+    {
+      "path": "data/pilot/legacy_response_pool.csv",
+      "bytes": 553106,
+      "sha256": "b614dbdcd6d9a3bd7e07ed769c1d7e4fd55cb7292e212840010859bbe44e7e27"
+    },
+    {
+      "path": "data/pilot/provisional_annotations.csv",
+      "bytes": 8120,
+      "sha256": "b1c573a207c5bf715822e37b037a1766986c92398b881d5e4e44559f03895763"
+    },
+    {
+      "path": "data/pilot/provisional_comparison.csv",
+      "bytes": 4419,
+      "sha256": "9e01900b8bbfbb089a5f2b2f7914eba63df31b382605c653835410e8293c5cb6"
+    },
+    {
+      "path": "data/pilot/provisional_metrics.json",
+      "bytes": 316,
+      "sha256": "78f0cff31ab6965455c71b53c09a449249ece709272567bf7262faa3fb498613"
+    },
+    {
+      "path": "data/taxonomy/attacks.csv",
+      "bytes": 1609,
+      "sha256": "ee1d7bf3696759f5b044cacc887343289dda478518a4ea2fd7ac06d808349a7a"
+    },
+    {
+      "path": "data/taxonomy/domains.csv",
+      "bytes": 4961,
+      "sha256": "63a22ae4c11e0c3109edd23a5196ffb036a331f9af770c7b8a5659201fa576fc"
+    },
+    {
+      "path": "data/taxonomy/issues.csv",
+      "bytes": 2637,
+      "sha256": "5cd7ae3f049a5c64730b8bb6a0006c990d56a1aafc7e372d4f4e6de0a0ef3581"
+    },
+    {
+      "path": "data/taxonomy/legacy_v1_crosswalk.csv",
+      "bytes": 6043,
+      "sha256": "edf5dcd407742feb2b68c7046c2f274597a8e6bd13667db9518ffa5375192f14"
+    },
+    {
+      "path": "data/taxonomy/subdimensions.csv",
+      "bytes": 3573,
+      "sha256": "ec0e6c0091b0d4ee8b8e1859b007411fba5d0e010957a866cc55d3fbfe1507ad"
+    }
+  ]
+}
