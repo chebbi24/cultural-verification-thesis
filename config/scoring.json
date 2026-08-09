@@ -1,0 +1,22 @@
+{
+  "score_version": "v2-development-default",
+  "calibration_status": "uncalibrated_until_real_human_development_labels_exist",
+  "claim_label_values": {
+    "supported": 1.0,
+    "mixed": 0.5,
+    "contradicted": 0.0,
+    "not_enough_evidence": null
+  },
+  "max_evidence_weight": 0.5,
+  "contradiction_penalty": 0.25,
+  "alignment_threshold": 0.7,
+  "hybrid_rm_weight": 0.5,
+  "verifier_softmax_temperature": 0.2,
+  "hard_fail_veto": true,
+  "notes": [
+    "not_enough_evidence is an abstention and is excluded from the evidence mean",
+    "retrieval coverage scales the evidence weight; retrieval failure does not count as evidence against a candidate",
+    "verifier scores are converted to within-set probabilities before hybrid fusion",
+    "all values are development defaults and must be calibrated only on real human development labels"
+  ]
+}

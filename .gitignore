@@ -1,7 +1,32 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
 
-models/
-logs/
-*.json
-.ipynb_checkpoints/
-.DS_Store
 .venv/
+venv/
+.env
+.DS_Store
+.idea/
+.vscode/
+
+# Model, API, and generated experiment artifacts
+.cache/
+artifacts/
+outputs/
+checkpoints/
+*.safetensors
+*.pt
+*.pth
+
+# Research source files are referenced by URL/metadata, not vendored.
+*.pdf
+*.pptx
+*.numbers
+*.zip
+
+# Spreadsheet inspection/render sidecars
+*.inspect.ndjson
+*.preview.png
