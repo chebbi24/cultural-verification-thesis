@@ -1,0 +1,11 @@
+domain_id,domain_name,definition
+D01,Everyday life and material culture,"Food, clothing, leisure, hospitality, routines, celebrations and material practices."
+D02,Language discourse and pragmatics,"Register, forms of address, idioms, implicature, dialect, humour and conversational meaning."
+D03,Social etiquette and interpersonal norms,"Social expectations governing greetings, invitations, boundaries, punctuality, disagreement and public behaviour."
+D04,Values ethics and moral pluralism,"Attitudes and moral priorities concerning autonomy, authority, justice, solidarity, security and contested questions."
+D05,Law policy and institutional rules,"Binding rights, obligations, public policy, administrative procedures and formal institutional constraints."
+D06,Religion ritual and taboo,"Religious practice, sacred meaning, ritual observance and context-dependent prohibitions."
+D07,Family kinship gender and generations,"Households, partnership, caregiving, gender relations, childhood, ageing and intergenerational expectations."
+D08,Work education and civic participation,"Workplace culture, educational life, professional roles, associations, elections and civic participation."
+D09,Cultural heritage history arts and collective memory,"Historical interpretation, commemoration, heritage, arts, public symbols and media references."
+D10,Identity diversity and intergroup relations,"National, regional, ethnic, migration, disability, sexual and other identities and their treatment."

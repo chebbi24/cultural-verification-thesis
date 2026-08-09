@@ -1,0 +1,12 @@
+| Domain | Minimum source families                                          |
+| ------ | ---------------------------------------------------------------- |
+| D01    | BLEnD, CulturalBench, Destatis time-use data                     |
+| D02    | Cultural linguistics, IDS/DWDS, multilingual cultural benchmarks |
+| D03    | NormAd, social-norm research, German-resident judgments          |
+| D04    | EVS, WVS, GlobalOpinionQA, Inglehart–Welzel                      |
+| D05    | SafeWorld, German legislation, official authorities              |
+| D06    | EVS/WVS, religious studies, religious communities                |
+| D07    | EVS, BLEnD, Destatis family statistics                           |
+| D08    | EVS/WVS, BLEnD, Destatis/KMK/labour sources                      |
+| D09    | CulturalBench, UNESCO, bpb, museums and archives                 |
+| D10    | WVS migration, FADA, Destatis/DeZIM, pluralistic alignment       |
