@@ -4,23 +4,28 @@
   "files": [
     {
       "path": "data/benchmark/lineage.csv",
-      "bytes": 52910,
-      "sha256": "8e269c42cf55fbcc8bd91f448f4012c30ce89744f49b838443caca5499a1af2a"
+      "bytes": 57349,
+      "sha256": "071750b289858ee7fa74d05e8a743ab2441a897a0c3b30a73ea0c401728bee8b"
     },
     {
       "path": "data/benchmark/prompts.csv",
-      "bytes": 60040,
-      "sha256": "45af8b745a3f26a37069255652cb35171d6e1aeb7633e60690ef62ca5a5cafd9"
+      "bytes": 69208,
+      "sha256": "3696381bd045f9ee91c0092a5b735467d932b98c70ca677b8c8323a061288176"
+    },
+    {
+      "path": "data/benchmark/source_metadata.csv",
+      "bytes": 89041,
+      "sha256": "daa216bc58c55148124d137dc4509a90afbf7d8101f9a1d9e7c1a6cff6accec4"
     },
     {
       "path": "data/benchmark/splits.csv",
-      "bytes": 17578,
-      "sha256": "86a829e747e8b0b7eeefcc43b758a2e3b9a0733250c14bc74239c7825f16bb23"
+      "bytes": 21777,
+      "sha256": "99d022a933e8c9a67dcdd1c4bd2cae97f3d3fc3deed3218f7521d5b2c1592555"
     },
     {
       "path": "data/evidence/reference_claims.csv",
-      "bytes": 296156,
-      "sha256": "b8ce09a83f1ff0d2158d656c18d757e3376488dea55a176fcb199d3e9d42dc34"
+      "bytes": 321307,
+      "sha256": "f52a30f1495f94518bc71c8531588bb34fefe576bbd223cc881bee0f01c82dbd"
     },
     {
       "path": "data/evidence/source_registry.csv",
@@ -59,8 +64,8 @@
     },
     {
       "path": "data/taxonomy/attacks.csv",
-      "bytes": 1609,
-      "sha256": "ee1d7bf3696759f5b044cacc887343289dda478518a4ea2fd7ac06d808349a7a"
+      "bytes": 525,
+      "sha256": "e48afa98e76a6deefa6c262fe534b02b2732bf1b7ff68576413a2e549e1fb501"
     },
     {
       "path": "data/taxonomy/domains.csv",

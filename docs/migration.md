@@ -2,12 +2,13 @@
 
 ## Source state
 
-The previous `main` snapshot mixed multiple benchmark generations, duplicate outputs, a committed local virtual environment, source PDFs, a Numbers file, a Colab setup notebook, and three verifier generations. The latest authoritative `RT` benchmark and verifier pilot existed outside that old repository snapshot.
+The previous `main` snapshot mixed multiple benchmark generations, duplicate outputs, a committed local virtual environment, source PDFs, a Numbers file, a Colab setup notebook, and three verifier generations. During the initial rebuild, a newer synthetic V3 matrix was incorrectly treated as authoritative. The canonical benchmark has now been restored from the historical 300-row `data/prompts/benchmark.csv`, which is byte-identical to `german_culture_benchmark_300_no_prefixes.csv`.
 
 ## Retained concepts and data
 
-- Final 300-item `RT` benchmark.
-- Ten domains, thirty subdimensions, fourteen issues, and ten attacks.
+- The historical 60-parent × five-form benchmark, normalized to `RT001`–`RT300` without changing prompt text.
+- Ten domains, thirty available subdimensions, fourteen issues, and five historical prompt forms.
+- Full source metadata and hashes, including 54 custom and six SafeWorld-adapted parent prompts.
 - One merged, remapped 450-response legacy pool.
 - One 30×4 diagnostic legacy pilot.
 - Compact legacy candidate scores needed to reproduce the pilot agreement analysis.
@@ -17,7 +18,8 @@ The previous `main` snapshot mixed multiple benchmark generations, duplicate out
 ## Removed from the working tree
 
 - Committed `.venv` and platform-specific binaries.
-- Superseded prompt files (`german_culture*`, `redteam_v1`, `redteam_v2*`, old `benchmark.csv`).
+- Duplicate prompt files (`german_culture*`, `redteam_v1`, `redteam_v2*`, and the semicolon-delimited source snapshot). Their authoritative prompt text and metadata are retained in the canonical benchmark and source-metadata files.
+- The synthetic V3 prompt matrix as the canonical benchmark; it remains only in external migration history and is not used for experiments.
 - Duplicate raw Llama output files and test output.
 - Superseded taxonomy inventories and Swiss-only source tables. The user-supplied v1 taxonomy is retained only as the normalized crosswalk, not as a second active taxonomy.
 - Two large vendored PDFs; references now use source metadata and URLs.

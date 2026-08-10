@@ -110,13 +110,15 @@ After inspecting the development report, copy only the selected values into `con
 
 ## Split policy
 
-Each subdimension contributes two items to development, two to verifier validation, and six to test. A deterministic rotation over attack IDs gives each attack exactly:
+The restored benchmark contains 60 parent scenarios with five prompt forms per parent. Splits are assigned at the parent-group level, never at the individual row level, so closely related variants cannot leak between development and evaluation.
 
-- 6 development prompts.
-- 6 verifier-validation prompts.
-- 18 test prompts.
+Within each of the twelve historical categories, a deterministic SHA-256 ordering with seed `20260810` assigns one parent to development, one to verifier validation, and three to test. This yields:
 
-Because final items were independently authored rather than expanded from shared seeds, each item is its own lineage group. The attack framework is shared by design and is not treated as a parent prompt.
+- 12 parent groups / 60 prompts in development.
+- 12 parent groups / 60 prompts in verifier validation.
+- 36 parent groups / 180 prompts in test.
+
+Because every parent contains all five prompt forms, each form occurs 12/12/36 times across the three splits. The newer 30-subdimension taxonomy is used as a semantic crosswalk, not as a quota system; forcing the historical prompts into equal subdimension counts would mislabel their content.
 
 ## Reporting hierarchy
 

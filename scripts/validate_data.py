@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -18,6 +20,7 @@ from cultural_verifier.ids import (
     PILOT_SET_RE,
     PROMPT_RE,
     SUBDIMENSION_RE,
+    normalize_legacy_prompt_id,
 )
 from cultural_verifier.io import read_csv
 
@@ -41,6 +44,7 @@ def main() -> None:
     legacy_crosswalk = read_csv(REPO_ROOT / "data/taxonomy/legacy_v1_crosswalk.csv")
     prompts = read_csv(REPO_ROOT / "data/benchmark/prompts.csv")
     lineage = read_csv(REPO_ROOT / "data/benchmark/lineage.csv")
+    source_metadata = read_csv(REPO_ROOT / "data/benchmark/source_metadata.csv")
     splits = read_csv(REPO_ROOT / "data/benchmark/splits.csv")
     claims = read_csv(REPO_ROOT / "data/evidence/reference_claims.csv")
     candidates = read_csv(REPO_ROOT / "data/pilot/candidates.csv")
@@ -66,7 +70,7 @@ def main() -> None:
     )
     require(len(domain_ids) == 10, "Expected 10 domains")
     require(len(subdimension_ids) == 30, "Expected 30 subdimensions")
-    require(len(attack_ids) == 10, "Expected 10 attacks")
+    require(len(attack_ids) == 5, "Expected five historical prompt forms")
     require(len(prompt_ids) == 300, "Expected 300 prompts")
     require(all(DOMAIN_RE.fullmatch(value) for value in domain_ids), "Invalid domain ID")
     require(all(SUBDIMENSION_RE.fullmatch(value) for value in subdimension_ids), "Invalid subdimension ID")
@@ -84,33 +88,144 @@ def main() -> None:
     )
     require(all(row["attack_id"] in attack_ids for row in prompts), "Prompt references unknown attack")
 
-    require(Counter(row["domain_id"] for row in prompts) == {value: 30 for value in domain_ids}, "Domain imbalance")
     require(
-        Counter(row["subdimension_id"] for row in prompts) == {value: 10 for value in subdimension_ids},
-        "Subdimension imbalance",
+        {row["domain_id"] for row in prompts} == domain_ids,
+        "Historical benchmark must retain coverage of all ten content domains",
     )
-    require(Counter(row["attack_id"] for row in prompts) == {value: 30 for value in attack_ids}, "Attack imbalance")
+    require(
+        Counter(row["attack_id"] for row in prompts) == {value: 60 for value in attack_ids},
+        "Historical prompt-form imbalance",
+    )
+    require(len({row["prompt_text"] for row in prompts}) == 300, "Duplicate benchmark prompt text")
 
     require(unique(lineage, "prompt_id") == prompt_ids, "Lineage coverage mismatch")
-    require(all(row["lineage_group_id"] == row["prompt_id"] for row in lineage), "Unexpected lineage grouping")
-    require(all(not row["parent_prompt_id"] for row in lineage), "Final RT items must not point to obsolete parents")
+    require(
+        all(LEGACY_PROMPT_RE.fullmatch(row["parent_prompt_id"]) for row in lineage),
+        "Invalid historical parent prompt ID",
+    )
+    require(
+        all(row["lineage_group_id"] == row["parent_prompt_id"] for row in lineage),
+        "Historical lineage group must equal its parent prompt ID",
+    )
+    require(
+        Counter(row["lineage_group_id"] for row in lineage)
+        == {f"LG{index:03d}": 5 for index in range(1, 61)},
+        "Expected 60 historical parent groups with five prompt forms each",
+    )
     require(all(len(row["source_row_sha256"]) == 64 for row in lineage), "Missing lineage hash")
+
+    require(unique(source_metadata, "prompt_id") == prompt_ids, "Source metadata coverage mismatch")
+    require(
+        len({row["legacy_benchmark_id"] for row in source_metadata}) == 300,
+        "Duplicate historical benchmark ID",
+    )
+    require(
+        Counter(row["variation_type"] for row in source_metadata)
+        == {
+            "personal_dilemma": 60,
+            "social_conflict": 60,
+            "authority_interaction": 60,
+            "foreigner_perspective": 60,
+            "ethical_justification": 60,
+        },
+        "Historical five-form coverage mismatch",
+    )
+    require(
+        Counter(row["parent_source"] for row in source_metadata)
+        == {"custom": 270, "SafeWorld": 30},
+        "Historical parent-source provenance mismatch",
+    )
+    parent_sources = {
+        (row["legacy_parent_prompt_id"], row["parent_source"])
+        for row in source_metadata
+    }
+    require(
+        Counter(source for _, source in parent_sources) == {"custom": 54, "SafeWorld": 6},
+        "Historical parent-level source provenance mismatch",
+    )
+    require(
+        Counter(row["legacy_attack_type"] for row in source_metadata)
+        == {"elicitation": 175, "trigger": 75, "steering": 50},
+        "Historical attack-type provenance mismatch",
+    )
+    require(
+        all(len(row["source_file_sha256"]) == 64 for row in source_metadata),
+        "Historical source-file hash is missing",
+    )
 
     require(unique(splits, "prompt_id") == prompt_ids, "Split coverage mismatch")
     split_counts = Counter(row["split"] for row in splits)
     require(split_counts == {"development": 60, "verifier_validation": 60, "test": 180}, "Wrong split sizes")
     split_by_prompt = {row["prompt_id"]: row["split"] for row in splits}
     prompt_by_id = {row["prompt_id"]: row for row in prompts}
-    for split, expected in [("development", 6), ("verifier_validation", 6), ("test", 18)]:
+    lineage_by_prompt = {row["prompt_id"]: row for row in lineage}
+    metadata_by_prompt = {row["prompt_id"]: row for row in source_metadata}
+    require(
+        all(
+            normalize_legacy_prompt_id(
+                metadata_by_prompt[prompt_id]["legacy_parent_prompt_id"]
+            )
+            == lineage_by_prompt[prompt_id]["parent_prompt_id"]
+            for prompt_id in prompt_ids
+        ),
+        "Historical source metadata and lineage disagree",
+    )
+    split_by_group: dict[str, set[str]] = defaultdict(set)
+    for prompt_id, split in split_by_prompt.items():
+        split_by_group[lineage_by_prompt[prompt_id]["lineage_group_id"]].add(split)
+    require(
+        all(len(assigned_splits) == 1 for assigned_splits in split_by_group.values()),
+        "Historical parent variants leak across splits",
+    )
+    require(
+        Counter(next(iter(assigned_splits)) for assigned_splits in split_by_group.values())
+        == {"development": 12, "verifier_validation": 12, "test": 36},
+        "Wrong parent-group split sizes",
+    )
+    for split, expected in [("development", 12), ("verifier_validation", 12), ("test", 36)]:
         counts = Counter(
             prompt_by_id[prompt_id]["attack_id"]
             for prompt_id, assigned in split_by_prompt.items()
             if assigned == split
         )
-        require(counts == {value: expected for value in attack_ids}, f"Attack imbalance in {split}")
+        require(counts == {value: expected for value in attack_ids}, f"Prompt-form imbalance in {split}")
 
     require(unique(claims, "reference_claim_id") == {f"{value}-CL01" for value in prompt_ids}, "Reference-claim coverage mismatch")
     require(all(row["evidence_status"] == "pending_agentic_search" for row in claims), "Unexpected evidence provenance")
+    claims_by_prompt = {row["prompt_id"]: row for row in claims}
+    require(set(claims_by_prompt) == prompt_ids, "Reference claims omit benchmark prompts")
+    require(
+        all(
+            claims_by_prompt[prompt_id][field] == prompt_by_id[prompt_id][field]
+            for prompt_id in prompt_ids
+            for field in ("domain_id", "subdimension_id", "attack_id")
+        ),
+        "Reference-claim taxonomy does not match benchmark prompts",
+    )
+    require(
+        all(
+            claims_by_prompt[prompt_id]["prompt_text"] == prompt_by_id[prompt_id]["prompt_text"]
+            for prompt_id in prompt_ids
+        ),
+        "Reference-claim prompt text does not match benchmark prompts",
+    )
+
+    manifest = json.loads((REPO_ROOT / "data/manifest.json").read_text(encoding="utf-8"))
+    manifest_entries = {entry["path"]: entry for entry in manifest["files"]}
+    versioned_data = {
+        str(path.relative_to(REPO_ROOT)): path
+        for path in (REPO_ROOT / "data").rglob("*")
+        if path.is_file() and path.name != "manifest.json"
+    }
+    require(set(manifest_entries) == set(versioned_data), "Data manifest coverage mismatch")
+    for relative_path, path in versioned_data.items():
+        content = path.read_bytes()
+        entry = manifest_entries[relative_path]
+        require(entry["bytes"] == len(content), f"Manifest byte count mismatch: {relative_path}")
+        require(
+            entry["sha256"] == hashlib.sha256(content).hexdigest(),
+            f"Manifest hash mismatch: {relative_path}",
+        )
 
     require(len(candidates) == 120, "Expected 120 pilot candidates")
     require(all(PILOT_SET_RE.fullmatch(row["set_id"]) for row in candidates), "Invalid pilot set ID")

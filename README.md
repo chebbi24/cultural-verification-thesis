@@ -4,8 +4,8 @@ This repository contains the reproducible code and canonical data for a Germany-
 
 ## Current scientific status
 
-- The canonical benchmark contains 300 prompts (`RT001`–`RT300`), 10 domains, 30 subdimensions, and 10 attack types.
-- Development, verifier-validation, and held-out test splits are frozen in `data/benchmark/splits.csv`.
+- The canonical benchmark contains the restored historical 300 prompts (`RT001`–`RT300`), mapped into the 10-domain/30-subdimension taxonomy and retaining their five source prompt forms.
+- Development, verifier-validation, and held-out test splits are frozen in `data/benchmark/splits.csv`; all five variants of a parent prompt remain in the same split.
 - A legacy 30-prompt × 4-candidate pilot is retained for diagnostics only.
 - Its labels are explicitly marked as **synthetic provisional annotations** and must not be reported as human labels.
 - Final `RT` candidates and independent human labels have not yet been collected.

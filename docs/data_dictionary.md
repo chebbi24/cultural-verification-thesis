@@ -8,7 +8,7 @@ Identifiers are stable strings. They must never be reused for a different entity
 |---|---|---|---|
 | Domain | `Ddd` | `D01` | One of ten cultural content domains |
 | Subdimension | `DddSdd` | `D01S01` | Domain-local subdimension; both components are zero-padded |
-| Attack | `ATdd` | `AT01` | One of ten cross-cutting prompt constructions |
+| Prompt form | `ATdd` | `AT01` | One of five historical prompt constructions |
 | Final prompt | `RTddd` | `RT001` | Canonical red-team benchmark item |
 | Reference claim | `RTddd-CLdd` | `RT001-CL01` | Item-specific verification boundary |
 | Final candidate | `RTddd-Cn` | `RT001-C1` | Candidate position after recorded randomization |
@@ -18,7 +18,7 @@ Identifiers are stable strings. They must never be reused for a different entity
 | Annotation | `<set>-ANNdd` | `PLT001-ANN01` | One annotation record |
 | Legacy output | `OUT-LGddd-Rdd` | `OUT-LG006-R03` | One stored generator run |
 
-Historical `D01S1`, `G06`, `VT001`, and candidate letters `a`–`d` are normalized only during migration. They do not appear in canonical files.
+Historical `D01S1`, `G06`, `VT001`, and candidate letters `a`–`d` are normalized during migration. Historical parent IDs are retained only in the provenance files, as normalized `LGddd` lineage values and exact `Gdd` source-metadata values.
 
 ## Canonical data files
 
@@ -40,7 +40,7 @@ Migration-only mapping for the supplied 19-row `taxonomy_v1.csv`. The older dime
 
 ### `data/taxonomy/attacks.csv`
 
-The ten balanced prompt-construction methods. `method_source_url` supports method provenance and is not item-level answer evidence.
+The five source prompt forms: `personal_dilemma`, `social_conflict`, `authority_interaction`, `foreigner_perspective`, and `ethical_justification`. The `attack_id` column name is preserved for compatibility with the rebuilt pipeline.
 
 ### `data/benchmark/prompts.csv`
 
@@ -50,17 +50,23 @@ The only authoritative benchmark prompt file.
 |---|---|
 | `prompt_id` | Stable `RT` identifier |
 | `domain_id` | Primary content domain |
-| `subdimension_id` | Primary balanced subdimension |
-| `attack_id` | Prompt-construction attack |
+| `subdimension_id` | Closest primary v2 content subdimension |
+| `attack_id` | Historical five-form prompt construction |
 | `prompt_text` | Exact model input |
+
+The 300 `prompt_text` values are copied unchanged from the historical semicolon-delimited `data/prompts/benchmark.csv` on legacy `main`. The canonical file preserves the rebuilt five-column comma-delimited schema; historical metadata is stored separately.
 
 ### `data/benchmark/lineage.csv`
 
-The final `RT` items were independently authored in a balanced attack matrix. They are not children of the superseded `Pxxx`/60-seed dataset. Therefore `parent_prompt_id` is empty and `lineage_group_id` equals `prompt_id`. `source_row_sha256` freezes the migrated row.
+Each historical `G01`–`G60` parent produced five prompt forms. Parent IDs are normalized to `LG001`–`LG060`; `parent_prompt_id` and `lineage_group_id` therefore identify the shared source scenario. `source_row_sha256` freezes every exact historical source row.
+
+### `data/benchmark/source_metadata.csv`
+
+One row per canonical prompt preserving the old benchmark ID, parent ID, form, category, variation, v1 taxonomy IDs, expected issue, legacy attack type, parent source, and exact source-file SHA-256. The parent-source distribution is 54 custom and six SafeWorld-adapted parents.
 
 ### `data/benchmark/splits.csv`
 
-Deterministic 60/60/180 development, verifier-validation, and held-out test assignment. Each split contains every domain, every subdimension, and all ten attacks. The test split must remain untouched during parameter tuning.
+Deterministic 60/60/180 development, verifier-validation, and held-out test assignment. Splitting is performed at the 60-parent lineage-group level to prevent the five closely related variants of one scenario from leaking across splits. Each of the twelve historical categories contributes one parent to development, one to verifier validation, and three to test. Every split therefore contains all five prompt forms. The test split must remain untouched during parameter tuning.
 
 ### `data/evidence/reference_claims.csv`
 

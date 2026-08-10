@@ -10,17 +10,28 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
-def read_csv(path: Path) -> list[dict[str, str]]:
+def read_csv(path: Path, *, delimiter: str = ",") -> list[dict[str, str]]:
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
-        return list(csv.DictReader(handle))
+        return list(csv.DictReader(handle, delimiter=delimiter))
 
 
-def write_csv(path: Path, rows: Iterable[dict[str, Any]], fieldnames: list[str]) -> None:
+def write_csv(
+    path: Path,
+    rows: Iterable[dict[str, Any]],
+    fieldnames: list[str],
+    *,
+    lineterminator: str = "\r\n",
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(
         "w", encoding="utf-8", newline="", dir=path.parent, delete=False
     ) as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames, extrasaction="ignore")
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=fieldnames,
+            extrasaction="ignore",
+            lineterminator=lineterminator,
+        )
         writer.writeheader()
         writer.writerows(rows)
         temporary = Path(handle.name)
