@@ -1,21 +1,15 @@
 """Standalone evidence-grounded cultural verifier.
 
-Research goal
--------------
-Score culturally appropriate responses *independently* of any reward model so
-that the verifier can be compared fairly against reward-model baselines.
+The verifier is independent of reward-model scores. It supports:
+- OpenRouter: hosted judge + OpenRouter web search
+- Ollama: local judge + Ollama web search
 
-Primary score
--------------
-Five equally weighted dimensions, each normalized to [0, 1]:
+Five equally weighted dimensions:
 1. evidence_grounding
 2. contextual_appropriateness
 3. nonessentialism
 4. variation_and_uncertainty
 5. actionable_helpfulness
-
-No reward-model score enters the verifier score. Hard failures are reported as
-an interpretable diagnostic and are not given an additional hidden penalty.
 """
 
 from __future__ import annotations
@@ -24,12 +18,16 @@ import json
 import os
 import re
 from dataclasses import asdict, dataclass
-from typing import Any
+from typing import Any, Protocol
 
 import requests
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-DEFAULT_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-4.1-mini")
+OLLAMA_LOCAL_CHAT_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/chat")
+OLLAMA_WEB_SEARCH_URL = "https://ollama.com/api/web_search"
+
+DEFAULT_OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-4.1-mini")
+DEFAULT_OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:4b")
 
 VERDICTS = {"supported", "contradicted", "mixed", "not_enough_evidence"}
 RUBRIC_KEYS = (
@@ -58,26 +56,38 @@ class VerifierResult:
     hard_failures: list[dict[str, str]]
 
 
+class JSONClient(Protocol):
+    def json_call(
+        self,
+        system: str,
+        user_payload: dict[str, Any],
+        *,
+        web_search: bool = False,
+        max_results: int = 5,
+    ) -> tuple[dict[str, Any], list[dict[str, str]]]:
+        ...
+
+
+def _extract_json(text: str) -> dict[str, Any]:
+    text = text.strip()
+    text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.I)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", text, flags=re.S)
+        if not match:
+            raise
+        return json.loads(match.group(0))
+
+
 class OpenRouterClient:
-    """Small OpenRouter client with optional server-side web search."""
+    """OpenRouter client with optional server-side web search."""
 
     def __init__(self, api_key: str | None = None, model: str | None = None):
         self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
         if not self.api_key:
-            raise RuntimeError("Set OPENROUTER_API_KEY before running the verifier.")
-        self.model = model or DEFAULT_MODEL
-
-    @staticmethod
-    def _extract_json(text: str) -> dict[str, Any]:
-        text = text.strip()
-        text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.I)
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError:
-            match = re.search(r"\{.*\}", text, flags=re.S)
-            if not match:
-                raise
-            return json.loads(match.group(0))
+            raise RuntimeError("Set OPENROUTER_API_KEY before using --backend openrouter.")
+        self.model = model or DEFAULT_OPENROUTER_MODEL
 
     @staticmethod
     def _sources_from_annotations(message: dict[str, Any]) -> list[dict[str, str]]:
@@ -116,16 +126,14 @@ class OpenRouterClient:
             "response_format": {"type": "json_object"},
         }
         if web_search:
-            payload["tools"] = [
-                {
-                    "type": "openrouter:web_search",
-                    "parameters": {
-                        "max_results": max_results,
-                        "max_total_results": max(8, max_results),
-                        "search_context_size": "medium",
-                    },
-                }
-            ]
+            payload["tools"] = [{
+                "type": "openrouter:web_search",
+                "parameters": {
+                    "max_results": max_results,
+                    "max_total_results": max(8, max_results),
+                    "search_context_size": "medium",
+                },
+            }]
 
         response = requests.post(
             OPENROUTER_URL,
@@ -139,13 +147,112 @@ class OpenRouterClient:
         response.raise_for_status()
         data = response.json()
         message = data["choices"][0]["message"]
-        return self._extract_json(message.get("content") or "{}"), self._sources_from_annotations(message)
+        return _extract_json(message.get("content") or "{}"), self._sources_from_annotations(message)
+
+
+class OllamaClient:
+    """Local Ollama judge plus Ollama's web-search API for evidence retrieval.
+
+    Local model calls require no API key. Web search requires OLLAMA_API_KEY.
+    """
+
+    def __init__(
+        self,
+        model: str | None = None,
+        local_url: str | None = None,
+        web_api_key: str | None = None,
+    ):
+        self.model = model or DEFAULT_OLLAMA_MODEL
+        self.local_url = local_url or OLLAMA_LOCAL_CHAT_URL
+        self.web_api_key = web_api_key or os.getenv("OLLAMA_API_KEY")
+
+    def _web_search(
+        self,
+        user_payload: dict[str, Any],
+        max_results: int,
+    ) -> list[dict[str, str]]:
+        if not self.web_api_key:
+            raise RuntimeError(
+                "OLLAMA_API_KEY is required for evidence retrieval with --backend ollama. "
+                "Create a free Ollama API key and export it as OLLAMA_API_KEY."
+            )
+
+        claim = str(user_payload.get("claim", "")).strip()
+        target = str(user_payload.get("target_context", "")).strip()
+        context = str(user_payload.get("prompt_context", "")).strip()
+        query = " ".join(part for part in (claim, target, context[:300]) if part).strip()
+        if not query:
+            query = json.dumps(user_payload, ensure_ascii=False)[:1000]
+
+        response = requests.post(
+            OLLAMA_WEB_SEARCH_URL,
+            headers={
+                "Authorization": f"Bearer {self.web_api_key}",
+                "Content-Type": "application/json",
+            },
+            json={"query": query, "max_results": max_results},
+            timeout=90,
+        )
+        response.raise_for_status()
+        results = response.json().get("results") or []
+        clean: list[dict[str, str]] = []
+        for item in results:
+            if not isinstance(item, dict):
+                continue
+            url = str(item.get("url", "")).strip()
+            if not url:
+                continue
+            clean.append({
+                "url": url,
+                "title": str(item.get("title", "")).strip(),
+                "content": str(item.get("content", "")).strip()[:2500],
+            })
+        return clean
+
+    def json_call(
+        self,
+        system: str,
+        user_payload: dict[str, Any],
+        *,
+        web_search: bool = False,
+        max_results: int = 5,
+    ) -> tuple[dict[str, Any], list[dict[str, str]]]:
+        sources: list[dict[str, str]] = []
+        payload_for_model = dict(user_payload)
+
+        if web_search:
+            sources = self._web_search(user_payload, max_results)
+            payload_for_model["retrieved_web_evidence"] = sources
+            system += (
+                " Use only the supplied retrieved_web_evidence for external evidence. "
+                "Describe it faithfully; do not invent unseen sources."
+            )
+
+        response = requests.post(
+            self.local_url,
+            headers={"Content-Type": "application/json"},
+            json={
+                "model": self.model,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": json.dumps(payload_for_model, ensure_ascii=False)},
+                ],
+                "stream": False,
+                "format": "json",
+                "options": {"temperature": 0},
+            },
+            timeout=300,
+        )
+        response.raise_for_status()
+        data = response.json()
+        message = data.get("message") or {}
+        return _extract_json(message.get("content") or "{}"), sources
 
 
 class CulturalVerifier:
     """Independent, evidence-grounded verifier for one candidate response."""
 
-    def __init__(self, client: OpenRouterClient):
+    def __init__(self, client: JSONClient):
         self.client = client
 
     def extract_claims(self, prompt: str, response: str, target_context: str) -> list[str]:
@@ -165,11 +272,11 @@ class CulturalVerifier:
         return [str(c).strip() for c in claims if str(c).strip()][:12]
 
     def check_claim(self, prompt: str, claim: str, target_context: str) -> ClaimCheck:
-        data, annotations = self.client.json_call(
-            "Return JSON only. Verify the supplied claim using web search. Search broadly across the web; do NOT restrict yourself to a preset "
-            "list of websites. Prefer current primary, official, survey, corpus, scholarly, or otherwise authoritative evidence when available, "
-            "but use the best relevant evidence you can find. Distinguish a cultural tendency from a universal rule. Do not interpret lack of "
-            "evidence as contradiction. Verdict must be exactly one of: supported, contradicted, mixed, not_enough_evidence.",
+        data, sources = self.client.json_call(
+            "Return JSON only. Verify the supplied claim using the supplied/retrieved web evidence. Search broadly; do NOT restrict evidence "
+            "to a preset list of websites. Prefer current primary, official, survey, corpus, scholarly, or otherwise authoritative evidence "
+            "when available. Distinguish a cultural tendency from a universal rule. Lack of evidence is not contradiction. Verdict must be "
+            "exactly one of: supported, contradicted, mixed, not_enough_evidence.",
             {
                 "prompt_context": prompt,
                 "target_context": target_context,
@@ -195,16 +302,11 @@ class CulturalVerifier:
             verdict=verdict,
             confidence=confidence,
             reason=str(data.get("reason", "")).strip(),
-            sources=annotations,
+            sources=sources,
         )
 
     @staticmethod
     def evidence_grounding(checks: list[ClaimCheck]) -> float:
-        """Transparent, untuned score: equal credit across claims.
-
-        supported=1.0, mixed=0.5, not_enough_evidence=0.5 (neutral),
-        contradicted=0.0. If there are no verifiable claims, use neutral 0.5.
-        """
         if not checks:
             return 0.5
         points = {
@@ -292,7 +394,6 @@ class CulturalVerifier:
         dimensions = {"evidence_grounding": self.evidence_grounding(checks)}
         dimensions.update(self.cultural_rubric(prompt, response, target_context, checks))
 
-        # Option A: equal weighting, no learned/tuned parameters and no RM contribution.
         final_score = sum(dimensions.values()) / len(dimensions)
         failures = self.detect_hard_failures(prompt, response, target_context, checks)
 
