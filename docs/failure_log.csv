@@ -1,0 +1,2 @@
+failure_id,date,pipeline_version,prompt_id,failure_category,observed_behavior,root_cause,hypothesis,proposed_fix,experiment,before_result,after_result,status,thesis_relevance
+F-001,,,,,,,,,,,,open,
