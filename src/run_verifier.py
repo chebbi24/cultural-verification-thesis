@@ -1,78 +1,52 @@
-"""
-Run the concrete cultural verifier on an existing model-output CSV.
+"""Run the standalone cultural verifier on rows containing prompt + response.
 
+For the thesis's main Best-of-4 comparison, prefer evaluate_best_of4.py.
 """
 
 from __future__ import annotations
 
 import argparse
 import csv
+import json
 from pathlib import Path
 
-from verifier import MINIMAL_OUTPUT_FIELDS, verify_case
-
-
-def detect_delimiter(path: Path) -> str:
-    sample = path.read_text(encoding="utf-8-sig", errors="replace")[:4096]
-    first_line = sample.splitlines()[0] if sample.splitlines() else ""
-
-    if first_line.count(";") > first_line.count(","):
-        return ";"
-
-    return ","
+from verifier import CulturalVerifier, OpenRouterClient
 
 
 def read_rows(path: Path) -> list[dict[str, str]]:
-    delimiter = detect_delimiter(path)
-
-    with path.open("r", encoding="utf-8-sig", newline="") as f:
+    sample = path.read_text(encoding="utf-8-sig", errors="replace")[:4096]
+    first = sample.splitlines()[0] if sample.splitlines() else ""
+    delimiter = ";" if first.count(";") > first.count(",") else ","
+    with path.open(encoding="utf-8-sig", newline="") as f:
         return list(csv.DictReader(f, delimiter=delimiter))
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("input_csv")
-    parser.add_argument("output_csv")
-    parser.add_argument("--target-culture", default="Germany")
-    parser.add_argument("--judge-model", default="llama3.2:3b")
-    parser.add_argument("--limit", type=int, default=0, help="Use 0 for all rows.")
-
+    parser.add_argument("input_csv", type=Path)
+    parser.add_argument("output_json", type=Path)
+    parser.add_argument("--target-context", default="Germany")
+    parser.add_argument("--model", default=None)
+    parser.add_argument("--limit", type=int, default=0)
     args = parser.parse_args()
 
-    input_path = Path(args.input_csv)
-    output_path = Path(args.output_csv)
-
-    if not input_path.exists():
-        raise FileNotFoundError(f"Input file does not exist: {input_path}")
-
-    rows = read_rows(input_path)
-
-    if args.limit and args.limit > 0:
+    rows = read_rows(args.input_csv)
+    if args.limit > 0:
         rows = rows[: args.limit]
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
+    verifier = CulturalVerifier(OpenRouterClient(model=args.model))
     results = []
-    total = len(rows)
-
-    for index, row in enumerate(rows, start=1):
+    for index, row in enumerate(rows, 1):
+        if "prompt" not in row or "response" not in row:
+            raise ValueError("Input CSV must contain columns named 'prompt' and 'response'. Use evaluate_best_of4.py for response_a..response_d files.")
         case_id = row.get("prompt_id") or row.get("case_id") or f"row_{index}"
-        print(f"[{index}/{total}] verifying {case_id}", flush=True)
+        print(f"[{index}/{len(rows)}] verifying {case_id}", flush=True)
+        result = verifier.verify(row["prompt"], row["response"], args.target_context)
+        results.append({"case_id": case_id, "prompt": row["prompt"], "response": row["response"], **result.__dict__})
 
-        result = verify_case(
-            row,
-            target_culture=args.target_culture,
-            judge_model=args.judge_model,
-        )
-
-        results.append(result)
-
-    with output_path.open("w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=MINIMAL_OUTPUT_FIELDS)
-        writer.writeheader()
-        writer.writerows(results)
-
-    print(f"Saved results to {output_path}")
+    args.output_json.parent.mkdir(parents=True, exist_ok=True)
+    args.output_json.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"Saved {args.output_json}")
 
 
 if __name__ == "__main__":
