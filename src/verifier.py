@@ -151,10 +151,7 @@ class OpenRouterClient:
 
 
 class OllamaClient:
-    """Local Ollama judge plus Ollama's web-search API for evidence retrieval.
-
-    Local model calls require no API key. Web search requires OLLAMA_API_KEY.
-    """
+    """Local Ollama judge plus Ollama's web-search API for evidence retrieval."""
 
     def __init__(
         self,
@@ -191,7 +188,7 @@ class OllamaClient:
                 "Content-Type": "application/json",
             },
             json={"query": query, "max_results": max_results},
-            timeout=90,
+            timeout=45,
         )
         response.raise_for_status()
         results = response.json().get("results") or []
@@ -239,9 +236,10 @@ class OllamaClient:
                 ],
                 "stream": False,
                 "format": "json",
+                "think": False,
                 "options": {"temperature": 0},
             },
-            timeout=300,
+            timeout=120,
         )
         response.raise_for_status()
         data = response.json()
@@ -388,14 +386,27 @@ class CulturalVerifier:
         return clean[:6]
 
     def verify(self, prompt: str, response: str, target_context: str = "Germany") -> VerifierResult:
+        print("    extracting claims...", flush=True)
         claims = self.extract_claims(prompt, response, target_context)
-        checks = [self.check_claim(prompt, claim, target_context) for claim in claims]
+        print(f"    found {len(claims)} claim(s)", flush=True)
 
+        checks: list[ClaimCheck] = []
+        for index, claim in enumerate(claims, 1):
+            preview = claim if len(claim) <= 90 else claim[:87] + "..."
+            print(f"    checking claim {index}/{len(claims)}: {preview}", flush=True)
+            check = self.check_claim(prompt, claim, target_context)
+            checks.append(check)
+            print(f"      -> {check.verdict} ({len(check.sources)} source(s))", flush=True)
+
+        print("    scoring cultural rubric...", flush=True)
         dimensions = {"evidence_grounding": self.evidence_grounding(checks)}
         dimensions.update(self.cultural_rubric(prompt, response, target_context, checks))
 
         final_score = sum(dimensions.values()) / len(dimensions)
+
+        print("    detecting hard failures...", flush=True)
         failures = self.detect_hard_failures(prompt, response, target_context, checks)
+        print(f"    final score: {final_score:.3f}", flush=True)
 
         return VerifierResult(
             final_score=round(final_score, 6),
