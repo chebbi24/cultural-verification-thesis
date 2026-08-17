@@ -3,8 +3,10 @@
 Expected columns: set_id (optional), prompt_id (optional), prompt,
 response_a, response_b, response_c, response_d, human_chosen (optional).
 
-The human label is used only after all candidates have been independently
-scored. It is never sent to the verifier.
+Human labels are used only after candidate scoring/tiebreaking and are never sent
+to the verifier. Pointwise ties are not broken by candidate order: tied responses
+receive an order-balanced comparative tiebreak. If the two tiebreak orders disagree,
+the verifier abstains rather than inventing a winner.
 """
 
 from __future__ import annotations
@@ -30,29 +32,22 @@ def main() -> None:
     parser.add_argument("input_csv", type=Path)
     parser.add_argument("output_csv", type=Path)
     parser.add_argument("--target-context", default="Germany")
-    parser.add_argument(
-        "--backend",
-        choices=("ollama", "openrouter"),
-        default="ollama",
-        help="Verifier backend. Default: ollama (local inference + Ollama web search).",
-    )
-    parser.add_argument(
-        "--model",
-        default=None,
-        help="Model name for the selected backend. Defaults: qwen3:4b for Ollama, openai/gpt-4.1-mini for OpenRouter.",
-    )
+    parser.add_argument("--backend", choices=("ollama", "openrouter"), default="ollama")
+    parser.add_argument("--model", default=None)
     parser.add_argument("--limit", type=int, default=0)
+    parser.add_argument(
+        "--tie-epsilon",
+        type=float,
+        default=1e-6,
+        help="Scores within this absolute distance from the top score enter comparative tiebreaking.",
+    )
     args = parser.parse_args()
 
     rows = read_rows(args.input_csv)
     if args.limit > 0:
         rows = rows[: args.limit]
 
-    if args.backend == "ollama":
-        client = OllamaClient(model=args.model)
-    else:
-        client = OpenRouterClient(model=args.model)
-
+    client = OllamaClient(model=args.model) if args.backend == "ollama" else OpenRouterClient(model=args.model)
     verifier = CulturalVerifier(client)
     summary: list[dict[str, object]] = []
     details: list[dict[str, object]] = []
@@ -65,22 +60,44 @@ def main() -> None:
         print(f"[{index}/{len(rows)}] {case_id}", flush=True)
 
         candidate_results = {}
+        responses = {}
         for label in "abcd":
             response = row[f"response_{label}"]
+            responses[label] = response
             print(f"  candidate {label.upper()}", flush=True)
             candidate_results[label] = verifier.verify(prompt, response, args.target_context)
 
-        winner = max(
-            "abcd",
-            key=lambda label: (candidate_results[label].final_score, -"abcd".index(label)),
-        )
+        top_score = max(result.final_score for result in candidate_results.values())
+        tied = [label for label in "abcd" if abs(candidate_results[label].final_score - top_score) <= args.tie_epsilon]
+        tiebreak_reason = ""
+        if len(tied) == 1:
+            winner = tied[0]
+            tie_status = "none"
+        else:
+            print(f"  pointwise tie: {','.join(label.upper() for label in tied)} -> balanced comparative tiebreak", flush=True)
+            winner, tiebreak_reason = verifier.compare_tied(
+                prompt,
+                {label: responses[label] for label in tied},
+                {label: candidate_results[label] for label in tied},
+                args.target_context,
+            )
+            tie_status = "resolved" if winner else "abstained"
+            if winner:
+                print(f"  tiebreak winner: {winner.upper()}", flush=True)
+            else:
+                print("  tiebreak unresolved: verifier abstains", flush=True)
+
         human = (row.get("human_chosen") or "").strip().lower()
+        verifier_winner = winner or "tie"
+        correct = "" if not human or not winner else int(winner == human)
         summary.append({
             "set_id": row.get("set_id", case_id),
             "prompt_id": row.get("prompt_id", ""),
             "human_chosen": human,
-            "verifier_winner": winner,
-            "verifier_correct": int(bool(human) and winner == human),
+            "verifier_winner": verifier_winner,
+            "verifier_correct": correct,
+            "tie_status": tie_status,
+            "tie_candidates": "|".join(tied) if len(tied) > 1 else "",
             "score_a": candidate_results["a"].final_score,
             "score_b": candidate_results["b"].final_score,
             "score_c": candidate_results["c"].final_score,
@@ -93,12 +110,12 @@ def main() -> None:
             "target_context": args.target_context,
             "backend": args.backend,
             "model": client.model,
-            "verifier_winner": winner,
+            "verifier_winner": verifier_winner,
+            "tie_status": tie_status,
+            "tie_candidates": tied if len(tied) > 1 else [],
+            "tiebreak_reason": tiebreak_reason,
             "candidates": {
-                label: {
-                    "response": row[f"response_{label}"],
-                    **candidate_results[label].__dict__,
-                }
+                label: {"response": responses[label], **candidate_results[label].__dict__}
                 for label in "abcd"
             },
         })
@@ -106,7 +123,7 @@ def main() -> None:
     args.output_csv.parent.mkdir(parents=True, exist_ok=True)
     fields = [
         "set_id", "prompt_id", "human_chosen", "verifier_winner", "verifier_correct",
-        "score_a", "score_b", "score_c", "score_d",
+        "tie_status", "tie_candidates", "score_a", "score_b", "score_c", "score_d",
     ]
     with args.output_csv.open("w", encoding="utf-8-sig", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fields)
@@ -116,10 +133,19 @@ def main() -> None:
     details_path = args.output_csv.with_suffix(".details.json")
     details_path.write_text(json.dumps(details, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    labelled = [row for row in summary if row["human_chosen"]]
-    if labelled:
-        accuracy = sum(int(row["verifier_correct"]) for row in labelled) / len(labelled)
-        print(json.dumps({"n_labelled": len(labelled), "best_of_4_accuracy": accuracy}, indent=2))
+    labelled_decided = [r for r in summary if r["human_chosen"] and r["verifier_winner"] != "tie"]
+    labelled_total = [r for r in summary if r["human_chosen"]]
+    if labelled_total:
+        accuracy = (
+            sum(int(r["verifier_correct"]) for r in labelled_decided) / len(labelled_decided)
+            if labelled_decided else None
+        )
+        print(json.dumps({
+            "n_labelled": len(labelled_total),
+            "n_decided": len(labelled_decided),
+            "coverage": len(labelled_decided) / len(labelled_total),
+            "best_of_4_accuracy_on_decided": accuracy,
+        }, indent=2))
     print(f"Saved {args.output_csv}")
     print(f"Saved {details_path}")
 
