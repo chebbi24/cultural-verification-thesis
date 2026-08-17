@@ -14,7 +14,7 @@ import csv
 import json
 from pathlib import Path
 
-from verifier import CulturalVerifier, OpenRouterClient
+from verifier import CulturalVerifier, OllamaClient, OpenRouterClient
 
 
 def read_rows(path: Path) -> list[dict[str, str]]:
@@ -30,7 +30,17 @@ def main() -> None:
     parser.add_argument("input_csv", type=Path)
     parser.add_argument("output_csv", type=Path)
     parser.add_argument("--target-context", default="Germany")
-    parser.add_argument("--model", default=None, help="OpenRouter model slug; otherwise OPENROUTER_MODEL/default is used.")
+    parser.add_argument(
+        "--backend",
+        choices=("ollama", "openrouter"),
+        default="ollama",
+        help="Verifier backend. Default: ollama (local inference + Ollama web search).",
+    )
+    parser.add_argument(
+        "--model",
+        default=None,
+        help="Model name for the selected backend. Defaults: qwen3:4b for Ollama, openai/gpt-4.1-mini for OpenRouter.",
+    )
     parser.add_argument("--limit", type=int, default=0)
     args = parser.parse_args()
 
@@ -38,9 +48,16 @@ def main() -> None:
     if args.limit > 0:
         rows = rows[: args.limit]
 
-    verifier = CulturalVerifier(OpenRouterClient(model=args.model))
+    if args.backend == "ollama":
+        client = OllamaClient(model=args.model)
+    else:
+        client = OpenRouterClient(model=args.model)
+
+    verifier = CulturalVerifier(client)
     summary: list[dict[str, object]] = []
     details: list[dict[str, object]] = []
+
+    print(f"backend={args.backend} model={client.model}", flush=True)
 
     for index, row in enumerate(rows, 1):
         prompt = row["prompt"]
@@ -74,6 +91,8 @@ def main() -> None:
             "prompt_id": row.get("prompt_id", ""),
             "prompt": prompt,
             "target_context": args.target_context,
+            "backend": args.backend,
+            "model": client.model,
             "verifier_winner": winner,
             "candidates": {
                 label: {
