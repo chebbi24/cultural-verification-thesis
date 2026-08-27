@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 import tempfile
 import unittest
@@ -19,7 +20,10 @@ from cultural_dimensions import (
 )
 from verifier import (
     CulturalVerifier,
+    DIMENSION_PLAN_SCHEMA,
     DimensionApplicability,
+    OllamaClient,
+    StructuredOutputError,
     TargetCheck,
     VerificationTarget,
 )
@@ -30,15 +34,28 @@ class ScriptedClient:
 
     def __init__(self, outputs: list[dict[str, Any]]):
         self.outputs = list(outputs)
+        self.calls: list[dict[str, Any]] = []
 
     def json_call(
         self,
         *_args: Any,
         **_kwargs: Any,
     ) -> tuple[dict[str, Any], list[dict[str, str]]]:
+        self.calls.append(dict(_kwargs))
         if not self.outputs:
             raise AssertionError("ScriptedClient received an unexpected call")
         return self.outputs.pop(0), []
+
+
+class FakeHTTPResponse:
+    def __init__(self, content: str):
+        self.content = content
+
+    def raise_for_status(self) -> None:
+        return None
+
+    def json(self) -> dict[str, Any]:
+        return {"message": {"content": self.content}}
 
 
 def plan(dimension_id: str = "D03") -> list[DimensionApplicability]:
@@ -102,6 +119,66 @@ class CulturalDimensionTests(unittest.TestCase):
         )
         self.assertEqual([item.dimension_id for item in result], ["D05", "D03"])
         self.assertEqual(result[0].relevance, "primary")
+        self.assertEqual(client.calls[0]["response_schema"], DIMENSION_PLAN_SCHEMA)
+        self.assertEqual(client.calls[0]["schema_name"], "dimension_applicability_plan")
+
+    def test_ollama_enforces_schema_and_repairs_once(self) -> None:
+        invalid = json.dumps(
+            {
+                "primary_dimension_id": "D03",
+                "secondary_dimensions": [],
+                "reason": "Wrong top-level schema.",
+            }
+        )
+        valid = json.dumps(
+            {
+                "applicable_dimensions": [
+                    {
+                        "dimension_id": "D03",
+                        "relevance": "primary",
+                        "reason": "Social etiquette is central.",
+                    }
+                ]
+            }
+        )
+        client = OllamaClient(local_url="http://ollama.test/api/chat")
+        with mock.patch(
+            "verifier.requests.post",
+            side_effect=[FakeHTTPResponse(invalid), FakeHTTPResponse(valid)],
+        ) as post:
+            data, sources = client.json_call(
+                "Return JSON only.",
+                {"prompt": "Test"},
+                response_schema=DIMENSION_PLAN_SCHEMA,
+                schema_name="dimension_applicability_plan",
+            )
+
+        self.assertEqual(data["applicable_dimensions"][0]["dimension_id"], "D03")
+        self.assertEqual(sources, [])
+        self.assertEqual(post.call_count, 2)
+        first_payload = post.call_args_list[0].kwargs["json"]
+        second_payload = post.call_args_list[1].kwargs["json"]
+        self.assertEqual(first_payload["format"], DIMENSION_PLAN_SCHEMA)
+        self.assertIn("REPAIR ATTEMPT", second_payload["messages"][0]["content"])
+
+    def test_ollama_aborts_after_one_invalid_schema_retry(self) -> None:
+        invalid = json.dumps({"primary_dimension_id": "D03"})
+        client = OllamaClient(local_url="http://ollama.test/api/chat")
+        with mock.patch(
+            "verifier.requests.post",
+            side_effect=[FakeHTTPResponse(invalid), FakeHTTPResponse(invalid)],
+        ) as post:
+            with self.assertRaisesRegex(
+                StructuredOutputError,
+                "dimension_applicability_plan remained invalid after one repair retry",
+            ):
+                client.json_call(
+                    "Return JSON only.",
+                    {"prompt": "Test"},
+                    response_schema=DIMENSION_PLAN_SCHEMA,
+                    schema_name="dimension_applicability_plan",
+                )
+        self.assertEqual(post.call_count, 2)
 
     def test_not_enough_evidence_is_not_a_contradiction_or_score_cap(self) -> None:
         client = ScriptedClient(
