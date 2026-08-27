@@ -51,7 +51,13 @@ Local Ollama backend:
 ```bash
 ollama pull qwen3:4b
 export OLLAMA_API_KEY="..."  # required by the current Ollama web-search adapter
+python src/check_verifier_setup.py --model qwen3:4b --require-web-search
 ```
+
+Every Ollama judge call now receives an enforced JSON Schema rather than only a
+prompt example. If a local model returns valid JSON with the wrong fields, the
+verifier makes one repair attempt and then fails explicitly. It never invents
+missing dimensions, evidence verdicts, or scores.
 
 Optional OpenRouter backend:
 
@@ -101,6 +107,9 @@ Outputs:
 ```bash
 python -m unittest discover -s tests -v
 python -m compileall -q src tests
+
+# Optional: real local-Qwen structured-output smoke test (no web search)
+RUN_OLLAMA_INTEGRATION=1 python -m unittest tests.test_ollama_integration -v
 ```
 
 ## Independent reward-model baseline
