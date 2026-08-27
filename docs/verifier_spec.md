@@ -40,6 +40,12 @@ For one candidate:
 
 `domain_id` is optional outside the benchmark. When provided from frozen benchmark metadata, it is authoritative and becomes the primary applicable dimension.
 
+## Structured-output contract and repair policy
+
+Every local Ollama and optional OpenRouter judge call receives an actual JSON Schema for its stage: dimension planning, evidence-target planning, evidence verdicts, dimension scoring, or tie-breaking. The client validates the returned object locally as well.
+
+If a model returns syntactically valid JSON with the wrong keys or types, the client issues one repair request containing the validation error and required schema. A second invalid response is an explicit operational failure. The verifier never maps alternative field names, fills in omitted values, or converts malformed model output into a score.
+
 ## Stage 1 - Prompt-only applicability planning
 
 The verifier selects exactly one primary and at most two secondary dimensions using only the prompt, target context, and optional declared `domain_id`.
