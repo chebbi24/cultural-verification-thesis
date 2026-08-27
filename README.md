@@ -2,66 +2,106 @@
 
 ## Primary research comparison
 
-The proposed cultural verifier is evaluated **independently** against reward-model baselines. Reward-model scores are never inputs to the verifier.
+The proposed cultural verifier is evaluated **independently** against reward-model and CARB baselines on the same Best-of-4 candidate sets. Reward-model scores are never inputs to the verifier, and the hybrid is not part of the primary research claim.
 
-### Standalone verifier pipeline
+## Standalone verifier pipeline
 
-`prompt + candidate response + target context`
-→ atomic verifiable claim extraction
-→ OpenRouter `openrouter:web_search` evidence search
-→ claim verification
-→ cultural rubric
-→ equal-weight verifier score
-→ Best-of-4 winner
+```text
+prompt + optional frozen domain_id
+-> prompt-only D01-D10 applicability plan
+-> candidate response
+-> decision-relevant evidence targets linked to active dimensions
+-> web evidence and claim verdicts
+-> applicable cultural-dimension scores
+-> confidence / abstention / severe hard-fail check
+-> standalone verifier score and Best-of-4 winner
+```
 
-The five equal-weight dimensions are:
+The verifier and benchmark now share one literature-derived ontology:
 
-1. evidence grounding
-2. contextual appropriateness
-3. non-essentialism
-4. variation and uncertainty
-5. actionable helpfulness
+1. D01 Everyday life and material culture
+2. D02 Language, discourse and pragmatics
+3. D03 Social etiquette and interpersonal norms
+4. D04 Values, ethics and moral pluralism
+5. D05 Law, policy and institutional rules
+6. D06 Religion, ritual and taboo
+7. D07 Family, kinship, gender and generations
+8. D08 Work, education and civic participation
+9. D09 Cultural heritage, history, arts and collective memory
+10. D10 Identity, diversity and intergroup relations
 
-Hard failures are logged for interpretability but do not receive an additional hidden numeric penalty.
+Every prompt receives one primary and at most two secondary dimensions. Each applicable dimension is scored `0`, `1`, or `2`; irrelevant dimensions are explicitly `N/A`. The final score is the equal-weight normalized mean over applicable, scorable dimensions:
+
+```text
+VerifierScore = sum(applicable dimension scores) / (2 * number scored)
+```
+
+Evidence is a basis for the affected dimension scores, not an additional arbitrary percentage. A directly contradicted linked claim caps that dimension at `1`. `not_enough_evidence` is not contradiction. If no applicable dimension can be assessed, the verifier abstains. A severe non-compensatory hard failure forces the final score to `0`.
+
+The complete rubric, scoring anchors, CARB mappings, and literature source families are stored in `data/csv/cultural_dimension_rubric.csv`.
 
 ## Setup
 
 ```bash
-cd src
-pip install -r requirements.txt
+python -m pip install -r src/requirements.txt
+```
+
+Local Ollama backend:
+
+```bash
+ollama pull qwen3:4b
+export OLLAMA_API_KEY="..."  # required by the current Ollama web-search adapter
+```
+
+Optional OpenRouter backend:
+
+```bash
 export OPENROUTER_API_KEY="..."
-# Optional; defaults to openai/gpt-4.1-mini
 export OPENROUTER_MODEL="openai/gpt-4.1-mini"
 ```
 
-## Quick smoke test: one or more prompt/response rows
+## Single-response smoke test
 
-Input CSV columns: `prompt,response` (optional `prompt_id`).
+Input CSV requires `prompt,response`; `prompt_id` and `domain_id` are optional.
 
 ```bash
-python src/run_verifier.py data/test.csv data/outputs/test_verifier.json --limit 1
+python src/run_verifier.py \
+  data/test.csv \
+  data/outputs/test_verifier.json \
+  --backend ollama \
+  --limit 1
 ```
 
 ## Main Best-of-4 verifier experiment
 
 Input columns:
 
-`set_id,prompt_id,prompt,response_a,response_b,response_c,response_d,human_chosen`
+```text
+set_id,prompt_id,domain_id,prompt,response_a,response_b,response_c,response_d,human_chosen
+```
 
-`human_chosen` is optional while developing. It is read **only after** the four candidates have been scored.
+`domain_id` and `human_chosen` are optional during development. Human labels are read only after all candidates are scored.
 
 ```bash
 python src/evaluate_best_of4.py \
   data/best_of4.csv \
   data/outputs/verifier_best_of4.csv \
+  --backend ollama \
   --target-context Germany \
   --limit 1
 ```
 
 Outputs:
 
-- `verifier_best_of4.csv`: winner and candidate scores
-- `verifier_best_of4.details.json`: claims, web evidence, verdicts, dimension scores and hard-failure diagnostics
+- `verifier_best_of4.csv`: winner, candidate scores, tie and abstention status
+- `verifier_best_of4.details.json`: applicable dimensions, all ten score records, evidence targets, sources, verdicts, confidence and hard-failure diagnostics
+
+## Tests
+
+```bash
+python -m unittest discover -s tests -v
+python -m compileall -q src tests
+```
 
 ## Independent reward-model baseline
 
@@ -72,4 +112,4 @@ python src/baseline_rm.py \
   --limit 1
 ```
 
-Compare `best_of_4_accuracy` from the standalone verifier and RM on the same labelled candidate sets. The hybrid approach is intentionally not part of the primary experiment.
+Compare human-winner selection accuracy, confidence intervals, per-dimension performance, and abstention coverage on the same frozen candidate sets.

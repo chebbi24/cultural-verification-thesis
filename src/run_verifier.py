@@ -10,7 +10,7 @@ import csv
 import json
 from pathlib import Path
 
-from verifier import CulturalVerifier, OpenRouterClient
+from verifier import CulturalVerifier, OllamaClient, OpenRouterClient
 
 
 def read_rows(path: Path) -> list[dict[str, str]]:
@@ -26,6 +26,7 @@ def main() -> None:
     parser.add_argument("input_csv", type=Path)
     parser.add_argument("output_json", type=Path)
     parser.add_argument("--target-context", default="Germany")
+    parser.add_argument("--backend", choices=("ollama", "openrouter"), default="ollama")
     parser.add_argument("--model", default=None)
     parser.add_argument("--limit", type=int, default=0)
     args = parser.parse_args()
@@ -34,18 +35,40 @@ def main() -> None:
     if args.limit > 0:
         rows = rows[: args.limit]
 
-    verifier = CulturalVerifier(OpenRouterClient(model=args.model))
+    client = (
+        OllamaClient(model=args.model)
+        if args.backend == "ollama"
+        else OpenRouterClient(model=args.model)
+    )
+    verifier = CulturalVerifier(client)
     results = []
     for index, row in enumerate(rows, 1):
         if "prompt" not in row or "response" not in row:
-            raise ValueError("Input CSV must contain columns named 'prompt' and 'response'. Use evaluate_best_of4.py for response_a..response_d files.")
+            raise ValueError(
+                "Input CSV must contain columns named 'prompt' and 'response'. Use evaluate_best_of4.py for response_a..response_d files."
+            )
         case_id = row.get("prompt_id") or row.get("case_id") or f"row_{index}"
+        domain_id = (row.get("domain_id") or "").strip().upper()
         print(f"[{index}/{len(rows)}] verifying {case_id}", flush=True)
-        result = verifier.verify(row["prompt"], row["response"], args.target_context)
-        results.append({"case_id": case_id, "prompt": row["prompt"], "response": row["response"], **result.__dict__})
+        result = verifier.verify(
+            row["prompt"],
+            row["response"],
+            args.target_context,
+            declared_domain_id=domain_id or None,
+        )
+        results.append(
+            {
+                "case_id": case_id,
+                "prompt": row["prompt"],
+                "response": row["response"],
+                **result.__dict__,
+            }
+        )
 
     args.output_json.parent.mkdir(parents=True, exist_ok=True)
-    args.output_json.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
+    args.output_json.write_text(
+        json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     print(f"Saved {args.output_json}")
 
 
