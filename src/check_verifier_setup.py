@@ -1,4 +1,4 @@
-"""Fail-fast setup checks for the local Ollama cultural-verifier backend."""
+"""Fail-fast setup checks for supported cultural-verifier backends."""
 
 from __future__ import annotations
 
@@ -8,18 +8,50 @@ import sys
 
 import requests
 
-from verifier import DEFAULT_OLLAMA_MODEL, OLLAMA_LOCAL_CHAT_URL
+from verifier import (
+    DEFAULT_OLLAMA_MODEL,
+    DEFAULT_OPENROUTER_MODEL,
+    OLLAMA_LOCAL_CHAT_URL,
+)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default=DEFAULT_OLLAMA_MODEL)
+    parser.add_argument("--backend", choices=("ollama", "openrouter"), default="ollama")
+    parser.add_argument("--model", default=None)
     parser.add_argument(
         "--require-web-search",
         action="store_true",
-        help="Require OLLAMA_API_KEY, which the full evidence-grounded verifier needs.",
+        help="For the Ollama backend, require OLLAMA_API_KEY for hosted web search.",
     )
     args = parser.parse_args()
+
+    if args.backend == "openrouter":
+        model = args.model or DEFAULT_OPENROUTER_MODEL
+        api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+        if not api_key:
+            print("FAIL OPENROUTER_API_KEY is missing.")
+            print('Run: export OPENROUTER_API_KEY="..."')
+            sys.exit(1)
+        try:
+            response = requests.get(
+                "https://openrouter.ai/api/v1/key",
+                headers={"Authorization": f"Bearer {api_key}"},
+                timeout=20,
+            )
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            print(f"FAIL OpenRouter API-key validation: {exc}")
+            sys.exit(1)
+        key_data = response.json().get("data") or {}
+        remaining = key_data.get("limit_remaining")
+        remaining_text = "unknown" if remaining is None else str(remaining)
+        print(f"OK OpenRouter API key accepted; remaining limit: {remaining_text}")
+        print(f"OK OpenRouter model: {model}")
+        print("OK OpenRouter web retrieval uses the web plugin when evidence is required")
+        return
+
+    model = args.model or DEFAULT_OLLAMA_MODEL
 
     tags_url = OLLAMA_LOCAL_CHAT_URL.rsplit("/api/chat", 1)[0] + "/api/tags"
     try:
@@ -27,7 +59,7 @@ def main() -> None:
         response.raise_for_status()
     except requests.RequestException as exc:
         print(f"FAIL local Ollama server: {exc}")
-        print("Start Ollama, then run: ollama pull " + args.model)
+        print("Start Ollama, then run: ollama pull " + model)
         sys.exit(1)
 
     installed = {
@@ -35,11 +67,11 @@ def main() -> None:
         for item in response.json().get("models", [])
         if isinstance(item, dict)
     }
-    if args.model not in installed:
-        print(f"FAIL local model missing: {args.model}")
-        print(f"Run: ollama pull {args.model}")
+    if model not in installed:
+        print(f"FAIL local model missing: {model}")
+        print(f"Run: ollama pull {model}")
         sys.exit(1)
-    print(f"OK local Ollama server and model: {args.model}")
+    print(f"OK local Ollama server and model: {model}")
 
     has_web_key = bool(os.getenv("OLLAMA_API_KEY"))
     if has_web_key:
