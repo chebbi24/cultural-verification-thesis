@@ -15,7 +15,12 @@ import csv
 import json
 from pathlib import Path
 
-from verifier import CulturalVerifier, OllamaClient, OpenRouterClient
+from verifier import (
+    CulturalVerifier,
+    OllamaClient,
+    OpenRouterClient,
+    RetrievalRoutedClient,
+)
 
 
 def read_rows(path: Path) -> list[dict[str, str]]:
@@ -33,6 +38,13 @@ def main() -> None:
     parser.add_argument("--target-context", default="Germany")
     parser.add_argument("--backend", choices=("ollama", "openrouter"), default="ollama")
     parser.add_argument("--model", default=None)
+    parser.add_argument(
+        "--search-provider",
+        choices=("same", "openrouter"),
+        default="same",
+        help="Use the judge backend for evidence calls or route only evidence calls through OpenRouter.",
+    )
+    parser.add_argument("--search-model", default=None)
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument(
         "--tie-epsilon",
@@ -46,16 +58,32 @@ def main() -> None:
     if args.limit > 0:
         rows = rows[: args.limit]
 
-    client = (
+    judge_client = (
         OllamaClient(model=args.model)
         if args.backend == "ollama"
         else OpenRouterClient(model=args.model)
+    )
+    client = (
+        RetrievalRoutedClient(
+            judge_client,
+            OpenRouterClient(model=args.search_model),
+        )
+        if args.search_provider == "openrouter" and args.backend != "openrouter"
+        else judge_client
     )
     verifier = CulturalVerifier(client)
     summary: list[dict[str, object]] = []
     details: list[dict[str, object]] = []
 
-    print(f"backend={args.backend} model={client.model}", flush=True)
+    retrieval_label = (
+        f"openrouter/{client.retrieval_model}"
+        if isinstance(client, RetrievalRoutedClient)
+        else f"same/{client.model}"
+    )
+    print(
+        f"backend={args.backend} model={client.model} retrieval={retrieval_label}",
+        flush=True,
+    )
 
     for index, row in enumerate(rows, 1):
         prompt = row["prompt"]
@@ -177,6 +205,8 @@ def main() -> None:
                 "target_context": args.target_context,
                 "backend": args.backend,
                 "model": client.model,
+                "search_provider": args.search_provider,
+                "search_model": getattr(client, "retrieval_model", client.model),
                 "applicable_dimensions": [
                     item.__dict__ for item in applicable_dimensions
                 ],
