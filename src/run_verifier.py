@@ -15,6 +15,7 @@ from verifier import (
     OllamaClient,
     OpenRouterClient,
     RetrievalRoutedClient,
+    TavilyGroundedClient,
 )
 
 
@@ -34,9 +35,14 @@ def main() -> None:
     parser.add_argument("--backend", choices=("ollama", "openrouter"), default="ollama")
     parser.add_argument("--model", default=None)
     parser.add_argument(
-        "--search-provider", choices=("same", "openrouter"), default="same"
+        "--search-provider",
+        choices=("same", "tavily", "openrouter"),
+        default="tavily",
     )
     parser.add_argument("--search-model", default=None)
+    parser.add_argument(
+        "--search-depth", choices=("basic", "advanced"), default=None
+    )
     parser.add_argument("--limit", type=int, default=0)
     args = parser.parse_args()
 
@@ -49,11 +55,17 @@ def main() -> None:
         if args.backend == "ollama"
         else OpenRouterClient(model=args.model)
     )
-    client = (
-        RetrievalRoutedClient(judge_client, OpenRouterClient(model=args.search_model))
-        if args.search_provider == "openrouter" and args.backend != "openrouter"
-        else judge_client
-    )
+    if args.search_provider == "tavily":
+        client = TavilyGroundedClient(
+            judge_client,
+            search_depth=args.search_depth,
+        )
+    elif args.search_provider == "openrouter" and args.backend != "openrouter":
+        client = RetrievalRoutedClient(
+            judge_client, OpenRouterClient(model=args.search_model)
+        )
+    else:
+        client = judge_client
     verifier = CulturalVerifier(client)
     results = []
     for index, row in enumerate(rows, 1):
@@ -75,6 +87,19 @@ def main() -> None:
                 "case_id": case_id,
                 "prompt": row["prompt"],
                 "response": row["response"],
+                "backend": args.backend,
+                "judge_model": client.model,
+                "search_provider": args.search_provider,
+                "retrieval_system": getattr(
+                    client, "retrieval_system", args.search_provider
+                ),
+                "retrieval_model": getattr(
+                    client, "retrieval_model", client.model
+                ),
+                "retrieval_model_disclosure": getattr(
+                    client, "retrieval_model_disclosure", None
+                ),
+                "search_depth": getattr(client, "search_depth", None),
                 **result.__dict__,
             }
         )
