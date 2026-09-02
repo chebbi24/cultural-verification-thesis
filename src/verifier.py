@@ -29,9 +29,11 @@ from hard_failures import HARD_FAILURE_CODES, hard_failure_records
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 OLLAMA_LOCAL_CHAT_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/chat")
 OLLAMA_WEB_SEARCH_URL = "https://ollama.com/api/web_search"
+TAVILY_SEARCH_URL = "https://api.tavily.com/search"
 DEFAULT_OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-4.1-mini")
 DEFAULT_OPENROUTER_WEB_ENGINE = os.getenv("OPENROUTER_WEB_ENGINE", "exa")
 DEFAULT_OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:4b")
+DEFAULT_TAVILY_SEARCH_DEPTH = os.getenv("TAVILY_SEARCH_DEPTH", "basic")
 
 VERDICTS = {"supported", "contradicted", "mixed", "not_enough_evidence"}
 EVIDENCE_TYPES = {
@@ -303,6 +305,117 @@ class RetrievalRoutedClient:
             response_schema=response_schema,
             schema_name=schema_name,
         )
+
+
+class TavilyGroundedClient:
+    """Retrieve evidence with Tavily, then judge it with the configured LLM.
+
+    Tavily is a search and ranking service, not the verifier's judging model.
+    Its public documentation describes proprietary AI for ranking but does not
+    expose a versioned model identifier. The delegated judge therefore remains
+    explicit in all model-facing calls and experimental metadata.
+    """
+
+    provider = "tavily"
+    retrieval_system = "Tavily Search API"
+    retrieval_model_disclosure = (
+        "Proprietary AI ranking; Tavily does not publish a named model identifier."
+    )
+
+    def __init__(
+        self,
+        judge_client: JSONClient,
+        api_key: str | None = None,
+        search_depth: str | None = None,
+    ):
+        self.judge_client = judge_client
+        self.api_key = (api_key or os.getenv("TAVILY_API_KEY", "")).strip()
+        if not self.api_key:
+            raise RuntimeError(
+                "TAVILY_API_KEY is required when --search-provider tavily."
+            )
+        self.search_depth = search_depth or DEFAULT_TAVILY_SEARCH_DEPTH
+        if self.search_depth not in {"basic", "advanced"}:
+            raise ValueError("Tavily search depth must be 'basic' or 'advanced'.")
+        self.model = judge_client.model
+        self.retrieval_model = (
+            f"Tavily Search API/proprietary-ranking/{self.search_depth}"
+        )
+
+    def _web_search(self, query: str, max_results: int) -> list[dict[str, str]]:
+        response = requests.post(
+            TAVILY_SEARCH_URL,
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "query": query,
+                "topic": "general",
+                "search_depth": self.search_depth,
+                "max_results": max_results,
+                "include_answer": False,
+                "include_raw_content": False,
+                "include_images": False,
+            },
+            timeout=45,
+        )
+        response.raise_for_status()
+        clean: list[dict[str, str]] = []
+        for item in response.json().get("results") or []:
+            if isinstance(item, dict) and item.get("url"):
+                clean.append(
+                    {
+                        "url": str(item.get("url", "")).strip(),
+                        "title": str(item.get("title", "")).strip(),
+                        "content": str(item.get("content", "")).strip()[:2500],
+                        "relevance_score": str(item.get("score", "")).strip(),
+                    }
+                )
+        return clean
+
+    def json_call(
+        self,
+        system: str,
+        user_payload: dict[str, Any],
+        *,
+        web_search: bool = False,
+        search_queries: list[str] | None = None,
+        max_results: int = 5,
+        response_schema: JsonSchema | None = None,
+        schema_name: str = "verifier_response",
+    ) -> tuple[dict[str, Any], list[dict[str, str]]]:
+        if not web_search:
+            return self.judge_client.json_call(
+                system,
+                user_payload,
+                response_schema=response_schema,
+                schema_name=schema_name,
+            )
+
+        queries = [q.strip() for q in (search_queries or []) if q.strip()]
+        if not queries:
+            queries = [json.dumps(user_payload, ensure_ascii=False)[:800]]
+        sources: list[dict[str, str]] = []
+        for query in queries[:2]:
+            sources.extend(self._web_search(query, max_results))
+        sources = _dedupe_sources(sources)
+
+        grounded_payload = dict(user_payload)
+        grounded_payload["retrieved_web_evidence"] = sources
+        grounded_system = (
+            system
+            + " Use only retrieved_web_evidence for external factual support. "
+            "Cite the supplied source URLs in the reason and do not invent sources. "
+            "If the evidence is inadequate, return not_enough_evidence."
+        )
+        data, _ = self.judge_client.json_call(
+            grounded_system,
+            grounded_payload,
+            response_schema=response_schema,
+            schema_name=schema_name,
+        )
+        return data, sources
 
 
 def _extract_json(text: str) -> dict[str, Any]:
