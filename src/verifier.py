@@ -30,6 +30,7 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 OLLAMA_LOCAL_CHAT_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/chat")
 OLLAMA_WEB_SEARCH_URL = "https://ollama.com/api/web_search"
 DEFAULT_OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-4.1-mini")
+DEFAULT_OPENROUTER_WEB_ENGINE = os.getenv("OPENROUTER_WEB_ENGINE", "exa")
 DEFAULT_OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:4b")
 
 VERDICTS = {"supported", "contradicted", "mixed", "not_enough_evidence"}
@@ -348,13 +349,19 @@ def _malformed(stage: str, data: dict[str, Any], detail: str) -> RuntimeError:
 
 
 class OpenRouterClient:
-    def __init__(self, api_key: str | None = None, model: str | None = None):
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str | None = None,
+        web_engine: str | None = None,
+    ):
         self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
         if not self.api_key:
             raise RuntimeError(
                 "Set OPENROUTER_API_KEY before using --backend openrouter."
             )
         self.model = model or DEFAULT_OPENROUTER_MODEL
+        self.web_engine = web_engine or DEFAULT_OPENROUTER_WEB_ENGINE
 
     @staticmethod
     def _sources_from_annotations(message: dict[str, Any]) -> list[dict[str, str]]:
@@ -424,14 +431,11 @@ class OpenRouterClient:
             if response_schema is not None:
                 payload["provider"] = {"require_parameters": True}
             if web_search:
-                payload["tools"] = [
+                payload["plugins"] = [
                     {
-                        "type": "openrouter:web_search",
-                        "parameters": {
-                            "max_results": max_results,
-                            "max_total_results": max(8, max_results),
-                            "search_context_size": "medium",
-                        },
+                        "id": "web",
+                        "engine": self.web_engine,
+                        "max_results": max_results,
                     }
                 ]
 
