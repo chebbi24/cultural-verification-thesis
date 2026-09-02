@@ -26,6 +26,7 @@ from verifier import (
     OpenRouterClient,
     RetrievalRoutedClient,
     StructuredOutputError,
+    TavilyGroundedClient,
     TargetCheck,
     VerificationTarget,
 )
@@ -69,6 +70,17 @@ class FakeHTTPResponse:
                 }
             ],
         }
+
+
+class FakeJSONResponse:
+    def __init__(self, payload: dict[str, Any]):
+        self.payload = payload
+
+    def raise_for_status(self) -> None:
+        return None
+
+    def json(self) -> dict[str, Any]:
+        return self.payload
 
 
 def plan(dimension_id: str = "D03") -> list[DimensionApplicability]:
@@ -260,8 +272,69 @@ class CulturalDimensionTests(unittest.TestCase):
         self.assertEqual(retrieval_data["stage"], "retrieval")
         self.assertEqual(len(judge.calls), 1)
         self.assertEqual(len(retrieval.calls), 1)
-        self.assertFalse(judge.calls[0]["web_search"])
+        self.assertFalse(judge.calls[0].get("web_search", False))
         self.assertTrue(retrieval.calls[0]["web_search"])
+
+    def test_tavily_retrieves_sources_and_keeps_verdict_judging_local(self) -> None:
+        judge = ScriptedClient(
+            [
+                {
+                    "verdict": "supported",
+                    "confidence": 0.9,
+                    "reason": "The supplied source supports the proposition.",
+                }
+            ]
+        )
+        judge.model = "qwen3:4b"
+        client = TavilyGroundedClient(
+            judge,
+            api_key="tvly-test",
+            search_depth="basic",
+        )
+        response = FakeJSONResponse(
+            {
+                "results": [
+                    {
+                        "url": "https://example.org/germany",
+                        "title": "German guidance",
+                        "content": "Relevant evidence.",
+                        "score": 0.91,
+                    }
+                ]
+            }
+        )
+        with mock.patch("verifier.requests.post", return_value=response) as post:
+            data, sources = client.json_call(
+                "Return JSON only.",
+                {"proposition": "Test"},
+                web_search=True,
+                search_queries=["Germany test evidence"],
+                max_results=3,
+                response_schema={
+                    "type": "object",
+                    "properties": {
+                        "verdict": {"type": "string"},
+                        "confidence": {"type": "number"},
+                        "reason": {"type": "string"},
+                    },
+                    "required": ["verdict", "confidence", "reason"],
+                    "additionalProperties": False,
+                },
+                schema_name="evidence_verdict",
+            )
+
+        self.assertEqual(post.call_args.args[0], "https://api.tavily.com/search")
+        payload = post.call_args.kwargs["json"]
+        self.assertEqual(payload["search_depth"], "basic")
+        self.assertFalse(payload["include_answer"])
+        self.assertEqual(data["verdict"], "supported")
+        self.assertEqual(sources[0]["url"], "https://example.org/germany")
+        self.assertEqual(len(judge.calls), 1)
+        self.assertFalse(judge.calls[0].get("web_search", False))
+        self.assertEqual(
+            judge.calls[0]["response_schema"]["required"],
+            ["verdict", "confidence", "reason"],
+        )
 
     def test_not_enough_evidence_is_not_a_contradiction_or_score_cap(self) -> None:
         client = ScriptedClient(
@@ -458,6 +531,8 @@ class CulturalDimensionTests(unittest.TestCase):
                 str(output_path),
                 "--backend",
                 "ollama",
+                "--search-provider",
+                "same",
             ]
             with (
                 mock.patch.object(evaluate_best_of4, "OllamaClient", FakeBackend),
@@ -510,7 +585,13 @@ class CulturalDimensionTests(unittest.TestCase):
                 "S1,Prompt,A,B,C,D\n",
                 encoding="utf-8",
             )
-            argv = ["evaluate_best_of4.py", str(input_path), str(output_path)]
+            argv = [
+                "evaluate_best_of4.py",
+                str(input_path),
+                str(output_path),
+                "--search-provider",
+                "same",
+            ]
             with (
                 mock.patch.object(evaluate_best_of4, "OllamaClient", FakeBackend),
                 mock.patch.object(evaluate_best_of4, "CulturalVerifier", FakeVerifier),
