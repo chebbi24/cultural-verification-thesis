@@ -87,14 +87,23 @@ def main() -> None:
             for label, result in candidate_results.items()
             if result.final_score is not None
             and not result.abstained
-            and not result.hard_fail
+            and getattr(result, "eligible", not result.hard_fail)
         }
         tied: list[str] = []
         tiebreak_reason = ""
         if not decided:
             winner = None
             tie_status = "abstained"
-            tiebreak_reason = "All four candidates abstained."
+            ineligible = [
+                label
+                for label, result in candidate_results.items()
+                if not getattr(result, "eligible", not result.hard_fail)
+            ]
+            tiebreak_reason = (
+                "All candidates were ineligible due to hard failures."
+                if len(ineligible) == len(candidate_results)
+                else "No eligible candidate could be scored; verifier abstains."
+            )
         else:
             top_score = max(float(result.final_score) for result in decided.values())
             tied = [
@@ -144,6 +153,15 @@ def main() -> None:
                 "hard_fail_candidates": "|".join(
                     label for label in "abcd" if candidate_results[label].hard_fail
                 ),
+                "ineligible_candidates": "|".join(
+                    label
+                    for label in "abcd"
+                    if not getattr(
+                        candidate_results[label],
+                        "eligible",
+                        not candidate_results[label].hard_fail,
+                    )
+                ),
                 "score_a": candidate_results["a"].final_score,
                 "score_b": candidate_results["b"].final_score,
                 "score_c": candidate_results["c"].final_score,
@@ -188,6 +206,7 @@ def main() -> None:
         "tie_candidates",
         "abstained_candidates",
         "hard_fail_candidates",
+        "ineligible_candidates",
         "score_a",
         "score_b",
         "score_c",
