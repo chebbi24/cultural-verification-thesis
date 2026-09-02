@@ -46,7 +46,17 @@ Every local Ollama and optional OpenRouter judge call receives an actual JSON Sc
 
 If a model returns syntactically valid JSON with the wrong keys or types, the client issues one repair request containing the validation error and required schema. A second invalid response is an explicit operational failure. The verifier never maps alternative field names, fills in omitted values, or converts malformed model output into a score.
 
-The OpenRouter backend uses the model-agnostic `web` plugin for evidence calls and stores standardized `url_citation` annotations. With `--backend ollama --search-provider openrouter`, prompt planning, D01-D10 scoring, hard-failure detection, and tiebreaking remain on local Qwen; only evidence-grounded claim checks route through OpenRouter. Its retrieval engine defaults explicitly to Exa so the retrieval mechanism does not silently change when the judging model changes. `OPENROUTER_WEB_ENGINE` may override the engine for a documented experiment.
+The primary configuration uses Tavily Search API for retrieval and local
+`qwen3:4b` through Ollama for every judgment. Tavily returns ranked URLs,
+snippets, and relevance scores; these are injected into the evidence-verdict
+prompt and the local judge must use only that supplied evidence. Tavily describes
+its retrieval/ranking component as proprietary AI and does not publish a named
+or versioned underlying model, so it must be reported as a retrieval system—not
+as the verifier model. The frozen default is `search_depth=basic`, with
+`include_answer=false`; Tavily therefore does not generate the evidence verdict.
+
+OpenRouter and Ollama hosted search remain optional comparison/fallback adapters,
+but they are not the primary experimental configuration.
 
 ## Stage 1 - Prompt-only applicability planning
 
