@@ -247,8 +247,9 @@ class CulturalDimensionTests(unittest.TestCase):
                     },
                     "hard_failures": [
                         {
-                            "category": "severe_discrimination_or_dehumanization",
+                            "category": "HF1",
                             "reason": "The response directly endorses exclusion of a protected group.",
+                            "response_span": "Response",
                         }
                     ],
                 },
@@ -260,7 +261,31 @@ class CulturalDimensionTests(unittest.TestCase):
             applicable_dimensions=plan("D10"),
         )
         self.assertTrue(result.hard_fail)
+        self.assertFalse(result.eligible)
         self.assertEqual(result.final_score, 0.0)
+
+    def test_hard_failure_requires_quoted_response_span(self) -> None:
+        client = ScriptedClient(
+            [
+                {"targets": []},
+                {
+                    "dimension_scores": {
+                        "D10": {"score": 2, "confidence": 0.9, "reason": "Nominal."}
+                    },
+                    "hard_failures": [
+                        {
+                            "category": "HF1",
+                            "reason": "Unsupported quote.",
+                            "response_span": "Not present in the response",
+                        }
+                    ],
+                },
+            ]
+        )
+        with self.assertRaisesRegex(RuntimeError, "response_span"):
+            CulturalVerifier(client).verify(
+                "Prompt", "Response", applicable_dimensions=plan("D10")
+            )
 
     def test_all_null_applicable_scores_produce_abstention(self) -> None:
         client = ScriptedClient(
@@ -370,6 +395,51 @@ class CulturalDimensionTests(unittest.TestCase):
                 encoding="utf-8"
             )
             self.assertIn('"dimension_id": "D03"', details)
+
+    def test_best_of_four_abstains_when_all_candidates_are_ineligible(self) -> None:
+        class FakeBackend:
+            model = "fake-backend"
+
+            def __init__(self, model: str | None = None):
+                if model:
+                    self.model = model
+
+        class FakeVerifier:
+            def __init__(self, _client: Any):
+                pass
+
+            def plan_dimensions(self, *_args: Any) -> list[DimensionApplicability]:
+                return plan("D10")
+
+            def verify(self, *_args: Any, **_kwargs: Any) -> Any:
+                return SimpleNamespace(
+                    final_score=0.0, abstained=False, hard_fail=True, eligible=False
+                )
+
+            def compare_candidates(self, *_args: Any, **_kwargs: Any) -> Any:
+                raise AssertionError("Ineligible candidates must not enter a tiebreak")
+
+        with tempfile.TemporaryDirectory() as directory:
+            input_path = Path(directory) / "best_of4.csv"
+            output_path = Path(directory) / "results.csv"
+            input_path.write_text(
+                "set_id,prompt,response_a,response_b,response_c,response_d\n"
+                "S1,Prompt,A,B,C,D\n",
+                encoding="utf-8",
+            )
+            argv = ["evaluate_best_of4.py", str(input_path), str(output_path)]
+            with (
+                mock.patch.object(evaluate_best_of4, "OllamaClient", FakeBackend),
+                mock.patch.object(evaluate_best_of4, "CulturalVerifier", FakeVerifier),
+                mock.patch.object(sys, "argv", argv),
+            ):
+                evaluate_best_of4.main()
+
+            summary = output_path.read_text(encoding="utf-8-sig")
+            self.assertIn("tie,", summary)
+            self.assertIn("a|b|c|d", summary)
+            details = output_path.with_suffix(".details.json").read_text(encoding="utf-8")
+            self.assertIn("All candidates were ineligible", details)
 
 
 if __name__ == "__main__":
