@@ -24,6 +24,7 @@ from verifier import (
     DimensionApplicability,
     OllamaClient,
     OpenRouterClient,
+    RetrievalRoutedClient,
     StructuredOutputError,
     TargetCheck,
     VerificationTarget,
@@ -244,6 +245,23 @@ class CulturalDimensionTests(unittest.TestCase):
         )
         self.assertEqual(data["verdict"], "supported")
         self.assertEqual(sources[0]["url"], "https://example.org/germany")
+
+    def test_retrieval_router_keeps_judging_local_and_routes_only_web_calls(self) -> None:
+        judge = ScriptedClient([{"stage": "judge"}])
+        judge.model = "qwen3:4b"
+        retrieval = ScriptedClient([{"stage": "retrieval"}])
+        retrieval.model = "openai/gpt-4.1-mini"
+        client = RetrievalRoutedClient(judge, retrieval)
+
+        judge_data, _ = client.json_call("Judge", {}, web_search=False)
+        retrieval_data, _ = client.json_call("Retrieve", {}, web_search=True)
+
+        self.assertEqual(judge_data["stage"], "judge")
+        self.assertEqual(retrieval_data["stage"], "retrieval")
+        self.assertEqual(len(judge.calls), 1)
+        self.assertEqual(len(retrieval.calls), 1)
+        self.assertFalse(judge.calls[0]["web_search"])
+        self.assertTrue(retrieval.calls[0]["web_search"])
 
     def test_not_enough_evidence_is_not_a_contradiction_or_score_cap(self) -> None:
         client = ScriptedClient(
