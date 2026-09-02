@@ -10,7 +10,12 @@ import csv
 import json
 from pathlib import Path
 
-from verifier import CulturalVerifier, OllamaClient, OpenRouterClient
+from verifier import (
+    CulturalVerifier,
+    OllamaClient,
+    OpenRouterClient,
+    RetrievalRoutedClient,
+)
 
 
 def read_rows(path: Path) -> list[dict[str, str]]:
@@ -28,6 +33,10 @@ def main() -> None:
     parser.add_argument("--target-context", default="Germany")
     parser.add_argument("--backend", choices=("ollama", "openrouter"), default="ollama")
     parser.add_argument("--model", default=None)
+    parser.add_argument(
+        "--search-provider", choices=("same", "openrouter"), default="same"
+    )
+    parser.add_argument("--search-model", default=None)
     parser.add_argument("--limit", type=int, default=0)
     args = parser.parse_args()
 
@@ -35,10 +44,15 @@ def main() -> None:
     if args.limit > 0:
         rows = rows[: args.limit]
 
-    client = (
+    judge_client = (
         OllamaClient(model=args.model)
         if args.backend == "ollama"
         else OpenRouterClient(model=args.model)
+    )
+    client = (
+        RetrievalRoutedClient(judge_client, OpenRouterClient(model=args.search_model))
+        if args.search_provider == "openrouter" and args.backend != "openrouter"
+        else judge_client
     )
     verifier = CulturalVerifier(client)
     results = []
