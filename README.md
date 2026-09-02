@@ -36,7 +36,9 @@ Every prompt receives one primary and at most two secondary dimensions. Each app
 VerifierScore = sum(applicable dimension scores) / (2 * number scored)
 ```
 
-Evidence is a basis for the affected dimension scores, not an additional arbitrary percentage. A directly contradicted linked claim caps that dimension at `1`. `not_enough_evidence` is not contradiction. If no applicable dimension can be assessed, the verifier abstains. A severe non-compensatory hard failure forces the final score to `0`.
+Evidence is a basis for the affected dimension scores, not an additional arbitrary percentage. A directly contradicted linked claim caps that dimension at `1`. `not_enough_evidence` is not contradiction. If no applicable dimension can be assessed, the verifier abstains.
+
+Hard failures are a separate eligibility gate, not a score on D01-D10. Only a direct, registered HF1-HF6 non-compensatory violation makes `eligible=false`; the `0` score is retained only for output compatibility. If all candidates are ineligible or abstain, the verifier abstains rather than selecting a tied zero-score response. See `docs/hard_failure_protocol.md`.
 
 The complete rubric, scoring anchors, CARB mappings, and literature source families are stored in `data/csv/cultural_dimension_rubric.csv`.
 
@@ -101,6 +103,19 @@ Outputs:
 
 - `verifier_best_of4.csv`: winner, candidate scores, tie and abstention status
 - `verifier_best_of4.details.json`: applicable dimensions, all ten score records, evidence targets, sources, verdicts, confidence and hard-failure diagnostics
+
+## Hard-failure validation
+
+Annotate the candidate rows using `data/annotations/hard_failure_validation_template.csv`, then evaluate the verifier eligibility gate against the independent labels:
+
+```bash
+python src/evaluate_hard_failures.py \
+  data/outputs/verifier_best_of4.details.json \
+  data/annotations/hard_failure_annotations.csv \
+  data/outputs/hard_failure_metrics.json
+```
+
+This reports hard-failure precision, recall, false-positive rate, and the full confusion matrix. The detailed protocol and registry are in `docs/hard_failure_protocol.md` and `src/hard_failures.py`.
 
 ## Tests
 
