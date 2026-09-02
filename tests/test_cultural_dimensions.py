@@ -23,6 +23,7 @@ from verifier import (
     DIMENSION_PLAN_SCHEMA,
     DimensionApplicability,
     OllamaClient,
+    OpenRouterClient,
     StructuredOutputError,
     TargetCheck,
     VerificationTarget,
@@ -48,14 +49,25 @@ class ScriptedClient:
 
 
 class FakeHTTPResponse:
-    def __init__(self, content: str):
+    def __init__(self, content: str, annotations: list[dict[str, Any]] | None = None):
         self.content = content
+        self.annotations = annotations or []
 
     def raise_for_status(self) -> None:
         return None
 
     def json(self) -> dict[str, Any]:
-        return {"message": {"content": self.content}}
+        return {
+            "message": {"content": self.content},
+            "choices": [
+                {
+                    "message": {
+                        "content": self.content,
+                        "annotations": self.annotations,
+                    }
+                }
+            ],
+        }
 
 
 def plan(dimension_id: str = "D03") -> list[DimensionApplicability]:
@@ -179,6 +191,59 @@ class CulturalDimensionTests(unittest.TestCase):
                     schema_name="dimension_applicability_plan",
                 )
         self.assertEqual(post.call_count, 2)
+
+    def test_openrouter_uses_current_web_plugin_and_preserves_sources(self) -> None:
+        content = json.dumps(
+            {
+                "verdict": "supported",
+                "confidence": 0.9,
+                "reason": "The retrieved source supports the proposition.",
+            }
+        )
+        annotations = [
+            {
+                "type": "url_citation",
+                "url_citation": {
+                    "url": "https://example.org/germany",
+                    "title": "German guidance",
+                    "content": "Relevant evidence.",
+                },
+            }
+        ]
+        client = OpenRouterClient(
+            api_key="test-key", model="openai/gpt-4.1-mini", web_engine="exa"
+        )
+        with mock.patch(
+            "verifier.requests.post",
+            return_value=FakeHTTPResponse(content, annotations),
+        ) as post:
+            data, sources = client.json_call(
+                "Return JSON only.",
+                {"proposition": "Test"},
+                web_search=True,
+                search_queries=["Germany test evidence"],
+                max_results=3,
+                response_schema={
+                    "type": "object",
+                    "properties": {
+                        "verdict": {"type": "string"},
+                        "confidence": {"type": "number"},
+                        "reason": {"type": "string"},
+                    },
+                    "required": ["verdict", "confidence", "reason"],
+                    "additionalProperties": False,
+                },
+                schema_name="evidence_verdict",
+            )
+
+        payload = post.call_args.kwargs["json"]
+        self.assertNotIn("tools", payload)
+        self.assertEqual(
+            payload["plugins"],
+            [{"id": "web", "engine": "exa", "max_results": 3}],
+        )
+        self.assertEqual(data["verdict"], "supported")
+        self.assertEqual(sources[0]["url"], "https://example.org/germany")
 
     def test_not_enough_evidence_is_not_a_contradiction_or_score_cap(self) -> None:
         client = ScriptedClient(
