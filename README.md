@@ -48,26 +48,38 @@ The complete rubric, scoring anchors, CARB mappings, and literature source famil
 python -m pip install -r src/requirements.txt
 ```
 
-Local Ollama backend:
+Local Ollama judge with Tavily retrieval (default):
 
 ```bash
 ollama pull qwen3:4b
-export OLLAMA_API_KEY="..."  # required by the current Ollama web-search adapter
-python src/check_verifier_setup.py --model qwen3:4b --require-web-search
+export TAVILY_API_KEY="..."
+python src/check_verifier_setup.py \
+  --backend ollama \
+  --model qwen3:4b \
+  --search-provider tavily \
+  --search-depth basic
 ```
+
+Tavily Search retrieves and relevance-ranks evidence; it does not score cultural
+correctness. Tavily publicly identifies its ranking technology only as
+proprietary AI, without a named or versioned model. The judging model remains
+the explicitly recorded local `qwen3:4b`. The default `basic` search depth,
+returned URLs, snippets, and relevance scores are preserved for auditability.
 
 Every Ollama judge call now receives an enforced JSON Schema rather than only a
 prompt example. If a local model returns valid JSON with the wrong fields, the
 verifier makes one repair attempt and then fails explicitly. It never invents
 missing dimensions, evidence verdicts, or scores.
 
-Optional OpenRouter backend:
+Optional legacy OpenRouter backend:
 
 ```bash
 export OPENROUTER_API_KEY="..."
 export OPENROUTER_MODEL="openai/gpt-4.1-mini"
 export OPENROUTER_WEB_ENGINE="exa"  # optional; explicit default
-python src/check_verifier_setup.py --backend openrouter
+python src/check_verifier_setup.py \
+  --backend openrouter \
+  --search-provider same
 ```
 
 OpenRouter can run the entire verifier with `--backend openrouter`, or it can replace only the failed Ollama hosted-search stage while local Qwen remains the judge. Evidence calls use OpenRouter's current `plugins: [{"id": "web"}]` contract and preserve standardized URL-citation annotations. Web retrieval consumes OpenRouter credits even when the selected model is free.
@@ -81,6 +93,8 @@ python src/run_verifier.py \
   data/test.csv \
   data/outputs/test_verifier.json \
   --backend ollama \
+  --search-provider tavily \
+  --search-depth basic \
   --limit 1
 ```
 
@@ -100,8 +114,8 @@ python src/evaluate_best_of4.py \
   data/outputs/verifier_best_of4.csv \
   --backend ollama \
   --model qwen3:4b \
-  --search-provider openrouter \
-  --search-model openai/gpt-4.1-mini \
+  --search-provider tavily \
+  --search-depth basic \
   --target-context Germany \
   --limit 1
 ```
