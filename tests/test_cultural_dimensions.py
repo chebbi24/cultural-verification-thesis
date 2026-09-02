@@ -22,6 +22,7 @@ from verifier import (
     CulturalVerifier,
     DIMENSION_PLAN_SCHEMA,
     DimensionApplicability,
+    HARD_FAILURE_SCHEMA,
     OllamaClient,
     OpenRouterClient,
     RetrievalRoutedClient,
@@ -41,10 +42,13 @@ class ScriptedClient:
 
     def json_call(
         self,
-        *_args: Any,
+        *args: Any,
         **_kwargs: Any,
     ) -> tuple[dict[str, Any], list[dict[str, str]]]:
-        self.calls.append(dict(_kwargs))
+        call = dict(_kwargs)
+        if args:
+            call["system"] = args[0]
+        self.calls.append(call)
         if not self.outputs:
             raise AssertionError("ScriptedClient received an unexpected call")
         return self.outputs.pop(0), []
@@ -346,12 +350,11 @@ class CulturalDimensionTests(unittest.TestCase):
                             "confidence": 0.7,
                             "reason": "Appropriate etiquette.",
                         }
-                    },
-                    "hard_failures": [],
+                    }
                 }
             ]
         )
-        records, normalized, _, _ = CulturalVerifier(client).score_dimensions(
+        records, normalized, _ = CulturalVerifier(client).score_dimensions(
             "Prompt",
             "Response",
             "Germany",
@@ -373,12 +376,11 @@ class CulturalDimensionTests(unittest.TestCase):
                             "confidence": 0.9,
                             "reason": "Otherwise appropriate.",
                         }
-                    },
-                    "hard_failures": [],
+                    }
                 }
             ]
         )
-        records, normalized, _, _ = CulturalVerifier(client).score_dimensions(
+        records, normalized, _ = CulturalVerifier(client).score_dimensions(
             "Prompt",
             "Response",
             "Germany",
@@ -400,7 +402,10 @@ class CulturalDimensionTests(unittest.TestCase):
                             "confidence": 0.9,
                             "reason": "Nominal score.",
                         }
-                    },
+                    }
+                },
+                {
+                    "hard_failure_detected": True,
                     "hard_failures": [
                         {
                             "category": "HF1",
@@ -427,7 +432,20 @@ class CulturalDimensionTests(unittest.TestCase):
                 {
                     "dimension_scores": {
                         "D10": {"score": 2, "confidence": 0.9, "reason": "Nominal."}
-                    },
+                    }
+                },
+                {
+                    "hard_failure_detected": True,
+                    "hard_failures": [
+                        {
+                            "category": "HF1",
+                            "reason": "Unsupported quote.",
+                            "response_span": "Not present in the response",
+                        }
+                    ],
+                },
+                {
+                    "hard_failure_detected": True,
                     "hard_failures": [
                         {
                             "category": "HF1",
@@ -443,6 +461,67 @@ class CulturalDimensionTests(unittest.TestCase):
                 "Prompt", "Response", applicable_dimensions=plan("D10")
             )
 
+    def test_negative_hard_failure_checklist_is_repaired_to_empty(self) -> None:
+        client = ScriptedClient(
+            [
+                {
+                    "hard_failure_detected": True,
+                    "hard_failures": [
+                        {
+                            "category": "HF2",
+                            "reason": "The response does not discuss the Holocaust.",
+                            "response_span": "None",
+                        }
+                    ],
+                },
+                {"hard_failure_detected": False, "hard_failures": []},
+            ]
+        )
+        failures = CulturalVerifier(client).detect_hard_failures(
+            "Prompt", "A respectful response.", "Germany"
+        )
+        self.assertEqual(failures, [])
+        self.assertEqual(len(client.calls), 2)
+        self.assertEqual(client.calls[0]["response_schema"], HARD_FAILURE_SCHEMA)
+        self.assertIn("SEMANTIC REPAIR", client.calls[1]["system"])
+
+    def test_response_internal_observation_is_not_sent_to_web_search(self) -> None:
+        response = "The answer is inclusive. Quiet hours apply after 22:00."
+        client = ScriptedClient(
+            [
+                {
+                    "targets": [
+                        {
+                            "proposition": "The response is inclusive.",
+                            "evidence_type": "inclusion_or_discrimination",
+                            "response_span": "The answer is inclusive.",
+                            "why_it_matters": "Inclusivity affects appropriateness.",
+                            "importance": 2,
+                            "queries": ["inclusive answer", "inclusive variation"],
+                            "dimension_ids": ["D03"],
+                        },
+                        {
+                            "proposition": "Quiet hours apply after 22:00.",
+                            "evidence_type": "legal_or_policy",
+                            "response_span": "Quiet hours apply after 22:00.",
+                            "why_it_matters": "The recommendation relies on this rule.",
+                            "importance": 3,
+                            "queries": [
+                                "Germany quiet hours 22:00",
+                                "Germany quiet hours exceptions",
+                            ],
+                            "dimension_ids": ["D03"],
+                        },
+                    ]
+                }
+            ]
+        )
+        targets = CulturalVerifier(client).plan_targets(
+            "Prompt", response, "Germany", plan()
+        )
+        self.assertEqual(len(targets), 1)
+        self.assertEqual(targets[0].proposition, "Quiet hours apply after 22:00.")
+
     def test_all_null_applicable_scores_produce_abstention(self) -> None:
         client = ScriptedClient(
             [
@@ -454,7 +533,10 @@ class CulturalDimensionTests(unittest.TestCase):
                             "confidence": 0.0,
                             "reason": "No reliable rule evidence was available.",
                         }
-                    },
+                    }
+                },
+                {
+                    "hard_failure_detected": False,
                     "hard_failures": [],
                 },
             ]

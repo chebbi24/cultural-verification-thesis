@@ -13,7 +13,8 @@ prompt + optional frozen domain_id
 -> decision-relevant evidence targets linked to active dimensions
 -> web evidence and claim verdicts
 -> applicable cultural-dimension scores
--> confidence / abstention / severe hard-fail check
+-> independent severe hard-failure eligibility check
+-> confidence / abstention
 -> standalone verifier score and Best-of-4 winner
 ```
 
@@ -66,10 +67,19 @@ proprietary AI, without a named or versioned model. The judging model remains
 the explicitly recorded local `qwen3:4b`. The default `basic` search depth,
 returned URLs, snippets, and relevance scores are preserved for auditability.
 
-Every Ollama judge call now receives an enforced JSON Schema rather than only a
+Every Ollama judge call receives an enforced JSON Schema rather than only a
 prompt example. If a local model returns valid JSON with the wrong fields, the
 verifier makes one repair attempt and then fails explicitly. It never invents
 missing dimensions, evidence verdicts, or scores.
+
+Dimension scoring and hard-failure detection are separate model calls. The
+hard-failure contract requires an explicit boolean and an empty list when no
+violation occurs. A semantic validator checks boolean/list consistency,
+duplicate categories, and exact quoted trigger spans; it allows one targeted
+repair and then aborts. Negative checklist entries such as "HF2 did not occur"
+can therefore never zero a candidate. Evidence planning also drops
+response-internal observations and targets without an exact response quotation,
+so Tavily is used only for external, decision-relevant factual claims.
 
 Optional legacy OpenRouter backend:
 
