@@ -273,6 +273,38 @@ class JSONClient(Protocol):
     ) -> tuple[dict[str, Any], list[dict[str, str]]]: ...
 
 
+class RetrievalRoutedClient:
+    """Use one client for judging and another only for evidence-grounded calls."""
+
+    def __init__(self, judge_client: JSONClient, retrieval_client: JSONClient):
+        self.judge_client = judge_client
+        self.retrieval_client = retrieval_client
+        self.model = judge_client.model
+        self.retrieval_model = retrieval_client.model
+
+    def json_call(
+        self,
+        system: str,
+        user_payload: dict[str, Any],
+        *,
+        web_search: bool = False,
+        search_queries: list[str] | None = None,
+        max_results: int = 5,
+        response_schema: JsonSchema | None = None,
+        schema_name: str = "verifier_response",
+    ) -> tuple[dict[str, Any], list[dict[str, str]]]:
+        client = self.retrieval_client if web_search else self.judge_client
+        return client.json_call(
+            system,
+            user_payload,
+            web_search=web_search,
+            search_queries=search_queries,
+            max_results=max_results,
+            response_schema=response_schema,
+            schema_name=schema_name,
+        )
+
+
 def _extract_json(text: str) -> dict[str, Any]:
     text = text.strip()
     text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.IGNORECASE)
