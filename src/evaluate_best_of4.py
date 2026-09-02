@@ -20,6 +20,7 @@ from verifier import (
     OllamaClient,
     OpenRouterClient,
     RetrievalRoutedClient,
+    TavilyGroundedClient,
 )
 
 
@@ -40,11 +41,17 @@ def main() -> None:
     parser.add_argument("--model", default=None)
     parser.add_argument(
         "--search-provider",
-        choices=("same", "openrouter"),
-        default="same",
-        help="Use the judge backend for evidence calls or route only evidence calls through OpenRouter.",
+        choices=("same", "tavily", "openrouter"),
+        default="tavily",
+        help="Retrieval provider. Tavily is the default; the judging model remains controlled by --backend.",
     )
     parser.add_argument("--search-model", default=None)
+    parser.add_argument(
+        "--search-depth",
+        choices=("basic", "advanced"),
+        default=None,
+        help="Tavily search depth (default: TAVILY_SEARCH_DEPTH or basic).",
+    )
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument(
         "--tie-epsilon",
@@ -63,21 +70,25 @@ def main() -> None:
         if args.backend == "ollama"
         else OpenRouterClient(model=args.model)
     )
-    client = (
-        RetrievalRoutedClient(
+    if args.search_provider == "tavily":
+        client = TavilyGroundedClient(
+            judge_client,
+            search_depth=args.search_depth,
+        )
+    elif args.search_provider == "openrouter" and args.backend != "openrouter":
+        client = RetrievalRoutedClient(
             judge_client,
             OpenRouterClient(model=args.search_model),
         )
-        if args.search_provider == "openrouter" and args.backend != "openrouter"
-        else judge_client
-    )
+    else:
+        client = judge_client
     verifier = CulturalVerifier(client)
     summary: list[dict[str, object]] = []
     details: list[dict[str, object]] = []
 
     retrieval_label = (
-        f"openrouter/{client.retrieval_model}"
-        if isinstance(client, RetrievalRoutedClient)
+        client.retrieval_model
+        if hasattr(client, "retrieval_model")
         else f"same/{client.model}"
     )
     print(
@@ -207,6 +218,13 @@ def main() -> None:
                 "model": client.model,
                 "search_provider": args.search_provider,
                 "search_model": getattr(client, "retrieval_model", client.model),
+                "search_depth": getattr(client, "search_depth", None),
+                "retrieval_system": getattr(
+                    client, "retrieval_system", args.search_provider
+                ),
+                "retrieval_model_disclosure": getattr(
+                    client, "retrieval_model_disclosure", None
+                ),
                 "applicable_dimensions": [
                     item.__dict__ for item in applicable_dimensions
                 ],
