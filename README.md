@@ -70,7 +70,7 @@ export OPENROUTER_WEB_ENGINE="exa"  # optional; explicit default
 python src/check_verifier_setup.py --backend openrouter
 ```
 
-With `--backend openrouter`, OpenRouter performs both structured verifier judging and evidence retrieval. Evidence calls use OpenRouter's current `plugins: [{"id": "web"}]` contract and preserve standardized URL-citation annotations. Web retrieval consumes OpenRouter credits even when the selected model is free.
+OpenRouter can run the entire verifier with `--backend openrouter`, or it can replace only the failed Ollama hosted-search stage while local Qwen remains the judge. Evidence calls use OpenRouter's current `plugins: [{"id": "web"}]` contract and preserve standardized URL-citation annotations. Web retrieval consumes OpenRouter credits even when the selected model is free.
 
 ## Single-response smoke test
 
@@ -98,8 +98,10 @@ set_id,prompt_id,domain_id,prompt,response_a,response_b,response_c,response_d,hu
 python src/evaluate_best_of4.py \
   data/best_of4.csv \
   data/outputs/verifier_best_of4.csv \
-  --backend openrouter \
-  --model openai/gpt-4.1-mini \
+  --backend ollama \
+  --model qwen3:4b \
+  --search-provider openrouter \
+  --search-model openai/gpt-4.1-mini \
   --target-context Germany \
   --limit 1
 ```
