@@ -20,14 +20,20 @@ def main() -> None:
     parser.add_argument("--backend", choices=("ollama", "openrouter"), default="ollama")
     parser.add_argument("--model", default=None)
     parser.add_argument(
+        "--search-provider", choices=("same", "openrouter"), default="same"
+    )
+    parser.add_argument("--search-model", default=None)
+    parser.add_argument(
         "--require-web-search",
         action="store_true",
         help="For the Ollama backend, require OLLAMA_API_KEY for hosted web search.",
     )
     args = parser.parse_args()
 
-    if args.backend == "openrouter":
-        model = args.model or DEFAULT_OPENROUTER_MODEL
+    if args.backend == "openrouter" or args.search_provider == "openrouter":
+        openrouter_model = (
+            args.model if args.backend == "openrouter" else args.search_model
+        ) or DEFAULT_OPENROUTER_MODEL
         api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
         if not api_key:
             print("FAIL OPENROUTER_API_KEY is missing.")
@@ -47,9 +53,10 @@ def main() -> None:
         remaining = key_data.get("limit_remaining")
         remaining_text = "unknown" if remaining is None else str(remaining)
         print(f"OK OpenRouter API key accepted; remaining limit: {remaining_text}")
-        print(f"OK OpenRouter model: {model}")
+        print(f"OK OpenRouter model: {openrouter_model}")
         print("OK OpenRouter web retrieval uses the web plugin when evidence is required")
-        return
+        if args.backend == "openrouter":
+            return
 
     model = args.model or DEFAULT_OLLAMA_MODEL
 
@@ -72,6 +79,10 @@ def main() -> None:
         print(f"Run: ollama pull {model}")
         sys.exit(1)
     print(f"OK local Ollama server and model: {model}")
+
+    if args.search_provider == "openrouter":
+        print("OK local Ollama judge will route evidence calls through OpenRouter")
+        return
 
     has_web_key = bool(os.getenv("OLLAMA_API_KEY"))
     if has_web_key:
