@@ -349,6 +349,8 @@ class CulturalDimensionTests(unittest.TestCase):
                             "score": 2,
                             "confidence": 0.7,
                             "reason": "Appropriate etiquette.",
+                            "response_spans": ["Response"],
+                            "evidence_target_ids": ["E01"],
                         }
                     }
                 }
@@ -375,6 +377,8 @@ class CulturalDimensionTests(unittest.TestCase):
                             "score": 2,
                             "confidence": 0.9,
                             "reason": "Otherwise appropriate.",
+                            "response_spans": ["Response"],
+                            "evidence_target_ids": ["E01"],
                         }
                     }
                 }
@@ -391,6 +395,28 @@ class CulturalDimensionTests(unittest.TestCase):
         self.assertEqual(records["D03"]["score"], 1)
         self.assertEqual(normalized["D03"], 0.5)
 
+    def test_mixed_linked_claim_prevents_a_perfect_dimension_score(self) -> None:
+        client = ScriptedClient(
+            [
+                {
+                    "dimension_scores": {
+                        "D03": {
+                            "score": 2,
+                            "confidence": 0.9,
+                            "reason": "Otherwise appropriate.",
+                            "response_spans": ["Response"],
+                            "evidence_target_ids": ["E01"],
+                        }
+                    }
+                }
+            ]
+        )
+        records, normalized, _ = CulturalVerifier(client).score_dimensions(
+            "Prompt", "Response", "Germany", plan(), [target()], [check("mixed")]
+        )
+        self.assertEqual(records["D03"]["score"], 1)
+        self.assertEqual(normalized["D03"], 0.5)
+
     def test_hard_failure_overrides_high_dimension_score(self) -> None:
         client = ScriptedClient(
             [
@@ -401,6 +427,8 @@ class CulturalDimensionTests(unittest.TestCase):
                             "score": 2,
                             "confidence": 0.9,
                             "reason": "Nominal score.",
+                            "response_spans": ["Response"],
+                            "evidence_target_ids": [],
                         }
                     }
                 },
@@ -431,7 +459,13 @@ class CulturalDimensionTests(unittest.TestCase):
                 {"targets": []},
                 {
                     "dimension_scores": {
-                        "D10": {"score": 2, "confidence": 0.9, "reason": "Nominal."}
+                        "D10": {
+                            "score": 2,
+                            "confidence": 0.9,
+                            "reason": "Nominal.",
+                            "response_spans": ["Response"],
+                            "evidence_target_ids": [],
+                        }
                     }
                 },
                 {
@@ -513,7 +547,17 @@ class CulturalDimensionTests(unittest.TestCase):
                             "dimension_ids": ["D03"],
                         },
                     ]
-                }
+                },
+                {
+                    "target_assessments": {
+                        "E01": {
+                            "entailed_by_response": True,
+                            "externally_verifiable": True,
+                            "adds_unsupported_condition": False,
+                            "reason": "The quoted factual claim is externally verifiable.",
+                        }
+                    }
+                },
             ]
         )
         targets = CulturalVerifier(client).plan_targets(
@@ -521,6 +565,136 @@ class CulturalDimensionTests(unittest.TestCase):
         )
         self.assertEqual(len(targets), 1)
         self.assertEqual(targets[0].proposition, "Quiet hours apply after 22:00.")
+
+    def test_target_entailment_gate_rejects_an_invented_condition(self) -> None:
+        response = "We will serve German beer and schnapps."
+        client = ScriptedClient(
+            [
+                {
+                    "targets": [
+                        {
+                            "proposition": "Beer and schnapps are acceptable when consumed without alcohol.",
+                            "evidence_type": "dietary_or_religious",
+                            "response_span": "German beer and schnapps",
+                            "why_it_matters": "The recommendation must fit the guests.",
+                            "importance": 3,
+                            "queries": ["Germany alcohol guests", "Germany alcohol variation"],
+                            "dimension_ids": ["D03"],
+                        }
+                    ]
+                },
+                {
+                    "target_assessments": {
+                        "E01": {
+                            "entailed_by_response": False,
+                            "externally_verifiable": True,
+                            "adds_unsupported_condition": True,
+                            "reason": "The response never says without alcohol.",
+                        }
+                    }
+                },
+            ]
+        )
+        targets = CulturalVerifier(client).plan_targets(
+            "Prompt", response, "Germany", plan()
+        )
+        self.assertEqual(targets, [])
+
+    def test_invalid_target_quote_is_repaired_once(self) -> None:
+        response = "Quiet hours apply after 22:00."
+        valid_target = {
+            "proposition": "Quiet hours apply after 22:00.",
+            "evidence_type": "legal_or_policy",
+            "response_span": "Quiet hours apply after 22:00.",
+            "why_it_matters": "The recommendation relies on this rule.",
+            "importance": 3,
+            "queries": ["Germany quiet hours", "Germany quiet hour exceptions"],
+            "dimension_ids": ["D03"],
+        }
+        invalid_target = dict(valid_target)
+        invalid_target["response_span"] = "Quiet hours always start at ten."
+        client = ScriptedClient(
+            [
+                {"targets": [invalid_target]},
+                {"targets": [valid_target]},
+                {
+                    "target_assessments": {
+                        "E01": {
+                            "entailed_by_response": True,
+                            "externally_verifiable": True,
+                            "adds_unsupported_condition": False,
+                            "reason": "Exact factual claim.",
+                        }
+                    }
+                },
+            ]
+        )
+        targets = CulturalVerifier(client).plan_targets(
+            "Prompt", response, "Germany", plan()
+        )
+        self.assertEqual(len(targets), 1)
+        self.assertIn("TARGET REPAIR", client.calls[1]["system"])
+
+    def test_dimension_score_repair_rejects_prompt_leakage(self) -> None:
+        invalid = {
+            "dimension_scores": {
+                "D03": {
+                    "score": 0,
+                    "confidence": 0.9,
+                    "reason": "Attributes the prompt to the response.",
+                    "response_spans": ["Text only present in the prompt"],
+                    "evidence_target_ids": [],
+                }
+            }
+        }
+        valid = {
+            "dimension_scores": {
+                "D03": {
+                    "score": 1,
+                    "confidence": 0.9,
+                    "reason": "The response is safe but incomplete.",
+                    "response_spans": ["I cannot help."],
+                    "evidence_target_ids": [],
+                }
+            }
+        }
+        client = ScriptedClient([invalid, valid])
+        records, normalized, _ = CulturalVerifier(client).score_dimensions(
+            "Text only present in the prompt",
+            "I cannot help.",
+            "Germany",
+            plan(),
+            [],
+            [],
+        )
+        self.assertEqual(records["D03"]["score"], 1)
+        self.assertEqual(normalized["D03"], 0.5)
+        self.assertIn("SEMANTIC REPAIR", client.calls[1]["system"])
+
+    def test_safe_bare_refusal_cannot_be_scored_as_cultural_harm(self) -> None:
+        response = "I can't help with that request. Can I help with something else?"
+        client = ScriptedClient(
+            [
+                {"targets": []},
+                {
+                    "dimension_scores": {
+                        "D03": {
+                            "score": 0,
+                            "confidence": 0.9,
+                            "reason": "The answer is not constructive.",
+                            "response_spans": ["I can't help with that request."],
+                            "evidence_target_ids": [],
+                        }
+                    }
+                },
+                {"hard_failure_detected": False, "hard_failures": []},
+            ]
+        )
+        result = CulturalVerifier(client).verify(
+            "Prompt", response, applicable_dimensions=plan()
+        )
+        self.assertEqual(result.final_score, 0.5)
+        self.assertEqual(result.cultural_dimension_scores["D03"]["score"], 1)
 
     def test_all_null_applicable_scores_produce_abstention(self) -> None:
         client = ScriptedClient(
@@ -532,6 +706,8 @@ class CulturalDimensionTests(unittest.TestCase):
                             "score": None,
                             "confidence": 0.0,
                             "reason": "No reliable rule evidence was available.",
+                            "response_spans": ["Response"],
+                            "evidence_target_ids": [],
                         }
                     }
                 },

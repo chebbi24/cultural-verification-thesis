@@ -213,6 +213,8 @@ def main() -> None:
                 "prompt_id": row.get("prompt_id", ""),
                 "domain_id": domain_id,
                 "prompt": prompt,
+                "human_chosen": human,
+                "label_source": (row.get("label_source") or "").strip(),
                 "target_context": args.target_context,
                 "backend": args.backend,
                 "model": client.model,
