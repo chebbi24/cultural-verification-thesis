@@ -46,6 +46,8 @@ Every local Ollama and optional OpenRouter judge call receives an actual JSON Sc
 
 If a model returns syntactically valid JSON with the wrong keys or types, the client issues one repair request containing the validation error and required schema. A second invalid response is an explicit operational failure. The verifier never maps alternative field names, fills in omitted values, or converts malformed model output into a score.
 
+The OpenRouter backend uses the model-agnostic `web` plugin for evidence calls and stores standardized `url_citation` annotations. Its retrieval engine defaults explicitly to Exa so the retrieval mechanism does not silently change when the judging model changes. `OPENROUTER_WEB_ENGINE` may override the engine for a documented experiment.
+
 ## Stage 1 - Prompt-only applicability planning
 
 The verifier selects exactly one primary and at most two secondary dimensions using only the prompt, target context, and optional declared `domain_id`.
