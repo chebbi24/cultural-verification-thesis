@@ -11,7 +11,9 @@ import requests
 from verifier import (
     DEFAULT_OLLAMA_MODEL,
     DEFAULT_OPENROUTER_MODEL,
+    DEFAULT_TAVILY_SEARCH_DEPTH,
     OLLAMA_LOCAL_CHAT_URL,
+    TAVILY_SEARCH_URL,
 )
 
 
@@ -20,15 +22,55 @@ def main() -> None:
     parser.add_argument("--backend", choices=("ollama", "openrouter"), default="ollama")
     parser.add_argument("--model", default=None)
     parser.add_argument(
-        "--search-provider", choices=("same", "openrouter"), default="same"
+        "--search-provider",
+        choices=("same", "tavily", "openrouter"),
+        default="tavily",
     )
     parser.add_argument("--search-model", default=None)
+    parser.add_argument(
+        "--search-depth", choices=("basic", "advanced"), default=None
+    )
     parser.add_argument(
         "--require-web-search",
         action="store_true",
         help="For the Ollama backend, require OLLAMA_API_KEY for hosted web search.",
     )
     args = parser.parse_args()
+
+    if args.search_provider == "tavily":
+        api_key = os.getenv("TAVILY_API_KEY", "").strip()
+        if not api_key:
+            print("FAIL TAVILY_API_KEY is missing.")
+            print('Run: export TAVILY_API_KEY="..."')
+            sys.exit(1)
+        depth = args.search_depth or DEFAULT_TAVILY_SEARCH_DEPTH
+        try:
+            response = requests.post(
+                TAVILY_SEARCH_URL,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "query": "Germany cultural context verifier setup test",
+                    "topic": "general",
+                    "search_depth": depth,
+                    "max_results": 1,
+                    "include_answer": False,
+                    "include_raw_content": False,
+                    "include_images": False,
+                },
+                timeout=20,
+            )
+            response.raise_for_status()
+            result_count = len(response.json().get("results") or [])
+        except (requests.RequestException, ValueError) as exc:
+            print(f"FAIL Tavily search validation: {exc}")
+            sys.exit(1)
+        print(
+            f"OK Tavily Search API: depth={depth}, results={result_count}; "
+            "ranking model=proprietary/not publicly identified"
+        )
 
     if args.backend == "openrouter" or args.search_provider == "openrouter":
         openrouter_model = (
@@ -80,8 +122,9 @@ def main() -> None:
         sys.exit(1)
     print(f"OK local Ollama server and model: {model}")
 
-    if args.search_provider == "openrouter":
-        print("OK local Ollama judge will route evidence calls through OpenRouter")
+    if args.search_provider in {"openrouter", "tavily"}:
+        provider_name = "OpenRouter" if args.search_provider == "openrouter" else "Tavily"
+        print(f"OK local Ollama judge will evaluate {provider_name} evidence")
         return
 
     has_web_key = bool(os.getenv("OLLAMA_API_KEY"))
