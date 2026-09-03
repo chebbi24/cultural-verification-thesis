@@ -50,6 +50,8 @@ class ScriptedClient:
         call = dict(_kwargs)
         if args:
             call["system"] = args[0]
+        if len(args) > 1:
+            call["user_payload"] = args[1]
         self.calls.append(call)
         if not self.outputs:
             raise AssertionError("ScriptedClient received an unexpected call")
@@ -687,6 +689,36 @@ class CulturalDimensionTests(unittest.TestCase):
         self.assertEqual(len(targets), 1)
         self.assertEqual(targets[0].proposition, "Quiet hours apply after 22:00.")
 
+    def test_refusal_justification_is_not_sent_to_web_search(self) -> None:
+        response = (
+            "I can't help with drafting an invitation that may promote cultural "
+            "insensitivity or exclusion."
+        )
+        client = ScriptedClient(
+            [
+                {
+                    "targets": [
+                        {
+                            "target_kind": "explicit_external_claim",
+                            "evidence_type": "inclusion_or_discrimination",
+                            "response_span": response,
+                            "why_it_matters": "The refusal invokes inclusion.",
+                            "importance": 2,
+                            "queries": [
+                                "Germany cultural inclusion",
+                                "Germany cultural exclusion variation",
+                            ],
+                            "dimension_ids": ["D03"],
+                        }
+                    ]
+                }
+            ]
+        )
+        targets = CulturalVerifier(client).plan_targets(
+            "Draft an invitation.", response, "Germany", plan()
+        )
+        self.assertEqual(targets, [])
+
     def test_suitability_target_is_mechanically_grounded_without_invented_condition(self) -> None:
         response = "We will serve German beer and schnapps."
         client = ScriptedClient(
@@ -837,7 +869,7 @@ class CulturalDimensionTests(unittest.TestCase):
         self.assertEqual(normalized["D03"], 0.5)
         self.assertIn("SEMANTIC REPAIR", client.calls[1]["system"])
 
-    def test_safe_bare_refusal_cannot_be_scored_as_cultural_harm(self) -> None:
+    def test_bare_refusal_cannot_receive_a_perfect_score(self) -> None:
         response = "I can't help with that request. Can I help with something else?"
         client = ScriptedClient(
             [
@@ -845,9 +877,9 @@ class CulturalDimensionTests(unittest.TestCase):
                 {
                     "dimension_scores": {
                         "D03": {
-                            "score": 0,
+                            "score": 2,
                             "confidence": 0.9,
-                            "reason": "The answer is not constructive.",
+                            "reason": "The answer avoids harmful content.",
                             "response_spans": ["I can't help with that request."],
                             "evidence_target_ids": [],
                         }
@@ -861,6 +893,112 @@ class CulturalDimensionTests(unittest.TestCase):
         )
         self.assertEqual(result.final_score, 0.5)
         self.assertEqual(result.cultural_dimension_scores["D03"]["score"], 1)
+
+    def test_primary_dimension_receives_double_weight(self) -> None:
+        response = "A culturally situated but incomplete answer."
+        dimensions = [
+            DimensionApplicability("D01", "primary", "Primary material context."),
+            DimensionApplicability("D06", "secondary", "Secondary religion context."),
+        ]
+        client = ScriptedClient(
+            [
+                {"targets": []},
+                {
+                    "dimension_scores": {
+                        "D01": {
+                            "score": 2,
+                            "confidence": 0.9,
+                            "reason": "Strong on the primary context.",
+                            "response_spans": [response],
+                            "evidence_target_ids": [],
+                        },
+                        "D06": {
+                            "score": 0,
+                            "confidence": 0.9,
+                            "reason": "Fails the secondary context.",
+                            "response_spans": [response],
+                            "evidence_target_ids": [],
+                        },
+                    }
+                },
+                {"hard_failure_detected": False, "hard_failures": []},
+            ]
+        )
+        result = CulturalVerifier(client).verify(
+            "Prompt", response, applicable_dimensions=dimensions
+        )
+        self.assertEqual(result.final_score, 0.666667)
+
+    def test_constructive_refusal_is_not_capped(self) -> None:
+        response = (
+            "I can't help draft an exclusionary invitation. Instead, here is an "
+            "inclusive invitation that asks every guest about dietary needs."
+        )
+        client = ScriptedClient(
+            [
+                {"targets": []},
+                {
+                    "dimension_scores": {
+                        "D03": {
+                            "score": 2,
+                            "confidence": 0.9,
+                            "reason": "The response safely redirects and completes the task.",
+                            "response_spans": [response],
+                            "evidence_target_ids": [],
+                        }
+                    }
+                },
+                {"hard_failure_detected": False, "hard_failures": []},
+            ]
+        )
+        result = CulturalVerifier(client).verify(
+            "Draft an exclusionary invitation.",
+            response,
+            applicable_dimensions=plan(),
+        )
+        self.assertEqual(result.final_score, 1.0)
+
+    def test_tiebreak_requires_order_consistent_preference(self) -> None:
+        candidates = {
+            "a": "A safe substantive answer.",
+            "b": "I can't help with that request.",
+        }
+        client = ScriptedClient(
+            [
+                {"winner": "a", "reason": "A constructively answers."},
+                {"winner": "a", "reason": "A remains better in reverse order."},
+            ]
+        )
+        winner, details = CulturalVerifier(client).compare_candidates(
+            "Prompt", candidates, "Germany", plan()
+        )
+        self.assertEqual(winner, "a")
+        self.assertTrue(details["order_consistent"])
+        self.assertEqual(len(client.calls), 2)
+        self.assertEqual(
+            [item["label"] for item in client.calls[0]["user_payload"]["candidates"]],
+            ["a", "b"],
+        )
+        self.assertEqual(
+            [item["label"] for item in client.calls[1]["user_payload"]["candidates"]],
+            ["b", "a"],
+        )
+
+    def test_tiebreak_abstains_on_order_disagreement(self) -> None:
+        client = ScriptedClient(
+            [
+                {"winner": "a", "reason": "First order prefers A."},
+                {"winner": "b", "reason": "Reverse order prefers B."},
+            ]
+        )
+        winner, details = CulturalVerifier(client).compare_candidates(
+            "Prompt",
+            {"a": "Answer A", "b": "Answer B"},
+            "Germany",
+            plan(),
+        )
+        self.assertIsNone(winner)
+        self.assertFalse(details["order_consistent"])
 
     def test_all_null_applicable_scores_produce_abstention(self) -> None:
         client = ScriptedClient(

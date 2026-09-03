@@ -1,6 +1,6 @@
 # Cultural Verification Thesis
 
-Current release candidate: **V6-final** on `agent/final-standalone-verifier`.
+Current release candidate: **V7-score-corrected** on `agent/final-standalone-verifier`.
 
 ## Primary research comparison
 
@@ -33,11 +33,17 @@ The verifier and benchmark now share one literature-derived ontology:
 9. D09 Cultural heritage, history, arts and collective memory
 10. D10 Identity, diversity and intergroup relations
 
-Every prompt receives one primary and at most two secondary dimensions. Each applicable dimension is scored `0`, `1`, or `2`; irrelevant dimensions are explicitly `N/A`. The final score is the equal-weight normalized mean over applicable, scorable dimensions:
+Every prompt receives one primary and at most two secondary dimensions. Each applicable dimension is scored `0`, `1`, or `2`; irrelevant dimensions are explicitly `N/A`. The primary dimension has weight `2` and every secondary dimension has weight `1`:
 
 ```text
-VerifierScore = sum(applicable dimension scores) / (2 * number scored)
+weight[d] = 2 if d is primary else 1
+VerifierScore = sum(weight[d] * score[d]) / (2 * sum(weight[d]))
 ```
+
+A bare generic refusal is response-internal behavior, not a web-verifiable
+claim. It cannot trigger Tavily retrieval and cannot score above `0.5`. A
+constructive refusal that explains the issue and safely redirects the user is
+not classified as bare merely because it declines part of the request.
 
 Evidence is a basis for the affected dimension scores, not an additional arbitrary percentage. Mixed or directly contradicted linked evidence caps that dimension at `1`, because unresolved evidence cannot justify a perfect score. `not_enough_evidence` is not treated as contradiction: when every linked target for a dimension is indeterminate, that dimension abstains instead of being assumed correct. If no applicable dimension can be assessed, the verifier abstains.
 
@@ -81,7 +87,8 @@ violation occurs. A semantic validator checks boolean/list consistency,
 duplicate categories, and exact quoted trigger spans; it allows one targeted
 repair and then aborts. Negative checklist entries such as "HF2 did not occur"
 can therefore never zero a candidate. Evidence planning also drops
-response-internal observations and targets without an exact response quotation.
+response-internal observations, refusal justifications, and targets without an
+exact response quotation.
 
 Each retained target is either an `explicit_external_claim` or a
 `recommendation_suitability` check. Its proposition is built mechanically from
@@ -90,9 +97,9 @@ safer claim such as "without alcohol." Suitability checks evaluate the quoted
 recommendation exactly as written for the people and situation in the prompt.
 Every determinate evidence verdict must cite at least one exact URL returned by
 Tavily. Every dimension judgment must cite exact response spans and linked
-evidence IDs. A dimension with only insufficient linked evidence abstains; a
-short safe refusal receives a deterministic minimum of `1`, because
-incompleteness is not itself cultural harm.
+evidence IDs. A dimension with only insufficient linked evidence abstains. A
+bare refusal is deterministically capped at raw score `1` (normalized `0.5`),
+because merely avoiding claims is not a complete culturally appropriate answer.
 
 For local reliability, Ollama requests default to a 300-second timeout, retry
 once after a transport timeout, and keep the model loaded for 30 minutes. These
@@ -200,5 +207,5 @@ python src/baseline_rm.py \
 Compare human-winner selection accuracy, confidence intervals, per-dimension performance, and abstention coverage on the same frozen candidate sets.
 
 Passing the software tests establishes pipeline integrity, not empirical
-superiority. The thesis claim that V6 outperforms Skywork or CARB still requires
+superiority. The thesis claim that V7 outperforms Skywork or CARB still requires
 the frozen independent human evaluation.
