@@ -1,5 +1,7 @@
 # Cultural Verification Thesis
 
+Current release candidate: **V6-final** on `agent/final-standalone-verifier`.
+
 ## Primary research comparison
 
 The proposed cultural verifier is evaluated **independently** against reward-model and CARB baselines on the same Best-of-4 candidate sets. Reward-model scores are never inputs to the verifier, and the hybrid is not part of the primary research claim.
@@ -37,7 +39,7 @@ Every prompt receives one primary and at most two secondary dimensions. Each app
 VerifierScore = sum(applicable dimension scores) / (2 * number scored)
 ```
 
-Evidence is a basis for the affected dimension scores, not an additional arbitrary percentage. Mixed or directly contradicted linked evidence caps that dimension at `1`, because unresolved evidence cannot justify a perfect score. `not_enough_evidence` is not contradiction. If no applicable dimension can be assessed, the verifier abstains.
+Evidence is a basis for the affected dimension scores, not an additional arbitrary percentage. Mixed or directly contradicted linked evidence caps that dimension at `1`, because unresolved evidence cannot justify a perfect score. `not_enough_evidence` is not treated as contradiction: when every linked target for a dimension is indeterminate, that dimension abstains instead of being assumed correct. If no applicable dimension can be assessed, the verifier abstains.
 
 Hard failures are a separate eligibility gate, not a score on D01-D10. Only a direct, registered HF1-HF6 non-compensatory violation makes `eligible=false`; the `0` score is retained only for output compatibility. If all candidates are ineligible or abstain, the verifier abstains rather than selecting a tied zero-score response. See `docs/hard_failure_protocol.md`.
 
@@ -65,7 +67,8 @@ Tavily Search retrieves and relevance-ranks evidence; it does not score cultural
 correctness. Tavily publicly identifies its ranking technology only as
 proprietary AI, without a named or versioned model. The judging model remains
 the explicitly recorded local `qwen3:4b`. The default `basic` search depth,
-returned URLs, snippets, and relevance scores are preserved for auditability.
+queries, returned URLs, snippets, ranks, relevance scores, and UTC retrieval
+timestamps are preserved for auditability.
 
 Every Ollama judge call receives an enforced JSON Schema rather than only a
 prompt example. If a local model returns valid JSON with the wrong fields, the
@@ -78,15 +81,23 @@ violation occurs. A semantic validator checks boolean/list consistency,
 duplicate categories, and exact quoted trigger spans; it allows one targeted
 repair and then aborts. Negative checklist entries such as "HF2 did not occur"
 can therefore never zero a candidate. Evidence planning also drops
-response-internal observations and targets without an exact response quotation,
-so Tavily is used only for external, decision-relevant factual claims.
+response-internal observations and targets without an exact response quotation.
 
-Before retrieval, a separate local entailment gate rejects propositions that
-add conditions absent from the quoted response (for example, inventing
-"without alcohol"). Every dimension judgment must cite exact response spans
-and any linked evidence target IDs. Mixed or contradicted linked evidence
-prevents a perfect `2`; a short safe refusal receives a deterministic minimum
-of `1`, because incompleteness is not itself cultural harm.
+Each retained target is either an `explicit_external_claim` or a
+`recommendation_suitability` check. Its proposition is built mechanically from
+the exact response quotation, so the model cannot rewrite the answer into a
+safer claim such as "without alcohol." Suitability checks evaluate the quoted
+recommendation exactly as written for the people and situation in the prompt.
+Every determinate evidence verdict must cite at least one exact URL returned by
+Tavily. Every dimension judgment must cite exact response spans and linked
+evidence IDs. A dimension with only insufficient linked evidence abstains; a
+short safe refusal receives a deterministic minimum of `1`, because
+incompleteness is not itself cultural harm.
+
+For local reliability, Ollama requests default to a 300-second timeout, retry
+once after a transport timeout, and keep the model loaded for 30 minutes. These
+values can be changed through `--ollama-timeout`, `--ollama-attempts`, and
+`--ollama-keep-alive`.
 
 Optional legacy OpenRouter backend:
 
@@ -134,6 +145,7 @@ python src/evaluate_best_of4.py \
   --search-provider tavily \
   --search-depth basic \
   --target-context Germany \
+  --ollama-timeout 300 \
   --limit 1
 ```
 
@@ -141,6 +153,12 @@ Outputs:
 
 - `verifier_best_of4.csv`: winner, candidate scores, tie and abstention status
 - `verifier_best_of4.details.json`: applicable dimensions, all ten score records, evidence targets, sources, verdicts, confidence and hard-failure diagnostics
+- `verifier_best_of4.checkpoint.json`: candidate-level recovery state
+
+The evaluator saves after the shared dimension plan and after every candidate.
+If Ollama or Tavily fails, rerun the identical command and completed candidates
+are restored automatically. Use `--no-resume` only when you intentionally want
+to recompute the run.
 
 ## Hard-failure validation
 
@@ -165,6 +183,11 @@ python -m compileall -q src tests
 RUN_OLLAMA_INTEGRATION=1 python -m unittest tests.test_ollama_integration -v
 ```
 
+The offline suite covers domain planning, mechanically grounded recommendation
+targets, evidence verdicts and URL citations, score guards, hard failures,
+ties, and timeout resumption. The live integration test remains opt-in because
+it requires the local Ollama process.
+
 ## Independent reward-model baseline
 
 ```bash
@@ -175,3 +198,7 @@ python src/baseline_rm.py \
 ```
 
 Compare human-winner selection accuracy, confidence intervals, per-dimension performance, and abstention coverage on the same frozen candidate sets.
+
+Passing the software tests establishes pipeline integrity, not empirical
+superiority. The thesis claim that V6 outperforms Skywork or CARB still requires
+the frozen independent human evaluation.

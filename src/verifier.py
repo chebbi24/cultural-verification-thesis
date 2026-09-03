@@ -13,7 +13,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from typing import Any, Protocol
 
 import requests
@@ -34,8 +36,13 @@ DEFAULT_OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-4.1-mini")
 DEFAULT_OPENROUTER_WEB_ENGINE = os.getenv("OPENROUTER_WEB_ENGINE", "exa")
 DEFAULT_OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:4b")
 DEFAULT_TAVILY_SEARCH_DEPTH = os.getenv("TAVILY_SEARCH_DEPTH", "basic")
+DEFAULT_OLLAMA_TIMEOUT_SECONDS = float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "300"))
+DEFAULT_OLLAMA_MAX_ATTEMPTS = int(os.getenv("OLLAMA_MAX_ATTEMPTS", "2"))
+DEFAULT_OLLAMA_KEEP_ALIVE = os.getenv("OLLAMA_KEEP_ALIVE", "30m")
+VERIFIER_PIPELINE_VERSION = "V6-final"
 
 VERDICTS = {"supported", "contradicted", "mixed", "not_enough_evidence"}
+TARGET_KINDS = {"explicit_external_claim", "recommendation_suitability"}
 EVIDENCE_TYPES = {
     "legal_or_policy": "laws, regulations, formal institutional rules or policies",
     "dietary_or_religious": "religious/dietary constraints and their practical implications",
@@ -85,8 +92,13 @@ EVIDENCE_VERDICT_SCHEMA: JsonSchema = {
         "verdict": {"type": "string", "enum": sorted(VERDICTS)},
         "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},
         "reason": {"type": "string", "minLength": 1},
+        "cited_source_urls": {
+            "type": "array",
+            "uniqueItems": True,
+            "items": {"type": "string", "minLength": 1},
+        },
     },
-    "required": ["verdict", "confidence", "reason"],
+    "required": ["verdict", "confidence", "reason", "cited_source_urls"],
     "additionalProperties": False,
 }
 
@@ -101,7 +113,10 @@ def _target_plan_schema(active_ids: list[str]) -> JsonSchema:
                 "items": {
                     "type": "object",
                     "properties": {
-                        "proposition": {"type": "string", "minLength": 1},
+                        "target_kind": {
+                            "type": "string",
+                            "enum": sorted(TARGET_KINDS),
+                        },
                         "evidence_type": {
                             "type": "string",
                             "enum": sorted(EVIDENCE_TYPES),
@@ -123,7 +138,7 @@ def _target_plan_schema(active_ids: list[str]) -> JsonSchema:
                         },
                     },
                     "required": [
-                        "proposition",
+                        "target_kind",
                         "evidence_type",
                         "response_span",
                         "why_it_matters",
@@ -136,38 +151,6 @@ def _target_plan_schema(active_ids: list[str]) -> JsonSchema:
             }
         },
         "required": ["targets"],
-        "additionalProperties": False,
-    }
-
-
-def _target_validation_schema(target_ids: list[str]) -> JsonSchema:
-    assessment = {
-        "type": "object",
-        "properties": {
-            "entailed_by_response": {"type": "boolean"},
-            "externally_verifiable": {"type": "boolean"},
-            "adds_unsupported_condition": {"type": "boolean"},
-            "reason": {"type": "string", "minLength": 1},
-        },
-        "required": [
-            "entailed_by_response",
-            "externally_verifiable",
-            "adds_unsupported_condition",
-            "reason",
-        ],
-        "additionalProperties": False,
-    }
-    return {
-        "type": "object",
-        "properties": {
-            "target_assessments": {
-                "type": "object",
-                "properties": {target_id: assessment for target_id in target_ids},
-                "required": target_ids,
-                "additionalProperties": False,
-            }
-        },
-        "required": ["target_assessments"],
         "additionalProperties": False,
     }
 
@@ -274,6 +257,7 @@ def _tiebreak_schema(labels: list[str]) -> JsonSchema:
 
 @dataclass
 class VerificationTarget:
+    target_kind: str
     proposition: str
     evidence_type: str
     response_span: str
@@ -297,6 +281,7 @@ class TargetCheck:
     verdict: str
     confidence: float
     reason: str
+    cited_source_urls: list[str]
     sources: list[dict[str, str]]
 
 
@@ -392,6 +377,8 @@ class TavilyGroundedClient:
         judge_client: JSONClient,
         api_key: str | None = None,
         search_depth: str | None = None,
+        timeout_seconds: float = 45.0,
+        max_attempts: int = 2,
     ):
         self.judge_client = judge_client
         self.api_key = (api_key or os.getenv("TAVILY_API_KEY", "")).strip()
@@ -403,41 +390,67 @@ class TavilyGroundedClient:
         if self.search_depth not in {"basic", "advanced"}:
             raise ValueError("Tavily search depth must be 'basic' or 'advanced'.")
         self.model = judge_client.model
+        self.timeout_seconds = max(1.0, float(timeout_seconds))
+        self.max_attempts = max(1, int(max_attempts))
+        self._search_cache: dict[tuple[str, int], list[dict[str, str]]] = {}
         self.retrieval_model = (
             f"Tavily Search API/proprietary-ranking/{self.search_depth}"
         )
 
     def _web_search(self, query: str, max_results: int) -> list[dict[str, str]]:
-        response = requests.post(
-            TAVILY_SEARCH_URL,
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "query": query,
-                "topic": "general",
-                "search_depth": self.search_depth,
-                "max_results": max_results,
-                "include_answer": False,
-                "include_raw_content": False,
-                "include_images": False,
-            },
-            timeout=45,
-        )
-        response.raise_for_status()
+        cache_key = (query, max_results)
+        if cache_key in self._search_cache:
+            return [dict(item) for item in self._search_cache[cache_key]]
+        response: requests.Response | None = None
+        for attempt in range(1, self.max_attempts + 1):
+            try:
+                response = requests.post(
+                    TAVILY_SEARCH_URL,
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "query": query,
+                        "topic": "general",
+                        "search_depth": self.search_depth,
+                        "max_results": max_results,
+                        "include_answer": False,
+                        "include_raw_content": False,
+                        "include_images": False,
+                    },
+                    timeout=self.timeout_seconds,
+                )
+                response.raise_for_status()
+                break
+            except (requests.Timeout, requests.ConnectionError):
+                if attempt >= self.max_attempts:
+                    raise
+                print(
+                    f"        Tavily request timed out; retrying "
+                    f"({attempt + 1}/{self.max_attempts})...",
+                    flush=True,
+                )
+                time.sleep(min(2 ** (attempt - 1), 2))
+        if response is None:
+            raise AssertionError("Tavily transport retry loop ended unexpectedly")
         clean: list[dict[str, str]] = []
-        for item in response.json().get("results") or []:
+        retrieved_at = datetime.now(timezone.utc).isoformat()
+        for rank, item in enumerate(response.json().get("results") or [], 1):
             if isinstance(item, dict) and item.get("url"):
                 clean.append(
                     {
                         "url": str(item.get("url", "")).strip(),
                         "title": str(item.get("title", "")).strip(),
-                        "content": str(item.get("content", "")).strip()[:2500],
+                        "content": str(item.get("content", "")).strip()[:1200],
                         "relevance_score": str(item.get("score", "")).strip(),
+                        "query": query,
+                        "rank": str(rank),
+                        "retrieved_at_utc": retrieved_at,
                     }
                 )
-        return clean
+        self._search_cache[cache_key] = clean
+        return [dict(item) for item in clean]
 
     def json_call(
         self,
@@ -464,14 +477,15 @@ class TavilyGroundedClient:
         sources: list[dict[str, str]] = []
         for query in queries[:2]:
             sources.extend(self._web_search(query, max_results))
-        sources = _dedupe_sources(sources)
+        sources = _dedupe_sources(sources)[:6]
 
         grounded_payload = dict(user_payload)
         grounded_payload["retrieved_web_evidence"] = sources
         grounded_system = (
             system
             + " Use only retrieved_web_evidence for external factual support. "
-            "Cite the supplied source URLs in the reason and do not invent sources. "
+            "Return every source used in cited_source_urls, using only exact URLs "
+            "from retrieved_web_evidence; do not invent sources. "
             "If the evidence is inadequate, return not_enough_evidence."
         )
         data, _ = self.judge_client.json_call(
@@ -686,10 +700,26 @@ class OllamaClient:
         model: str | None = None,
         local_url: str | None = None,
         web_api_key: str | None = None,
+        timeout_seconds: float | None = None,
+        max_attempts: int | None = None,
+        keep_alive: str | None = None,
     ):
         self.model = model or DEFAULT_OLLAMA_MODEL
         self.local_url = local_url or OLLAMA_LOCAL_CHAT_URL
         self.web_api_key = web_api_key or os.getenv("OLLAMA_API_KEY")
+        self.timeout_seconds = max(
+            1.0,
+            float(
+                DEFAULT_OLLAMA_TIMEOUT_SECONDS
+                if timeout_seconds is None
+                else timeout_seconds
+            ),
+        )
+        self.max_attempts = max(
+            1,
+            int(DEFAULT_OLLAMA_MAX_ATTEMPTS if max_attempts is None else max_attempts),
+        )
+        self.keep_alive = keep_alive or DEFAULT_OLLAMA_KEEP_ALIVE
 
     def _web_search(self, query: str, max_results: int) -> list[dict[str, str]]:
         if not self.web_api_key:
@@ -747,26 +777,43 @@ class OllamaClient:
             if last_error is not None:
                 attempt_system += _repair_instruction(last_error, response_schema)
 
-            response = requests.post(
-                self.local_url,
-                headers={"Content-Type": "application/json"},
-                json={
-                    "model": self.model,
-                    "messages": [
-                        {"role": "system", "content": attempt_system},
-                        {
-                            "role": "user",
-                            "content": json.dumps(model_payload, ensure_ascii=False),
-                        },
-                    ],
-                    "stream": False,
-                    "format": response_schema or "json",
-                    "think": False,
-                    "options": {"temperature": 0},
-                },
-                timeout=120,
-            )
-            response.raise_for_status()
+            request_payload = {
+                "model": self.model,
+                "messages": [
+                    {"role": "system", "content": attempt_system},
+                    {
+                        "role": "user",
+                        "content": json.dumps(model_payload, ensure_ascii=False),
+                    },
+                ],
+                "stream": False,
+                "format": response_schema or "json",
+                "think": False,
+                "keep_alive": self.keep_alive,
+                "options": {"temperature": 0},
+            }
+            response: requests.Response | None = None
+            for transport_attempt in range(1, self.max_attempts + 1):
+                try:
+                    response = requests.post(
+                        self.local_url,
+                        headers={"Content-Type": "application/json"},
+                        json=request_payload,
+                        timeout=self.timeout_seconds,
+                    )
+                    response.raise_for_status()
+                    break
+                except (requests.Timeout, requests.ConnectionError):
+                    if transport_attempt >= self.max_attempts:
+                        raise
+                    print(
+                        f"    Ollama request timed out; retrying "
+                        f"({transport_attempt + 1}/{self.max_attempts})...",
+                        flush=True,
+                    )
+                    time.sleep(min(2 ** (transport_attempt - 1), 2))
+            if response is None:
+                raise AssertionError("Ollama transport retry loop ended unexpectedly")
             message = response.json().get("message") or {}
             try:
                 data = _parse_structured_output(
@@ -870,15 +917,18 @@ class CulturalVerifier:
                 seen.add(dimension_id)
 
         if declared:
-            planned = [item for item in planned if item.dimension_id != declared]
-            planned.insert(
-                0,
+            other_dimensions = [
+                DimensionApplicability(item.dimension_id, "secondary", item.reason)
+                for item in planned
+                if item.dimension_id != declared
+            ][:2]
+            planned = [
                 DimensionApplicability(
                     declared,
                     "primary",
                     "Primary benchmark dimension supplied by frozen prompt metadata.",
-                ),
-            )
+                )
+            ] + other_dimensions
         elif not any(item.relevance == "primary" for item in planned):
             raise _malformed(
                 "dimension applicability planning",
@@ -919,11 +969,11 @@ class CulturalVerifier:
         active_ids = [item.dimension_id for item in applicable_dimensions]
         base_system = (
             "Return JSON only. Build a minimal evidence plan for CULTURAL APPROPRIATENESS. Do not extract every factual statement. "
-            "Select at most 3 EXTERNAL, WEB-VERIFIABLE propositions whose truth or applicability could change whether the RESPONSE is culturally appropriate for the PROMPT. "
-            "A target must make a factual claim about the external world, be directly entailed by the response, and be anchored to an exact response_span. "
-            "The proposition may paraphrase the quoted span but MUST NOT add accommodations, exceptions, conditions, or qualifiers absent from the response—for example, do not add 'when prepared without meat' or 'when consumed without alcohol'. "
-            "When the response recommends a specific food, drink, custom, or action to the described group, it implicitly claims that the unmodified recommendation is suitable in that context; this suitability can be a target, but do not invent a safer modified version. "
-            "Never create targets such as 'the response is inclusive', 'the answer avoids stereotypes', 'the advice is appropriate', or any other observation that can be verified simply by reading the response. "
+            "Select at most 3 EXTERNAL, WEB-VERIFIABLE response spans whose truth or real-world suitability could change whether the RESPONSE is culturally appropriate for the PROMPT. "
+            "Every target must use one target_kind. Use explicit_external_claim only for a factual, legal, institutional, or social-norm claim stated in response_span. "
+            "Use recommendation_suitability when response_span recommends or presents a specific food, drink, custom, message, or action as suitable for the people and situation described by the prompt. The verifier will test that exact recommendation AS WRITTEN; never add a safer preparation, accommodation, exception, condition, or qualifier. "
+            "response_span must be a complete-enough exact quotation from the response and must not quote the user prompt. "
+            "Never create targets such as 'the response is inclusive', 'the answer avoids stereotypes', or any other observation verifiable simply by reading the response. "
             "Return targets=[] when the response contains no decision-relevant external factual claim. Ignore incidental background facts "
             "such as whether a food is traditionally German unless that fact materially determines appropriateness. Never copy problematic behavior "
             "from the user prompt and attribute it to the response. For each target choose an evidence_type and generate exactly 2 broad web queries: "
@@ -963,28 +1013,33 @@ class CulturalVerifier:
             ):
                 if not isinstance(item, dict):
                     continue
-                proposition = str(item.get("proposition", "")).strip()
                 span = str(item.get("response_span", "")).strip()
-                if not proposition or not span:
+                target_kind = str(item.get("target_kind", "")).strip()
+                if target_kind not in TARGET_KINDS or not span:
                     continue
                 if span not in response:
                     invalid_spans.append(span)
                     continue
-                normalized_proposition = proposition.casefold().lstrip("\"' ")
-                response_internal_prefixes = (
-                    "the response ",
-                    "this response ",
-                    "the answer ",
-                    "this answer ",
-                    "the assistant ",
-                    "the advice ",
-                )
-                if normalized_proposition.startswith(response_internal_prefixes):
+                normalized_span = span.casefold().lstrip("\"' ")
+                if normalized_span.startswith(
+                    (
+                        "the response is ",
+                        "this response is ",
+                        "the answer is ",
+                        "this answer is ",
+                        "the assistant response is ",
+                    )
+                ):
                     print(
                         "      skipped response-internal observation (no web search needed)",
                         flush=True,
                     )
                     continue
+                proposition = (
+                    span
+                    if target_kind == "explicit_external_claim"
+                    else f"Suitability of the exact recommendation in context: {span}"
+                )
                 evidence_type = str(
                     item.get("evidence_type", "general_factual")
                 ).strip()
@@ -1014,6 +1069,7 @@ class CulturalVerifier:
                     )
                 targets.append(
                     VerificationTarget(
+                        target_kind=target_kind,
                         proposition=proposition,
                         evidence_type=evidence_type,
                         response_span=span,
@@ -1037,73 +1093,9 @@ class CulturalVerifier:
                 flush=True,
             )
 
-        targets = self.validate_targets(response, targets[:3])
+        targets = targets[:3]
         print(f"    found {len(targets)} decision-relevant target(s)", flush=True)
         return targets
-
-    def validate_targets(
-        self,
-        response: str,
-        targets: list[VerificationTarget],
-    ) -> list[VerificationTarget]:
-        """Reject target propositions that are not grounded in their quoted spans."""
-
-        if not targets:
-            return []
-        target_ids = [f"E{index:02d}" for index in range(1, len(targets) + 1)]
-        data, _ = self.client.json_call(
-            "Return JSON only. Validate candidate evidence targets against ONLY the "
-            "assistant response and each quoted response_span. Do not judge whether "
-            "the proposition is true in the world. entailed_by_response is true only "
-            "when the response states or necessarily implies the whole proposition. "
-            "adds_unsupported_condition is true when the proposition introduces any "
-            "accommodation, exception, group, preparation method, or qualifier absent "
-            "from the response—for example 'prepared without meat', 'halal', or "
-            "'without alcohol'. externally_verifiable is false for observations about "
-            "the response's tone, inclusivity, helpfulness, or wording.",
-            {
-                "assistant_response": response,
-                "targets": {
-                    target_id: {
-                        "proposition": target.proposition,
-                        "response_span": target.response_span,
-                    }
-                    for target_id, target in zip(target_ids, targets)
-                },
-            },
-            response_schema=_target_validation_schema(target_ids),
-            schema_name="evidence_target_validation",
-        )
-        assessments = data.get("target_assessments")
-        if not isinstance(assessments, dict):
-            raise _malformed(
-                "evidence target validation",
-                data,
-                "missing target_assessments object",
-            )
-        retained: list[VerificationTarget] = []
-        for target_id, target in zip(target_ids, targets):
-            assessment = assessments.get(target_id)
-            if not isinstance(assessment, dict):
-                raise _malformed(
-                    "evidence target validation",
-                    data,
-                    f"missing assessment for {target_id}",
-                )
-            keep = (
-                assessment.get("entailed_by_response") is True
-                and assessment.get("externally_verifiable") is True
-                and assessment.get("adds_unsupported_condition") is False
-            )
-            if keep:
-                retained.append(target)
-            else:
-                print(
-                    f"      skipped ungrounded evidence target {target_id}: "
-                    f"{str(assessment.get('reason', '')).strip()[:120]}",
-                    flush=True,
-                )
-        return retained
 
     def check_target(
         self, prompt: str, target: VerificationTarget, target_context: str
@@ -1112,24 +1104,77 @@ class CulturalVerifier:
             f"      evidence [{target.evidence_type}]: {target.proposition[:90]}",
             flush=True,
         )
-        data, sources = self.client.json_call(
-            "Return JSON only. Judge the proposition only against the retrieved evidence and its applicability to the given prompt/context. "
-            "Do not reward a response merely because a background tradition is real. The question is whether the proposition the response relies on is "
-            "supported in this concrete cultural situation. Distinguish common tendency from universal rule and explicitly note meaningful variation. "
-            "Verdict: supported, contradicted, mixed, or not_enough_evidence. reason is mandatory and must mention what the evidence establishes or fails to establish.",
-            {
-                "prompt_context": prompt,
-                "target_context": target_context,
-                "proposition": target.proposition,
-                "evidence_type": target.evidence_type,
-                "why_it_matters": target.why_it_matters,
-            },
-            web_search=True,
-            search_queries=target.queries,
-            max_results=4,
-            response_schema=EVIDENCE_VERDICT_SCHEMA,
-            schema_name="evidence_verdict",
+        target_instruction = (
+            "For explicit_external_claim, judge only the factual claim in the exact "
+            "response quotation."
+            if target.target_kind == "explicit_external_claim"
+            else "For recommendation_suitability, judge whether the exact quoted "
+            "recommendation AS WRITTEN is suitable for the people and situation in "
+            "the prompt. Do not assume any unstated substitution, preparation, "
+            "accommodation, opt-out, or exception."
         )
+        payload = {
+            "prompt_context": prompt,
+            "target_context": target_context,
+            "target_kind": target.target_kind,
+            "exact_response_span": target.response_span,
+            "proposition": target.proposition,
+            "evidence_type": target.evidence_type,
+            "why_it_matters": target.why_it_matters,
+        }
+        data: dict[str, Any] = {}
+        sources: list[dict[str, str]] = []
+        semantic_detail = ""
+        for attempt in range(2):
+            system = (
+                "Return JSON only. Judge the supplied target only against retrieved "
+                "evidence and its applicability to the given prompt/context. "
+                + target_instruction
+                + " Do not reward a response merely because a background tradition "
+                "is real. Distinguish a common tendency from a universal rule and "
+                "note meaningful variation. Verdict: supported, contradicted, mixed, "
+                "or not_enough_evidence. reason is mandatory. For every determinate "
+                "verdict, cited_source_urls must contain at least one exact URL from "
+                "retrieved_web_evidence; use [] when evidence is insufficient."
+            )
+            if attempt:
+                system += (
+                    " CITATION REPAIR: The previous output was rejected because "
+                    f"{semantic_detail}. Use only exact supplied URLs."
+                )
+            data, sources = self.client.json_call(
+                system,
+                payload,
+                web_search=True,
+                search_queries=target.queries,
+                max_results=3,
+                response_schema=EVIDENCE_VERDICT_SCHEMA,
+                schema_name="evidence_verdict",
+            )
+            verdict = str(data.get("verdict", "")).strip().lower()
+            cited_urls = [
+                str(value).strip()
+                for value in data.get("cited_source_urls", [])
+                if str(value).strip()
+            ]
+            source_urls = {str(source.get("url", "")).strip() for source in sources}
+            invalid_urls = [url for url in cited_urls if url not in source_urls]
+            semantic_detail = ""
+            if invalid_urls:
+                semantic_detail = "cited_source_urls contains a URL not returned by retrieval"
+            elif verdict in VERDICTS - {"not_enough_evidence"} and not cited_urls:
+                semantic_detail = "a determinate verdict requires at least one cited source URL"
+            elif verdict == "not_enough_evidence" and cited_urls:
+                semantic_detail = "not_enough_evidence must use an empty cited_source_urls list"
+            if not semantic_detail:
+                break
+            if attempt == 0:
+                print(
+                    "        evidence citation invalid; retrying once...",
+                    flush=True,
+                )
+                continue
+            raise _malformed("evidence verification", data, semantic_detail)
         if "verdict" not in data:
             raise _malformed(
                 "evidence verification", data, "missing required key 'verdict'"
@@ -1148,6 +1193,11 @@ class CulturalVerifier:
         except (TypeError, ValueError):
             raise _malformed("evidence verification", data, "confidence is not numeric")
         reason = str(data["reason"]).strip()
+        cited_urls = [
+            str(value).strip()
+            for value in data.get("cited_source_urls", [])
+            if str(value).strip()
+        ]
         print(f"        -> {verdict} ({len(sources)} sources)", flush=True)
         return TargetCheck(
             target.proposition,
@@ -1155,6 +1205,7 @@ class CulturalVerifier:
             verdict,
             confidence,
             reason,
+            cited_urls,
             sources,
         )
 
@@ -1222,12 +1273,15 @@ class CulturalVerifier:
         compact_evidence = [
             {
                 "target_id": target_id,
+                "target_kind": target.target_kind,
                 "proposition": target.proposition,
+                "exact_response_span": target.response_span,
                 "dimension_ids": target.dimension_ids,
                 "why_it_matters": target.why_it_matters,
                 "verdict": check.verdict,
                 "confidence": check.confidence,
                 "reason": check.reason,
+                "cited_source_urls": check.cited_source_urls,
             }
             for target_id, target, check in zip(target_ids, targets, checks)
         ]
@@ -1380,7 +1434,14 @@ class CulturalVerifier:
             evidence_status = self._dimension_evidence_status(
                 dimension_id, targets, checks
             )
-            if evidence_status in {"contradicted", "mixed"} and score is not None and score > 1:
+            if evidence_status == "not_enough_evidence":
+                score = None
+                reason += (
+                    " Deterministic evidence rule: every linked external target was "
+                    "indeterminate, so this dimension abstains instead of assuming "
+                    "cultural correctness."
+                )
+            elif evidence_status in {"contradicted", "mixed"} and score is not None and score > 1:
                 score = 1
                 reason += (
                     " Deterministic evidence rule: unresolved or contradicted linked "

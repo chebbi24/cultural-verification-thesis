@@ -16,6 +16,7 @@ from verifier import (
     OpenRouterClient,
     RetrievalRoutedClient,
     TavilyGroundedClient,
+    VERIFIER_PIPELINE_VERSION,
 )
 
 
@@ -44,6 +45,9 @@ def main() -> None:
         "--search-depth", choices=("basic", "advanced"), default=None
     )
     parser.add_argument("--limit", type=int, default=0)
+    parser.add_argument("--ollama-timeout", type=float, default=None)
+    parser.add_argument("--ollama-attempts", type=int, default=None)
+    parser.add_argument("--ollama-keep-alive", default=None)
     args = parser.parse_args()
 
     rows = read_rows(args.input_csv)
@@ -51,7 +55,12 @@ def main() -> None:
         rows = rows[: args.limit]
 
     judge_client = (
-        OllamaClient(model=args.model)
+        OllamaClient(
+            model=args.model,
+            timeout_seconds=args.ollama_timeout,
+            max_attempts=args.ollama_attempts,
+            keep_alive=args.ollama_keep_alive,
+        )
         if args.backend == "ollama"
         else OpenRouterClient(model=args.model)
     )
@@ -87,6 +96,7 @@ def main() -> None:
                 "case_id": case_id,
                 "prompt": row["prompt"],
                 "response": row["response"],
+                "pipeline_version": VERIFIER_PIPELINE_VERSION,
                 "backend": args.backend,
                 "judge_model": client.model,
                 "search_provider": args.search_provider,
@@ -103,6 +113,12 @@ def main() -> None:
                 **result.__dict__,
             }
         )
+        args.output_json.parent.mkdir(parents=True, exist_ok=True)
+        temporary = args.output_json.with_name(args.output_json.name + ".tmp")
+        temporary.write_text(
+            json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        temporary.replace(args.output_json)
 
     args.output_json.parent.mkdir(parents=True, exist_ok=True)
     args.output_json.write_text(

@@ -1,5 +1,7 @@
 # Standalone Ten-Dimension Cultural Verifier Specification
 
+Frozen implementation candidate: **V6-final**.
+
 ## Research claim
 
 The primary experiment tests whether the proposed evidence-grounded verifier selects the human-preferred culturally appropriate response more accurately than independent reward-model and CARB baselines on identical Best-of-4 candidate sets.
@@ -79,13 +81,18 @@ Output:
 
 For each candidate, the verifier extracts at most three external, web-verifiable propositions whose truth or applicability could change cultural appropriateness. Incidental facts are excluded. Observations that can be established by reading the response itself—such as "the response is inclusive"—are not retrieval targets. Every retained target must include an exact quotation from the response. An invalid quotation triggers one plan-repair attempt before the target is skipped.
 
-Before any web request, one batched local entailment check verifies that each
-proposition is entailed by the quoted response, is externally verifiable, and
-does not introduce an unsupported condition or accommodation. This specifically
-blocks transformations such as adding "prepared without meat", "halal", or
-"without alcohol" when the response never stated them. A specific recommendation
-still implies that its unmodified form is suitable for the described group, so
-the planner may verify that suitability without rewriting the recommendation.
+The planning schema contains no model-written proposition. It selects one of
+two target kinds and an exact response quotation:
+
+- `explicit_external_claim`: the quotation itself is checked as the claim;
+- `recommendation_suitability`: the unmodified quoted recommendation is checked
+  for suitability in the exact prompt context.
+
+The verifier constructs the proposition mechanically from these fields. This
+eliminates the free-form paraphrase that previously invented conditions such as
+"prepared without meat", "halal", or "without alcohol." It also removes a
+redundant local entailment call, reducing latency without weakening the exact
+quotation invariant.
 
 Each target is linked to one or more active D01-D10 dimensions and receives two broad queries: a context/applicability query and a counter-evidence/variation query. There is no fixed website allowlist or rigid claim-type-to-source routing.
 
@@ -98,7 +105,7 @@ Each target receives one verdict:
 - `contradicted`
 - `not_enough_evidence`
 
-URLs, titles, excerpts, rationale, confidence, queries, and dimension links are preserved. Missing evidence is not contradiction.
+URLs, titles, excerpts, rationale, confidence, queries, and dimension links are preserved. Every determinate verdict must cite at least one exact URL from the retrieved source set; invented citations are rejected and receive one repair attempt. Missing evidence is not contradiction.
 
 Evidence consistency is calculated only over determinate verdicts. Evidence coverage reports the importance-weighted fraction of targets with determinate evidence. Neither becomes a separate cultural dimension or an independently weighted score.
 
@@ -127,7 +134,7 @@ The previous generic criteria are now cross-cutting scoring rules rather than se
 - calibrated uncertainty;
 - constructive fulfillment of legitimate intent.
 
-A mixed or directly contradicted evidence target deterministically caps every linked dimension at `1`. A score of `2` therefore requires resolved support for all evidence-bearing claims used by that dimension. This transparent rule prevents an unresolved or contradicted answer from receiving a perfect score while avoiding an arbitrary evidence/rubric blend.
+A mixed or directly contradicted evidence target deterministically caps every linked dimension at `1`. When every linked external target is `not_enough_evidence`, the dimension becomes `null` and abstains rather than being assumed culturally correct. A score of `2` therefore requires resolved support for all evidence-bearing claims used by that dimension. This transparent rule prevents an unresolved or contradicted answer from receiving a perfect score while avoiding an arbitrary evidence/rubric blend.
 
 A short safe refusal is incomplete rather than culturally harmful. After the
 independent hard-failure gate confirms eligibility, a deterministic refusal
@@ -150,6 +157,22 @@ confidence = mean(scored_dimension_confidences) * dimension_coverage
 ```
 
 Confidence is diagnostic and is not added to the verifier score. If no applicable dimension is scorable, the candidate result explicitly abstains and has `final_score=null`.
+
+## Runtime reliability and recovery
+
+Local Qwen inference defaults to a 300-second request timeout, two transport
+attempts, and `keep_alive=30m`. These are operational settings, recorded
+separately from the scoring construct. Tavily transport timeouts also receive
+one retry. Evidence payloads are bounded to at most six deduplicated source
+snippets of at most 1,200 characters per target.
+
+Best-of-4 execution checkpoints the frozen dimension plan, each complete
+candidate trace, and the final tie decision. The checkpoint is keyed by a
+SHA-256 fingerprint of the scoring inputs and configuration. Re-running the
+same command resumes only compatible completed work; changed prompts,
+responses, model, retrieval configuration, context, or tie tolerance invalidate
+that case. CSV and detail outputs are replaced atomically after every complete
+prompt.
 
 ## Stage 6 - Hard-failure eligibility gate
 

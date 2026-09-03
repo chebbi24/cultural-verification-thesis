@@ -14,6 +14,7 @@ from verifier import (
     DEFAULT_TAVILY_SEARCH_DEPTH,
     OLLAMA_LOCAL_CHAT_URL,
     TAVILY_SEARCH_URL,
+    OllamaClient,
 )
 
 
@@ -34,6 +35,13 @@ def main() -> None:
         "--require-web-search",
         action="store_true",
         help="For the Ollama backend, require OLLAMA_API_KEY for hosted web search.",
+    )
+    parser.add_argument("--ollama-timeout", type=float, default=None)
+    parser.add_argument("--ollama-attempts", type=int, default=None)
+    parser.add_argument(
+        "--skip-judge-smoke",
+        action="store_true",
+        help="Check installation only; do not run one structured local-model request.",
     )
     args = parser.parse_args()
 
@@ -112,7 +120,7 @@ def main() -> None:
         sys.exit(1)
 
     installed = {
-        str(item.get("name", "")).strip()
+        str(item.get("name", "")).strip(): item
         for item in response.json().get("models", [])
         if isinstance(item, dict)
     }
@@ -120,7 +128,31 @@ def main() -> None:
         print(f"FAIL local model missing: {model}")
         print(f"Run: ollama pull {model}")
         sys.exit(1)
-    print(f"OK local Ollama server and model: {model}")
+    digest = str(installed[model].get("digest", "")).strip() or "not reported"
+    print(f"OK local Ollama server and model: {model}; digest={digest}")
+
+    if not args.skip_judge_smoke:
+        smoke_schema = {
+            "type": "object",
+            "properties": {"status": {"type": "string", "enum": ["ready"]}},
+            "required": ["status"],
+            "additionalProperties": False,
+        }
+        try:
+            data, _ = OllamaClient(
+                model=model,
+                timeout_seconds=args.ollama_timeout,
+                max_attempts=args.ollama_attempts,
+            ).json_call(
+                "Return JSON only with status set to ready.",
+                {"task": "verifier setup smoke test"},
+                response_schema=smoke_schema,
+                schema_name="setup_smoke",
+            )
+        except (requests.RequestException, RuntimeError, ValueError) as exc:
+            print(f"FAIL local Ollama structured-output smoke test: {exc}")
+            sys.exit(1)
+        print(f"OK local Ollama structured output: {data['status']}")
 
     if args.search_provider in {"openrouter", "tavily"}:
         provider_name = "OpenRouter" if args.search_provider == "openrouter" else "Tavily"

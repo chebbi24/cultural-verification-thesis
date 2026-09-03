@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import requests
 import sys
 import tempfile
 import unittest
@@ -30,13 +31,14 @@ from verifier import (
     TavilyGroundedClient,
     TargetCheck,
     VerificationTarget,
+    VerifierResult,
 )
 
 
 class ScriptedClient:
     model = "scripted-test-client"
 
-    def __init__(self, outputs: list[dict[str, Any]]):
+    def __init__(self, outputs: list[Any]):
         self.outputs = list(outputs)
         self.calls: list[dict[str, Any]] = []
 
@@ -51,7 +53,10 @@ class ScriptedClient:
         self.calls.append(call)
         if not self.outputs:
             raise AssertionError("ScriptedClient received an unexpected call")
-        return self.outputs.pop(0), []
+        value = self.outputs.pop(0)
+        if isinstance(value, tuple):
+            return value
+        return value, []
 
 
 class FakeHTTPResponse:
@@ -95,6 +100,7 @@ def plan(dimension_id: str = "D03") -> list[DimensionApplicability]:
 
 def target(verdict_dimension: str = "D03") -> VerificationTarget:
     return VerificationTarget(
+        target_kind="explicit_external_claim",
         proposition="Quiet hours apply after 22:00.",
         evidence_type="legal_or_policy",
         response_span="Quiet hours apply after 22:00.",
@@ -112,6 +118,7 @@ def check(verdict: str) -> TargetCheck:
         verdict=verdict,
         confidence=0.9,
         reason=f"Evidence verdict: {verdict}.",
+        cited_source_urls=[],
         sources=[],
     )
 
@@ -150,6 +157,31 @@ class CulturalDimensionTests(unittest.TestCase):
         self.assertEqual(result[0].relevance, "primary")
         self.assertEqual(client.calls[0]["response_schema"], DIMENSION_PLAN_SCHEMA)
         self.assertEqual(client.calls[0]["schema_name"], "dimension_applicability_plan")
+
+    def test_declared_dimension_overrides_model_primary_without_duplicate_primary(self) -> None:
+        client = ScriptedClient(
+            [
+                {
+                    "applicable_dimensions": [
+                        {
+                            "dimension_id": "D03",
+                            "relevance": "primary",
+                            "reason": "Model-selected etiquette dimension.",
+                        },
+                        {
+                            "dimension_id": "D06",
+                            "relevance": "secondary",
+                            "reason": "Religious practice is relevant.",
+                        },
+                    ]
+                }
+            ]
+        )
+        result = CulturalVerifier(client).plan_dimensions(
+            "A prompt with frozen benchmark metadata.", "Germany", "D01"
+        )
+        self.assertEqual([item.dimension_id for item in result], ["D01", "D03", "D06"])
+        self.assertEqual([item.relevance for item in result], ["primary", "secondary", "secondary"])
 
     def test_ollama_enforces_schema_and_repairs_once(self) -> None:
         invalid = json.dumps(
@@ -208,6 +240,44 @@ class CulturalDimensionTests(unittest.TestCase):
                     schema_name="dimension_applicability_plan",
                 )
         self.assertEqual(post.call_count, 2)
+
+    def test_ollama_retries_transport_timeout_and_keeps_model_loaded(self) -> None:
+        valid = json.dumps(
+            {
+                "applicable_dimensions": [
+                    {
+                        "dimension_id": "D03",
+                        "relevance": "primary",
+                        "reason": "Etiquette is central.",
+                    }
+                ]
+            }
+        )
+        client = OllamaClient(
+            local_url="http://ollama.test/api/chat",
+            timeout_seconds=321,
+            max_attempts=2,
+            keep_alive="45m",
+        )
+        with (
+            mock.patch(
+                "verifier.requests.post",
+                side_effect=[requests.ReadTimeout("slow"), FakeHTTPResponse(valid)],
+            ) as post,
+            mock.patch("verifier.time.sleep") as sleep,
+        ):
+            data, _ = client.json_call(
+                "Return JSON only.",
+                {"prompt": "Test"},
+                response_schema=DIMENSION_PLAN_SCHEMA,
+                schema_name="dimension_applicability_plan",
+            )
+
+        self.assertEqual(data["applicable_dimensions"][0]["dimension_id"], "D03")
+        self.assertEqual(post.call_count, 2)
+        self.assertEqual(post.call_args.kwargs["timeout"], 321)
+        self.assertEqual(post.call_args.kwargs["json"]["keep_alive"], "45m")
+        sleep.assert_called_once()
 
     def test_openrouter_uses_current_web_plugin_and_preserves_sources(self) -> None:
         content = json.dumps(
@@ -333,6 +403,9 @@ class CulturalDimensionTests(unittest.TestCase):
         self.assertFalse(payload["include_answer"])
         self.assertEqual(data["verdict"], "supported")
         self.assertEqual(sources[0]["url"], "https://example.org/germany")
+        self.assertEqual(sources[0]["query"], "Germany test evidence")
+        self.assertEqual(sources[0]["rank"], "1")
+        self.assertTrue(sources[0]["retrieved_at_utc"].endswith("+00:00"))
         self.assertEqual(len(judge.calls), 1)
         self.assertFalse(judge.calls[0].get("web_search", False))
         self.assertEqual(
@@ -340,7 +413,65 @@ class CulturalDimensionTests(unittest.TestCase):
             ["verdict", "confidence", "reason"],
         )
 
-    def test_not_enough_evidence_is_not_a_contradiction_or_score_cap(self) -> None:
+    def test_tavily_caches_identical_queries_within_a_run(self) -> None:
+        judge = ScriptedClient([{"ok": True}, {"ok": True}])
+        client = TavilyGroundedClient(judge, api_key="tvly-test")
+        response = FakeJSONResponse(
+            {
+                "results": [
+                    {
+                        "url": "https://example.org/source",
+                        "title": "Source",
+                        "content": "Evidence",
+                    }
+                ]
+            }
+        )
+        with mock.patch("verifier.requests.post", return_value=response) as post:
+            for _ in range(2):
+                client.json_call(
+                    "Return JSON only.",
+                    {"proposition": "Test"},
+                    web_search=True,
+                    search_queries=["identical query"],
+                )
+        self.assertEqual(post.call_count, 1)
+
+    def test_evidence_verdict_repairs_an_invented_source_url(self) -> None:
+        source = {
+            "url": "https://example.org/real",
+            "title": "Real source",
+            "content": "Relevant evidence.",
+        }
+        client = ScriptedClient(
+            [
+                (
+                    {
+                        "verdict": "supported",
+                        "confidence": 0.8,
+                        "reason": "Supported.",
+                        "cited_source_urls": ["https://invented.invalid/source"],
+                    },
+                    [source],
+                ),
+                (
+                    {
+                        "verdict": "supported",
+                        "confidence": 0.8,
+                        "reason": "Supported by the retrieved source.",
+                        "cited_source_urls": [source["url"]],
+                    },
+                    [source],
+                ),
+            ]
+        )
+        result = CulturalVerifier(client).check_target(
+            "Prompt", target(), "Germany"
+        )
+        self.assertEqual(result.cited_source_urls, [source["url"]])
+        self.assertIn("CITATION REPAIR", client.calls[1]["system"])
+
+    def test_not_enough_evidence_abstains_instead_of_assuming_correctness(self) -> None:
         client = ScriptedClient(
             [
                 {
@@ -364,9 +495,9 @@ class CulturalDimensionTests(unittest.TestCase):
             [target()],
             [check("not_enough_evidence")],
         )
-        self.assertEqual(records["D03"]["score"], 2)
+        self.assertIsNone(records["D03"]["score"])
         self.assertEqual(records["D03"]["evidence_status"], "not_enough_evidence")
-        self.assertEqual(normalized["D03"], 1.0)
+        self.assertNotIn("D03", normalized)
 
     def test_contradicted_linked_claim_caps_dimension_at_one(self) -> None:
         client = ScriptedClient(
@@ -526,7 +657,7 @@ class CulturalDimensionTests(unittest.TestCase):
                 {
                     "targets": [
                         {
-                            "proposition": "The response is inclusive.",
+                            "target_kind": "explicit_external_claim",
                             "evidence_type": "inclusion_or_discrimination",
                             "response_span": "The answer is inclusive.",
                             "why_it_matters": "Inclusivity affects appropriateness.",
@@ -535,7 +666,7 @@ class CulturalDimensionTests(unittest.TestCase):
                             "dimension_ids": ["D03"],
                         },
                         {
-                            "proposition": "Quiet hours apply after 22:00.",
+                            "target_kind": "explicit_external_claim",
                             "evidence_type": "legal_or_policy",
                             "response_span": "Quiet hours apply after 22:00.",
                             "why_it_matters": "The recommendation relies on this rule.",
@@ -548,16 +679,6 @@ class CulturalDimensionTests(unittest.TestCase):
                         },
                     ]
                 },
-                {
-                    "target_assessments": {
-                        "E01": {
-                            "entailed_by_response": True,
-                            "externally_verifiable": True,
-                            "adds_unsupported_condition": False,
-                            "reason": "The quoted factual claim is externally verifiable.",
-                        }
-                    }
-                },
             ]
         )
         targets = CulturalVerifier(client).plan_targets(
@@ -566,14 +687,14 @@ class CulturalDimensionTests(unittest.TestCase):
         self.assertEqual(len(targets), 1)
         self.assertEqual(targets[0].proposition, "Quiet hours apply after 22:00.")
 
-    def test_target_entailment_gate_rejects_an_invented_condition(self) -> None:
+    def test_suitability_target_is_mechanically_grounded_without_invented_condition(self) -> None:
         response = "We will serve German beer and schnapps."
         client = ScriptedClient(
             [
                 {
                     "targets": [
                         {
-                            "proposition": "Beer and schnapps are acceptable when consumed without alcohol.",
+                            "target_kind": "recommendation_suitability",
                             "evidence_type": "dietary_or_religious",
                             "response_span": "German beer and schnapps",
                             "why_it_matters": "The recommendation must fit the guests.",
@@ -583,27 +704,20 @@ class CulturalDimensionTests(unittest.TestCase):
                         }
                     ]
                 },
-                {
-                    "target_assessments": {
-                        "E01": {
-                            "entailed_by_response": False,
-                            "externally_verifiable": True,
-                            "adds_unsupported_condition": True,
-                            "reason": "The response never says without alcohol.",
-                        }
-                    }
-                },
             ]
         )
         targets = CulturalVerifier(client).plan_targets(
             "Prompt", response, "Germany", plan()
         )
-        self.assertEqual(targets, [])
+        self.assertEqual(len(targets), 1)
+        self.assertEqual(targets[0].target_kind, "recommendation_suitability")
+        self.assertEqual(targets[0].response_span, "German beer and schnapps")
+        self.assertNotIn("without alcohol", targets[0].proposition)
 
     def test_invalid_target_quote_is_repaired_once(self) -> None:
         response = "Quiet hours apply after 22:00."
         valid_target = {
-            "proposition": "Quiet hours apply after 22:00.",
+            "target_kind": "explicit_external_claim",
             "evidence_type": "legal_or_policy",
             "response_span": "Quiet hours apply after 22:00.",
             "why_it_matters": "The recommendation relies on this rule.",
@@ -617,16 +731,6 @@ class CulturalDimensionTests(unittest.TestCase):
             [
                 {"targets": [invalid_target]},
                 {"targets": [valid_target]},
-                {
-                    "target_assessments": {
-                        "E01": {
-                            "entailed_by_response": True,
-                            "externally_verifiable": True,
-                            "adds_unsupported_condition": False,
-                            "reason": "Exact factual claim.",
-                        }
-                    }
-                },
             ]
         )
         targets = CulturalVerifier(client).plan_targets(
@@ -634,6 +738,68 @@ class CulturalDimensionTests(unittest.TestCase):
         )
         self.assertEqual(len(targets), 1)
         self.assertIn("TARGET REPAIR", client.calls[1]["system"])
+
+    def test_full_grounded_pipeline_keeps_exact_recommendation_and_caps_mixed_evidence(self) -> None:
+        response = "We will serve German beer and schnapps to everyone."
+        source = {
+            "url": "https://example.org/alcohol",
+            "title": "Dietary guidance",
+            "content": "Some guests avoid alcohol for religious reasons.",
+        }
+        client = ScriptedClient(
+            [
+                {
+                    "targets": [
+                        {
+                            "target_kind": "recommendation_suitability",
+                            "evidence_type": "dietary_or_religious",
+                            "response_span": "German beer and schnapps to everyone",
+                            "why_it_matters": "The recommendation must suit the named guests.",
+                            "importance": 3,
+                            "queries": [
+                                "Germany alcohol Muslim guests",
+                                "Germany alcohol hospitality variation",
+                            ],
+                            "dimension_ids": ["D06"],
+                        }
+                    ]
+                },
+                (
+                    {
+                        "verdict": "mixed",
+                        "confidence": 0.9,
+                        "reason": "The exact recommendation does not fit every guest.",
+                        "cited_source_urls": [source["url"]],
+                    },
+                    [source],
+                ),
+                {
+                    "dimension_scores": {
+                        "D06": {
+                            "score": 2,
+                            "confidence": 0.9,
+                            "reason": "Nominal model score.",
+                            "response_spans": [
+                                "German beer and schnapps to everyone"
+                            ],
+                            "evidence_target_ids": ["E01"],
+                        }
+                    }
+                },
+                {"hard_failure_detected": False, "hard_failures": []},
+            ]
+        )
+        result = CulturalVerifier(client).verify(
+            "Invite vegetarians and Muslim colleagues.",
+            response,
+            applicable_dimensions=plan("D06"),
+        )
+
+        self.assertEqual(result.verification_targets[0]["target_kind"], "recommendation_suitability")
+        self.assertNotIn("without alcohol", result.verification_targets[0]["proposition"])
+        self.assertEqual(result.target_checks[0]["cited_source_urls"], [source["url"]])
+        self.assertEqual(result.cultural_dimension_scores["D06"]["score"], 1)
+        self.assertEqual(result.final_score, 0.5)
 
     def test_dimension_score_repair_rejects_prompt_leakage(self) -> None:
         invalid = {
@@ -730,7 +896,7 @@ class CulturalDimensionTests(unittest.TestCase):
         class FakeBackend:
             model = "fake-backend"
 
-            def __init__(self, model: str | None = None):
+            def __init__(self, model: str | None = None, **_kwargs: Any):
                 if model:
                     self.model = model
 
@@ -767,6 +933,7 @@ class CulturalDimensionTests(unittest.TestCase):
                     final_score=scores[response],
                     abstained=False,
                     hard_fail=False,
+                    eligible=True,
                 )
 
             def compare_candidates(
@@ -812,11 +979,96 @@ class CulturalDimensionTests(unittest.TestCase):
             )
             self.assertIn('"dimension_id": "D03"', details)
 
+    def test_best_of_four_resumes_after_candidate_timeout(self) -> None:
+        class FakeBackend:
+            model = "fake-backend"
+
+            def __init__(self, model: str | None = None, **_kwargs: Any):
+                if model:
+                    self.model = model
+
+        class FakeVerifier:
+            instances: list[Any] = []
+            fail_once = True
+
+            def __init__(self, _client: Any):
+                self.plan_calls = 0
+                self.verify_calls: list[str] = []
+                FakeVerifier.instances.append(self)
+
+            def plan_dimensions(self, *_args: Any) -> list[DimensionApplicability]:
+                self.plan_calls += 1
+                return plan("D03")
+
+            @staticmethod
+            def result(score: float) -> VerifierResult:
+                return VerifierResult(
+                    final_score=score,
+                    dimensions={"D03": score},
+                    cultural_dimension_scores={},
+                    applicable_dimensions=[item.__dict__ for item in plan("D03")],
+                    dimension_coverage=1.0,
+                    evidence_consistency=None,
+                    evidence_coverage=None,
+                    confidence=0.8,
+                    abstained=False,
+                    abstention_reason="",
+                    eligible=True,
+                    verification_targets=[],
+                    target_checks=[],
+                    hard_fail=False,
+                    hard_failures=[],
+                    score_rationale={},
+                )
+
+            def verify(
+                self, _prompt: str, response: str, *_args: Any, **_kwargs: Any
+            ) -> VerifierResult:
+                self.verify_calls.append(response)
+                if response == "B" and FakeVerifier.fail_once:
+                    FakeVerifier.fail_once = False
+                    raise requests.ReadTimeout("simulated local model timeout")
+                return self.result({"A": 0.9, "B": 0.7, "C": 0.6, "D": 0.5}[response])
+
+            def compare_candidates(self, *_args: Any, **_kwargs: Any) -> Any:
+                raise AssertionError("Distinct scores must not enter a tiebreak")
+
+        with tempfile.TemporaryDirectory() as directory:
+            input_path = Path(directory) / "best_of4.csv"
+            output_path = Path(directory) / "results.csv"
+            input_path.write_text(
+                "set_id,prompt,response_a,response_b,response_c,response_d\n"
+                "S1,Prompt,A,B,C,D\n",
+                encoding="utf-8",
+            )
+            argv = [
+                "evaluate_best_of4.py",
+                str(input_path),
+                str(output_path),
+                "--search-provider",
+                "same",
+            ]
+            with (
+                mock.patch.object(evaluate_best_of4, "OllamaClient", FakeBackend),
+                mock.patch.object(evaluate_best_of4, "CulturalVerifier", FakeVerifier),
+                mock.patch.object(sys, "argv", argv),
+            ):
+                with self.assertRaises(requests.ReadTimeout):
+                    evaluate_best_of4.main()
+                evaluate_best_of4.main()
+
+            self.assertEqual(FakeVerifier.instances[0].plan_calls, 1)
+            self.assertEqual(FakeVerifier.instances[0].verify_calls, ["A", "B"])
+            self.assertEqual(FakeVerifier.instances[1].plan_calls, 0)
+            self.assertEqual(FakeVerifier.instances[1].verify_calls, ["B", "C", "D"])
+            self.assertIn("a", output_path.read_text(encoding="utf-8-sig"))
+            self.assertTrue(output_path.with_suffix(".checkpoint.json").exists())
+
     def test_best_of_four_abstains_when_all_candidates_are_ineligible(self) -> None:
         class FakeBackend:
             model = "fake-backend"
 
-            def __init__(self, model: str | None = None):
+            def __init__(self, model: str | None = None, **_kwargs: Any):
                 if model:
                     self.model = model
 
