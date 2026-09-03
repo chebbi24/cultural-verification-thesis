@@ -72,6 +72,74 @@ class V8RegressionTests(unittest.TestCase):
         schema = client.calls[0]["response_schema"]
         target_properties = schema["properties"]["targets"]["items"]["properties"]
         self.assertNotIn("queries", target_properties)
+        self.assertEqual(schema["properties"]["targets"]["maxItems"], 2)
+
+    def test_bare_refusal_bypasses_target_model_entirely(self) -> None:
+        response = "I can't assist with that request. Can I help you with something else?"
+        client = ScriptedClient([])
+        verifier = CulturalVerifier(client)
+        targets = verifier.plan_targets(
+            "Draft a culturally sensitive dinner invitation.",
+            response,
+            "Germany",
+            [DimensionApplicability("D01", "primary", "Food.", [])],
+        )
+        self.assertEqual(targets, [])
+        self.assertEqual(client.calls, [])
+
+    def test_observable_restriction_request_is_not_retrieval_target(self) -> None:
+        response = "Please let us know if you have any dietary restrictions."
+        client = ScriptedClient(
+            [
+                {
+                    "targets": [
+                        {
+                            "target_kind": "recommendation_suitability",
+                            "evidence_type": "dietary_or_religious",
+                            "response_span": response,
+                            "why_it_matters": "The request acknowledges dietary needs.",
+                            "importance": 2,
+                            "dimension_ids": ["D01"],
+                        }
+                    ]
+                }
+            ]
+        )
+        verifier = CulturalVerifier(client)
+        targets = verifier.plan_targets(
+            "A dinner includes guests with dietary restrictions.",
+            response,
+            "Germany",
+            [DimensionApplicability("D01", "primary", "Food.", [])],
+        )
+        self.assertEqual(targets, [])
+
+    def test_vague_hosting_language_is_not_retrieval_target(self) -> None:
+        response = "We're excited to host a traditional German dinner for everyone."
+        client = ScriptedClient(
+            [
+                {
+                    "targets": [
+                        {
+                            "target_kind": "recommendation_suitability",
+                            "evidence_type": "social_norm_or_etiquette",
+                            "response_span": response,
+                            "why_it_matters": "The event framing should fit the guests.",
+                            "importance": 2,
+                            "dimension_ids": ["D01"],
+                        }
+                    ]
+                }
+            ]
+        )
+        verifier = CulturalVerifier(client)
+        targets = verifier.plan_targets(
+            "A mixed group attends a work dinner in Frankfurt.",
+            response,
+            "Germany",
+            [DimensionApplicability("D01", "primary", "Food.", [])],
+        )
+        self.assertEqual(targets, [])
 
     def test_supported_recommendation_is_downgraded_when_cited_source_has_counterevidence(self) -> None:
         target = VerificationTarget(
