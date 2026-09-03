@@ -65,6 +65,8 @@ _MATERIAL_ACTION_MARKERS = (
 
 
 def _has_material_recommendation_content(span: str) -> bool:
+    """Detect obvious concrete content only for filtering conversational/vague spans."""
+
     normalized = _core._normalized_text(span)
     if any(marker in normalized for marker in _MATERIAL_ACTION_MARKERS):
         return True
@@ -108,7 +110,10 @@ class CulturalVerifier(_BaseCulturalVerifier):
         print("    planning context-relevant evidence targets...", flush=True)
 
         if self._is_bare_refusal(response):
-            print("    found 0 decision-relevant target(s) (bare refusal: no web retrieval)", flush=True)
+            print(
+                "    found 0 decision-relevant target(s) (bare refusal: no web retrieval)",
+                flush=True,
+            )
             return []
 
         active_ids = [item.dimension_id for item in applicable_dimensions]
@@ -121,8 +126,14 @@ class CulturalVerifier(_BaseCulturalVerifier):
                     "items": {
                         "type": "object",
                         "properties": {
-                            "target_kind": {"type": "string", "enum": sorted(TARGET_KINDS)},
-                            "evidence_type": {"type": "string", "enum": sorted(EVIDENCE_TYPES)},
+                            "target_kind": {
+                                "type": "string",
+                                "enum": sorted(TARGET_KINDS),
+                            },
+                            "evidence_type": {
+                                "type": "string",
+                                "enum": sorted(EVIDENCE_TYPES),
+                            },
                             "response_span": {"type": "string", "minLength": 1},
                             "why_it_matters": {"type": "string", "minLength": 1},
                             "importance": {"type": "integer", "enum": [1, 2, 3]},
@@ -154,8 +165,9 @@ class CulturalVerifier(_BaseCulturalVerifier):
             "Do NOT generate search queries. response_span must be an exact quotation from the assistant response. "
             "Use explicit_external_claim only for a literal externally testable factual, legal, institutional, demographic, or social-norm assertion. "
             "Use recommendation_suitability only for a CONCRETE proposed food, drink, action, custom, wording, dress, greeting, schedule, or other practice whose suitability depends on the people or situation in the prompt. "
-            "NEVER target politeness, greetings, enthusiasm, generic hosting language, generic offers to help, refusal text, follow-up questions, requests to disclose preferences/restrictions/allergies, or observations about the response itself. These are directly observable response behaviors, not web-verifiable propositions. "
+            "NEVER target politeness, greetings used only as pleasantries, enthusiasm, generic hosting language, generic offers to help, refusal text, follow-up questions, requests to disclose preferences/restrictions/allergies, or observations about the response itself. These are directly observable response behaviors, not web-verifiable propositions. "
             "Do not target vague phrases such as being excited to host a traditional German evening unless the quoted span itself contains a concrete practice that requires external verification. "
+            "A concrete cultural practice such as a form of address, greeting convention, gesture, dress choice, scheduling norm, food/drink choice, or ritual may still be a valid recommendation target even if it does not contain a fixed action keyword. "
             "Prefer the smallest complete exact span containing the actual claim or concrete recommendation. "
             "Do not verify incidental background facts. Assign each target only to supplied applicable_dimension_ids."
         )
@@ -209,6 +221,9 @@ class CulturalVerifier(_BaseCulturalVerifier):
                 conversational = _is_nonretrievable_conversational_span(span)
                 vague_hosting = _is_vague_hospitality_span(span)
 
+                # Observable conversation/accommodation behavior is not an external
+                # proposition. Preserve a span only when it also contains a concrete
+                # proposal (for example a menu item followed by an accommodation note).
                 if conversational and not material_recommendation:
                     continue
                 if vague_hosting and not material_recommendation:
@@ -216,27 +231,30 @@ class CulturalVerifier(_BaseCulturalVerifier):
                 if span.rstrip().endswith("?") and not material_recommendation:
                     continue
 
+                # If the model labels a directive as a factual claim, repair the kind
+                # rather than discarding a potentially valid cultural practice.
                 if (
                     target_kind == "explicit_external_claim"
                     and self._looks_like_recommendation_or_directive(span)
                 ):
-                    if not material_recommendation:
-                        continue
                     target_kind = "recommendation_suitability"
 
-                if target_kind == "recommendation_suitability" and not material_recommendation:
-                    continue
-
-                evidence_type = str(item.get("evidence_type", "general_factual")).strip()
+                evidence_type = str(
+                    item.get("evidence_type", "general_factual")
+                ).strip()
                 if evidence_type not in EVIDENCE_TYPES:
                     evidence_type = "general_factual"
 
-                dimension_ids = _core._unique([
-                    str(value).strip().upper()
-                    for value in item.get("dimension_ids", [])
-                    if str(value).strip()
-                ])
-                if not dimension_ids or any(value not in active_ids for value in dimension_ids):
+                dimension_ids = _core._unique(
+                    [
+                        str(value).strip().upper()
+                        for value in item.get("dimension_ids", [])
+                        if str(value).strip()
+                    ]
+                )
+                if not dimension_ids or any(
+                    value not in active_ids for value in dimension_ids
+                ):
                     raise _core._legacy._malformed(
                         "evidence target planning",
                         data,
