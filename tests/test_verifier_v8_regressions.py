@@ -66,6 +66,7 @@ class V8RegressionTests(unittest.TestCase):
 
         self.assertEqual(len(targets), 1)
         self.assertEqual(targets[0].target_kind, "recommendation_suitability")
+        self.assertEqual(targets[0].response_span, "Schnitzel or Sauerbraten")
         self.assertIn("muslim", " ".join(targets[0].queries).lower())
         self.assertIn("vegetarian", " ".join(targets[0].queries).lower())
         self.assertFalse(any(query.lower().startswith("what ") for query in targets[0].queries))
@@ -141,6 +142,35 @@ class V8RegressionTests(unittest.TestCase):
         )
         self.assertEqual(targets, [])
 
+    def test_absolute_factual_claim_is_not_treated_as_recommendation(self) -> None:
+        response = "Don't worry, there's no such thing as a beer-free zone in Germany!"
+        client = ScriptedClient(
+            [
+                {
+                    "targets": [
+                        {
+                            "target_kind": "recommendation_suitability",
+                            "evidence_type": "general_factual",
+                            "response_span": response,
+                            "why_it_matters": "This universal claim affects cultural accuracy.",
+                            "importance": 3,
+                            "dimension_ids": ["D01"],
+                        }
+                    ]
+                }
+            ]
+        )
+        verifier = CulturalVerifier(client)
+        targets = verifier.plan_targets(
+            "Describe a casual trip in Germany.",
+            response,
+            "Germany",
+            [DimensionApplicability("D01", "primary", "Everyday practice.", [])],
+        )
+        self.assertEqual(len(targets), 1)
+        self.assertEqual(targets[0].target_kind, "explicit_external_claim")
+        self.assertEqual(targets[0].proposition, response)
+
     def test_supported_recommendation_is_downgraded_when_cited_source_has_counterevidence(self) -> None:
         target = VerificationTarget(
             target_kind="recommendation_suitability",
@@ -211,6 +241,74 @@ class V8RegressionTests(unittest.TestCase):
         self.assertEqual(records["D01"]["score"], 1)
         self.assertEqual(normalized["D01"], 0.5)
         self.assertEqual(records["D01"]["confidence"], 0.85)
+
+    def test_second_invalid_dimension_quotes_recover_and_mixed_evidence_caps_score(self) -> None:
+        response = (
+            "White sausage is the way to go; it's a local favorite. "
+            "Don't worry, there's no such thing as a beer-free zone in Germany!"
+        )
+        target = VerificationTarget(
+            target_kind="explicit_external_claim",
+            proposition="Don't worry, there's no such thing as a beer-free zone in Germany!",
+            evidence_type="general_factual",
+            response_span="Don't worry, there's no such thing as a beer-free zone in Germany!",
+            why_it_matters="The universal claim can change the cultural-correctness judgment.",
+            importance=3,
+            queries=["Germany beer-free zones", "Germany alcohol-free places"],
+            dimension_ids=["D01"],
+        )
+        mixed = TargetCheck(
+            proposition=target.proposition,
+            evidence_type=target.evidence_type,
+            verdict="mixed",
+            confidence=0.7,
+            reason="Beer is common, but alcohol-free settings and abstention also exist.",
+            cited_source_urls=["https://example.org/source"],
+            sources=[
+                {
+                    "url": "https://example.org/source",
+                    "title": "Alcohol-free settings",
+                    "content": "Alcohol-free venues and non-drinking preferences exist.",
+                }
+            ],
+        )
+        invalid_score = {
+            "dimension_scores": {
+                "D01": {
+                    "score": 2,
+                    "confidence": 0.95,
+                    "reason": (
+                        "The response avoids claiming beer-free zones do not exist and is fully accurate."
+                    ),
+                    "response_spans": [
+                        "Don't worry, there is no such thing as a beer-free zone in Germany!"
+                    ],
+                    "evidence_target_ids": ["E01"],
+                }
+            }
+        }
+        client = ScriptedClient([invalid_score, invalid_score])
+        verifier = CulturalVerifier(client)
+        records, normalized, _ = verifier.score_dimensions(
+            "Describe a casual Germany itinerary.",
+            response,
+            "Germany",
+            [DimensionApplicability("D01", "primary", "Everyday practice.", [])],
+            [target],
+            [mixed],
+        )
+
+        self.assertEqual(len(client.calls), 2)
+        self.assertIn("SEMANTIC REPAIR", client.calls[1]["args"][0])
+        self.assertEqual(records["D01"]["score"], 1)
+        self.assertEqual(normalized["D01"], 0.5)
+        self.assertEqual(records["D01"]["confidence"], 0.6)
+        self.assertTrue(records["D01"]["span_repair_applied"])
+        self.assertTrue(
+            all(span in response for span in records["D01"]["response_spans"])
+        )
+        self.assertIn("mixed", records["D01"]["reason"].lower())
+        self.assertNotIn("avoids claiming", records["D01"]["reason"].lower())
 
     def test_reason_cleanup_removes_repetition_and_internal_leakage(self) -> None:
         client = ScriptedClient(
