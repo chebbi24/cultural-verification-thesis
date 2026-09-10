@@ -334,6 +334,7 @@ class CulturalVerifier(_BaseCulturalVerifier):
                 if self._is_nonretrievable_response_behavior(span):
                     continue
 
+                original_span = span
                 span = _strip_observable_tail(span, response)
                 target_kind = str(item.get("target_kind", "")).strip()
                 if target_kind not in TARGET_KINDS:
@@ -352,7 +353,10 @@ class CulturalVerifier(_BaseCulturalVerifier):
 
                 if (
                     target_kind == "explicit_external_claim"
-                    and self._looks_like_recommendation_or_directive(span)
+                    and (
+                        self._looks_like_recommendation_or_directive(original_span)
+                        or self._looks_like_recommendation_or_directive(span)
+                    )
                     and not _looks_like_strong_external_assertion(span)
                 ):
                     target_kind = "recommendation_suitability"
