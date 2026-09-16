@@ -1,5 +1,2 @@
-torch>=2.2
-transformers>=4.51
-accelerate>=1.2
-requests>=2.32
-jsonschema>=4.23
+# Compatibility entry point. From repository root: pip install -r src/requirements.txt
+-e .
