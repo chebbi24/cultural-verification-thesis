@@ -1,0 +1,25 @@
+\begin{table}[htbp]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.08}
+\caption{Experimental configuration: implemented constants and values that remain to be frozen before the final run.}
+\label{tab:experiment-freeze}
+\begin{tabularx}{\textwidth}{p{4.2cm}X}
+\toprule
+\textbf{Field} & \textbf{Frozen/current value} \\
+\midrule
+Verifier architecture & \texttt{cultverify-1.0.0}; implementation commit \texttt{2e546a48ba0950e78f7bd244b5b37b7b475ccf2d} \\
+Semantic model/provider/revision & \texttt{[FINAL VERIFIER MODEL / PROVIDER / REVISION TO BE FROZEN]} \\
+Temperature & 0 in current configuration; confirm in final manifest \\
+Target budget & Maximum 3 material targets \\
+Retrieval depth & \texttt{top\_k}=3 accepted documents per query; maximum 2 retrieval rounds \\
+Evidence mode & LIVE acquisition followed by primary REPLAY evaluation \\
+Reward-model baseline & \texttt{Skywork/Skywork-Reward-V2-Qwen3-4B}; exact-top tie must map to \texttt{no\_clear\_winner} \\
+Direct judge & \texttt{[MODEL / PROMPT / ORDER SCHEDULE / SEED TO BE FROZEN]} \\
+Evaluation sample & PLT001--PLT030 fixed evaluation set unless a confirmatory unseen set is added before freeze \\
+Human annotations & Five annotators planned; final export/hash pending \\
+Statistical seed & \texttt{[TO BE FROZEN BEFORE RESULTS]} \\
+\bottomrule
+\end{tabularx}
+\end{table}
