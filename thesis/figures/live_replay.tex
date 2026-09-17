@@ -1,0 +1,25 @@
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  node distance=5mm and 10mm,
+  box/.style={draw, rounded corners=2pt, align=center, minimum height=8mm, text width=3.4cm, font=\footnotesize},
+  artifact/.style={box, fill=black!7},
+  arrow/.style={-{Latex[length=2mm]}, thick}
+]
+\node[box] (liveq) {LIVE: generated question/query schedule};
+\node[box, below=of liveq] (search) {Tavily search};
+\node[artifact, below=of search] (snap) {Frozen retrieval snapshots + hashes};
+
+\node[box, right=24mm of liveq] (replayq) {REPLAY: load frozen schedule};
+\node[box, below=of replayq] (verify) {Verify query/config/content hashes};
+\node[artifact, below=of verify] (reuse) {Reuse the same frozen evidence};
+
+\draw[arrow] (liveq) -- (search);
+\draw[arrow] (search) -- (snap);
+\draw[arrow] (replayq) -- (verify);
+\draw[arrow] (verify) -- (reuse);
+\draw[arrow,dashed] (snap) -- node[above,font=\scriptsize]{archived artifacts} (reuse);
+\end{tikzpicture}
+\caption{LIVE and REPLAY evidence modes. REPLAY fixes the retrieval artifacts and has no live-search fallback, but semantic model stages still execute and are therefore not guaranteed to be bitwise deterministic.}
+\label{fig:live-replay}
+\end{figure}
