@@ -1,3 +1,45 @@
 \chapter{Human Annotation Protocol}
 \label{app:annotation}
-% TODO-HUMAN: Insert final survey instructions and item presentation protocol.
+
+This appendix records the intended annotation protocol that underlies \cref{sec:human-eval}. It is deliberately separated from the final annotation results. The final survey export must be archived and hashed before automated-system results are analyzed.
+
+\section*{Annotator-facing task}
+For each evaluation item, the annotator is shown the prompt followed by four complete candidate responses labelled A, B, C and D. No verifier output, reward-model score, direct-judge decision, provisional annotation, expected issue, benchmark answer or evidence trace is shown.
+
+The required categorical question is:
+
+\begin{quote}
+\textbf{Which response is the most culturally appropriate?}
+\end{quote}
+
+The available choices are \textbf{A}, \textbf{B}, \textbf{C}, \textbf{D}, and \textbf{No clear winner}. The final option is intended for cases in which the annotator cannot identify one response as clearly more culturally appropriate than the others; it is not a substitute for skipping an item.
+
+A second required item records confidence on an integer scale from 1 to 5. No verbal interpretation of intermediate values is assumed in the thesis unless the final exported survey shows that explicit anchors were presented to annotators.
+
+\section*{Reference construction}
+Five student annotators are planned. Votes are unweighted by confidence. Three or more identical categorical votes define a majority. A majority for A--D yields the corresponding human reference winner. A majority for \emph{No clear winner} yields that category. If no category reaches three votes, the item is retained as an \emph{unresolved human split} for disagreement analysis but excluded from the primary winner-agreement denominator.
+
+\section*{Blinding and data handling}
+Annotators are not described as cultural experts unless their actual qualifications warrant that description. The aggregate is called a \emph{human reference judgment}, not cultural ground truth. Response identifiers should be pseudonymous or survey-generated; no personally identifying information is required for the scientific analysis. Candidate order and any survey-side randomization must be recovered from the final export rather than assumed retrospectively.
+
+\section*{Minimum archived fields}
+\begin{table}[htbp]
+\centering
+\footnotesize
+\caption{Minimum fields required from the final annotation export.}
+\label{tab:annotation-export-schema}
+\begin{tabularx}{\textwidth}{p{3.4cm}X}
+\toprule
+\textbf{Field} & \textbf{Purpose} \\
+\midrule
+Annotator/response ID & Distinguish the five independent records without requiring identity disclosure \\
+Set ID & Link annotation to the fixed evaluation item (for example, \texttt{PLT001}) \\
+Presented candidate order & Determine whether A--D order was fixed or randomized \\
+Chosen category & A/B/C/D/No clear winner \\
+Confidence & Required integer 1--5 response \\
+Completion/timestamp metadata & Audit missing or duplicate submissions where available \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% TODO-HUMAN: Replace this protocol text only if the archived final survey/export proves that the actual presentation differed.
