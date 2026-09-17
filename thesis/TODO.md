@@ -21,6 +21,7 @@
 - [x] Verify and populate initial bibliography from primary/final sources (Run 2).
 - [x] Build source-to-claim map for Chapters 2--5 (Run 2).
 - [x] Record publication-version corrections for CARB/Think-as-Locals, SafeWorld, CulturalBench, Skywork, and Wang et al. (Run 2).
+- [x] Add survey/pluralistic-alignment sources required for Chapters 2--3 (Run 3).
 - [ ] Add a dedicated source for family/kinship/gender/intergenerational cultural theory before making strong D07 derivation claims.
 - [ ] Add a dedicated source for work/education/civic cultural theory if D08 receives detailed theoretical treatment beyond operational coverage.
 - [ ] Add a dedicated collective-memory source if that concept is substantively theorized under D09.
@@ -29,10 +30,14 @@
 
 ## Writing still required
 
-- [ ] Write Chapters 2 and 3.
+- [x] Write Chapters 2 and 3 (Run 3).
 - [ ] Write literature-grounded D01--D10 derivation in Chapter 4.
 - [ ] Write code-grounded Chapter 5.
 - [ ] Finalize Chapter 6.
 - [ ] Populate Chapter 7 only from real outputs.
 - [ ] Populate Chapter 8 only from real comparative cases.
 - [ ] Finalize Introduction and Conclusion last.
+
+## Page-budget follow-up
+
+- [ ] Revisit Chapter 3 during the final whole-thesis editing pass if the main-text page budget requires trimming; the Run-3 draft is approximately one page above its provisional 9--10 page target.
