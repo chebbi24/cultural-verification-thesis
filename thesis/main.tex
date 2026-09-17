@@ -14,9 +14,16 @@
 \usepackage{longtable}
 \usepackage{array}
 \usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tabularx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,calc,backgrounds}
+\usepackage{listings}
 \usepackage{amsmath,amssymb}
+\newcommand{\TBD}{\texttt{TBD}}
 \usepackage{hyperref}
 \usepackage[nameinlink,capitalise]{cleveref}
+\lstset{basicstyle=\ttfamily\scriptsize,breaklines=true,columns=fullflexible,keepspaces=true,showstringspaces=false,frame=single}
 \usepackage[backend=biber,style=authoryear,maxcitenames=2]{biblatex}
 \addbibresource{bibliography/references.bib}
 \addbibresource{bibliography/run3_sources.bib}
@@ -36,6 +43,10 @@
 This abstract is intentionally left as a structured placeholder until the final empirical evaluation is complete.
 
 \tableofcontents
+\clearpage
+\listoffigures
+\clearpage
+\listoftables
 \clearpage
 \pagenumbering{arabic}
 
