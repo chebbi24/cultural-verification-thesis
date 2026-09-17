@@ -1,44 +1,256 @@
 \chapter{The Proposed Evidence-Grounded Cultural Verifier}
 \label{ch:verifier}
+
+The previous chapter operationalized cultural appropriateness as a multidimensional and context-sensitive construct. This chapter defines the method used to evaluate one generated response against that construct. The central design goal is not to turn external retrieval into a second language-model opinion, but to separate three functions that are often conflated in automated evaluation: identifying what in a response is materially relevant, acquiring evidence about externally checkable cultural claims, and assigning a final rubric-based judgment. The resulting verifier is a standalone post-hoc evaluation system. It does not use reward-model scores, human reference labels, benchmark answers or expected-error annotations as inputs.
+
+The implementation on the frozen \texttt{agent/final-verifier} branch follows the sequence
+\[
+\begin{aligned}
+\text{prompt} &\rightarrow \text{context} \rightarrow \text{dimension plan} \rightarrow \text{material targets} \\
+&\rightarrow \text{verification questions} \rightarrow \text{evidence} \rightarrow \text{frozen memo} \\
+&\rightarrow \text{target verdicts} \rightarrow \text{dimension scores} \rightarrow \text{aggregate score}.
+\end{aligned}
+\]
+For Best-of-4 evaluation, the prompt-level context and dimension plan are shared across all four candidates, while all candidate-dependent stages are executed independently. The verifier therefore produces both a scalar ranking signal and a diagnostic trace explaining which dimensions, targets and evidence contributed to the result.
+
 \section{Design Objectives}
-\mbox{}\par
-\section{Overall Architecture}
-\mbox{}\par
+\label{sec:verifier-objectives}
+
+The verifier is guided by seven methodological objectives. First, it must remain \emph{independent of the systems against which it is compared}. Reward-model outputs, direct-judge preferences and human labels are therefore excluded from the verifier interface. Second, cultural interpretation must be \emph{context-sensitive}. Prior work on social norms and geo-diverse safety shows that the same behavior can be interpreted differently depending on explicit setting, relationship, location or institutional constraints \parencite{rao2025normad,yin2024safeworld,wang2025ethicalreasoning}. The pipeline therefore extracts supported prompt context before selecting applicable rubric dimensions.
+
+Third, externally checkable claims should be distinguished from purely internal qualities or non-verifiable value statements. This prevents unnecessary search for issues that must be judged from the response itself. Fourth, evidence acquisition should be separated from the final candidate comparison as far as the task permits. LLM-based evaluators are known to exhibit order and framing effects in comparative settings \parencite{zheng2023llmjudge,wang2024notfairevaluators}; this motivates a structural boundary after verification-question generation, although it does not establish that the resulting evidence stage is unbiased. Fifth, the search process must be bounded and auditable. Retrieval introduces freshness and provenance advantages, but also contamination and search-opportunity risks \parencite{lewis2020rag,deng2024contamination}. The method therefore caps target and retrieval budgets, records every query and preserves the exact evidence used.
+
+Sixth, the verifier must be able to express \emph{insufficient basis}. A forced cultural score can be misleading when evidence is missing or structurally invalid. The system therefore supports dimension-level abstention and reports coverage separately from score, conceptually related to the broader reject-option principle in selective prediction \parencite{geifman2017selective}. It does not, however, inherit formal risk guarantees from selective-classification algorithms. Seventh, every completed judgment should be reconstructable from an execution trace containing model configuration, prompt-template versions, retrieved documents, identifiers and stage outputs.
+
+These objectives are implemented as explicit data and control-flow constraints rather than as informal prompting alone. Table~\ref{tab:verifier-stages} summarizes the main stages and their principal inputs.
+
+\begin{table}[htbp]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.08}
+\caption{Main stages of the standalone cultural verifier.}
+\label{tab:verifier-stages}
+\begin{tabular}{p{3.2cm}p{4.4cm}p{5.7cm}}
+\toprule
+\textbf{Stage} & \textbf{Primary input} & \textbf{Output / methodological role} \\
+\midrule
+Context extraction & Prompt & Explicitly supported contextual facts with verbatim prompt spans \\
+Dimension planning & Prompt, context, D01--D10 rubric & Shared applicable-dimension plan with one primary dimension when nonempty \\
+Target extraction & Prompt, response, context, plan & Up to three decision-relevant response targets with epistemic type and exact quote \\
+Question generation & Target, context & Baseline and variation questions that remove candidate identifiers and evaluative framing \\
+Blind evidence stage & Questions, context & Queries, retrieved documents, source classes and evidence memo \\
+Target comparison & Target, frozen memo & Supported, contradicted, mixed or insufficient verdict \\
+Dimension scoring & Full response, plan, targets, verdicts, memos, rubric & D01--D10 scores in \{0,1,2,abstain\} \\
+Aggregation/ranking & Non-abstained scores & Equal-weight overall score and exact Best-of-4 comparison \\
+Trace & All stage artifacts & Reconstructable record of configuration, calls, links, errors and result \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Overall Architecture and Semantic Backbone}
+\label{sec:overall-architecture}
+
+All semantic stages use one explicitly configured language model. The implementation rejects a mismatch between the model configuration attached to the adapter and the configuration attached to the pipeline. The same provider, model identifier and temperature are therefore used for context extraction, dimension planning, target extraction, question generation, query rewriting, source classification, memo synthesis, follow-up generation, target comparison and dimension scoring. This design reduces one source of uncontrolled heterogeneity: differences between stages cannot silently be attributed to different model backbones.
+
+The configuration does not provide a scientifically preferred default model. A model identifier must be supplied explicitly, and the current local \texttt{qwen3:4b} setting is a development convenience rather than the final experimental choice. The supported built-in providers are Ollama and OpenRouter, with a custom-adapter interface for alternatives. OpenRouter requests disable provider fallback, so a nominal model cannot silently be replaced by another backend model. Temperature defaults to zero, but this is treated only as a variance-reduction setting; it does not imply perfect determinism.
+
+Semantic calls are stateless. Every request contains a fresh system message and a serialized payload rather than accumulated chat history. The semantic session records each attempt, validates the model output against a strict Pydantic schema and applies at most one semantic repair retry. Transport-level retries are separately bounded. A failure after those budgets raises a structured stage error rather than allowing an unvalidated value to continue through the pipeline. This distinction between semantic generation and Python validation is central to the method: Python enforces format, identifiers, exact quotations, evidence links and budgets, but it does not hard-code which cultural conclusion or score is correct.
+
 \section{Context Extraction}
-\mbox{}\par
+\label{sec:context-extraction}
+
+The first semantic stage sees only the user prompt. It extracts a \texttt{ContextFrame} containing the setting, participants, relationships, explicit location, temporal context, explicit constraints and user goal. Each non-null contextual fact contains both a normalized value and an exact \texttt{prompt\_span}. The validator requires that this span occur verbatim in the original prompt. As a result, a model-generated statement such as an inferred nationality or religion cannot pass validation unless the prompt itself contains an exact supporting span.
+
+The prompt instruction further prohibits demographic inference from names and prohibits assuming a default country. These instructions are not in themselves a guarantee against hallucination; the stronger implementation property is that every retained fact must be traceable to verbatim prompt text. If context extraction remains structurally invalid after its bounded retry, the planner replaces it with an empty context frame. This fallback is intentionally conservative: unsupported context is discarded instead of being repaired by inserting a plausible but ungrounded assumption.
+
+An empty context does not automatically terminate evaluation. Dimension planning can still proceed from the prompt. Conversely, if the planning stage itself fails, the candidate evaluation is treated as a pipeline failure rather than as a culturally neutral response. This separation is useful because uncertainty about context and failure to execute the evaluation are methodologically different events.
+
 \section{Prompt-Level Dimension Planning}
-\mbox{}\par
+\label{sec:dimension-planning}
+
+The planner receives the prompt, the validated context frame and the full D01--D10 rubric from \cref{ch:framework}. It selects the dimensions that are applicable to the prompt and assigns exactly one of them the role \texttt{primary} when the plan is nonempty; any others are marked \texttt{secondary}. The roles describe relevance, not score weight. Aggregation later treats all scored dimensions equally.
+
+The plan is produced before any candidate response is inspected. This is especially important in Best-of-4 mode. The \texttt{rank} interface computes one context frame and one dimension plan from the prompt and passes those identical objects to all four candidate evaluations. Candidate A therefore cannot be scored on a different prompt-level rubric simply because it mentions a different culturally salient detail than candidate B. This improves comparability across the set and prevents the evaluator from selecting more favorable dimensions for one candidate after seeing its answer.
+
+The design also has a known limitation. A response can introduce a cultural issue that was not salient in the prompt-level plan. Because target dimensions must be a subset of the planned dimensions, that issue may not become an independently scored dimension. The final dimension scorer does see the complete response and can consider omitted explicit requirements, but the frozen method does not dynamically expand the prompt-level dimension set per candidate. This trade-off between cross-candidate comparability and candidate-specific coverage is reported explicitly rather than hidden by adaptive planning.
+
 \section{Material Target Extraction}
-\mbox{}\par
+\label{sec:target-extraction}
+
+Once a shared plan exists, the verifier analyzes one candidate response and extracts a bounded set of \emph{material targets}. A target is a decision-relevant unit whose correctness or contextual suitability could materially affect the cultural judgment. The semantic instruction asks for normally one or two such units and permits at most three. The cap prevents long answers from gaining effectively unlimited search opportunities and keeps evidence acquisition comparable across candidates.
+
+Each target stores five substantive elements: an exact quotation from the candidate response, a normalized proposition, an epistemic type, the relevant planned dimension identifiers and a materiality explanation. Exact response quotations are validated against the original response. Target references to dimensions outside the prompt-level plan are rejected. If the extractor identifies more material units than the budget can represent, it can set \texttt{targets\_truncated=true}; this exposes the coverage limitation instead of silently pretending that the response has been exhaustively decomposed.
+
+The epistemic type determines whether external retrieval is appropriate. The runtime schema distinguishes five classes: external facts; descriptive cultural norms; context-dependent recommendations; response-internal quality; and non-verifiable value statements. Their serialized labels are shown below:
+\begin{center}
+\small
+\texttt{external\_fact}, \texttt{descriptive\_cultural\_norm}, \texttt{context\_dependent\_recommendation}\\
+\texttt{response\_internal\_quality}, \texttt{non\_verifiable\_value\_statement}.
+\end{center}
+Internal-quality and non-verifiable-value targets are structurally forbidden from triggering retrieval. Externally checkable facts, descriptive norms and context-dependent recommendations may be routed to the evidence pipeline. This avoids the category error of searching the web to decide, for example, whether a response is internally coherent or whether a purely normative preference is objectively true.
+
+Target extraction is quote-based, which creates a second limitation. A missing requirement in the response has no response span from which to form a target. The dimension scorer therefore receives the full prompt and response and is instructed to consider omitted explicit requirements at scoring time, but omissions do not receive their own target-level retrieval trace in the current method.
+
 \section{Neutral Verification Questions}
-\mbox{}\par
+\label{sec:verification-questions}
+
+For each retrievable material target, the verifier generates exactly two initial questions in a fixed order: a \texttt{baseline} question and a \texttt{variation} question. The baseline question asks what is documented about the underlying subject; the variation question asks what contextual variation or scope qualifications matter. The intent is to discourage a single retrieved source from being converted into an unjustified universal rule, which is particularly important for cultural practices and social norms. Prior work on community-grounded cultural knowledge and cross-national opinions motivates explicit attention to variation rather than one monolithic profile \parencite{shi2024culturebank,durmus2023globalopinionqa}.
+
+Question generation necessarily sees the material target. This fact places a precise boundary on what can be called \emph{candidate-blind}. The generator must know the proposition under investigation in order to ask useful evidence questions. Its instruction therefore attempts to remove candidate wording, identifiers and evaluative language and to avoid requesting proof that the candidate is correct or incorrect. However, the generated question can still preserve framing inherited from the target. The thesis consequently does not describe the full pipeline as end-to-end blind and does not claim that neutral-question prompting eliminates framing bias.
+
+The stronger structural claim begins only after these two questions have been created. The target identifier, response text, candidate position and target verdict are not included in the question objects passed to the evidence engine.
+
 \section{Candidate-Blind Evidence Boundary}
-\mbox{}\par
-\section{Query Rewriting}
-\mbox{}\par
-\section{Evidence Retrieval}
-\mbox{}\par
+\label{sec:blind-boundary}
+
+The evidence engine exposes a deliberately narrow public interface: it accepts exactly a tuple of two \texttt{VerificationQuestion} objects and one \texttt{ContextFrame}. Runtime checks reject subclassed or lookalike containers that might carry extra candidate fields. The underlying Pydantic models also forbid unknown fields. Candidate text, material-target objects, candidate letters, human labels, reward-model outputs and target verdicts are therefore unavailable to the query-rewriting, retrieval, source-classification and evidence-synthesis stages through this interface.
+
+The engine also creates a fresh semantic session. No preceding candidate conversation state is retained. This is an implementation mechanism for reducing direct candidate-conditioned evidence interpretation: after the questions are formed, the evidence subsystem cannot simply reread the answer and search for sources that support its wording. The design responds to known concerns about LLM-evaluator sensitivity to comparison context and presentation order \parencite{zheng2023llmjudge,wang2024notfairevaluators}, but the literature does not validate this exact architectural mechanism and the implementation does not prove the absence of bias.
+
+Two residual channels remain. First, the verification questions originate from candidate-derived targets and can therefore carry framing. Second, retrieved web content can itself be selective, biased or incomplete. Candidate blindness should thus be interpreted as a controlled information boundary, not as a guarantee of epistemic neutrality.
+
+\section{Query Rewriting and Evidence Retrieval}
+\label{sec:retrieval}
+
+Each verification question is rewritten into one search query using only the question and the validated context. The query-rewriter does not receive the response or target object and is instructed not to add a verdict. Search is performed in LIVE mode through a Tavily adapter. The current adapter requests general search with \texttt{search\_depth=advanced} by default and explicitly disables generated answers, raw-page content and images.
+
+The resulting evidence unit is therefore a search-result excerpt rather than a fully downloaded web page. For every accepted document, the system records a stable document identifier, the originating query, URL, title, excerpt text, rank, provider score when available, retrieval timestamp, content hash and later a semantic source class. This distinction is important: the thesis can claim that the verifier preserves the search content it actually used, but it cannot claim to have parsed or verified the full underlying webpage.
+
+The retriever requests up to twice the configured \texttt{top\_k} results, subject to an implementation maximum of twenty, so that provenance filtering and deduplication can remove unsuitable entries before the final budget is applied. At most \texttt{top\_k} accepted documents are retained per question; the frozen default is three. Fewer may remain after filtering. Retrieval is therefore bounded both by the target budget and by the per-question document budget.
+
+The use of retrieval follows the general motivation of retrieval-augmented systems: explicit external evidence can provide provenance and can be refreshed independently of model parameters \parencite{lewis2020rag}. In this thesis, however, retrieval is not used to improve the generated answer. It is an evaluation-stage evidence source, and empirical accuracy still depends on whether the queries retrieve relevant and representative material.
+
 \section{Leakage and Contamination Filtering}
-\mbox{}\par
+\label{sec:leakage-filtering}
+
+Because the evaluation repository itself contains prompts, annotations and research artifacts, search results must not be allowed to reveal known benchmark answers or provisional labels. Before any evidence reaches the semantic synthesis stage, the retrieval layer applies provenance exclusions. The default configuration excludes the thesis repository on GitHub and common annotation or result paths, while additional domains, repositories and URL/path globs can be frozen for the final experiment.
+
+Filtering occurs before source classification and memo generation. Canonicalized URLs and content hashes are also used for deduplication. Every rejected result is stored with a reason such as excluded domain, excluded repository, excluded path or duplicate URL/content. Accepted snapshots are integrity-checked against their content hashes, and a frozen snapshot that later violates the active exclusion policy causes an explicit error.
+
+These controls are motivated by the broader problem of benchmark contamination, which can inflate apparent evaluation performance \parencite{deng2024contamination}. Their scope is deliberately limited. URL and repository rules can block known answer-bearing sources; they cannot prove that an unknown mirror does not contain the same material, nor can they remove information learned during the verifier model's pretraining. The exclusion list must therefore be reviewed and frozen before held-out evaluation, and leakage filtering is reported as a mitigation rather than a contamination guarantee.
+
 \section{Source Classification}
-\mbox{}\par
+\label{sec:source-classification}
+
+Accepted documents are classified semantically into eight source families: official/legal, academic peer-reviewed, statistical survey, institutional/professional, community insider, general explanatory, commercial/lifestyle, or unknown. The implementation serializes these as:
+\begin{center}
+\small
+\texttt{official\_legal}, \texttt{academic\_peer\_reviewed}, \texttt{statistical\_survey}, \texttt{institutional\_professional}\\
+\texttt{community\_insider}, \texttt{general\_explanatory}, \texttt{commercial\_lifestyle}, \texttt{unknown}.
+\end{center}
+Every document must receive exactly one classification, and the classifier is instructed not to infer peer review merely from formal writing style.
+
+The classes are not converted into a universal numerical quality score. Source fitness depends on the question. An official primary source is normally preferable for a binding legal rule; empirical linguistic research may be better suited to a pragmatic convention; and credible community evidence can be informative for lived practice that is poorly represented in formal institutions. The evidence-memo prompt is instructed to reason about this fit rather than to treat one source class as globally superior.
+
+Classification itself remains an LLM judgment. Python validates that each document is classified exactly once and that document identifiers match, but it does not verify that a source truly is peer reviewed or institutionally authoritative. Misclassification is therefore a semantic failure mode to be audited empirically.
+
 \section{Candidate-Blind Evidence Memo}
-\mbox{}\par
+\label{sec:evidence-memo}
+
+After the initial questions have been searched and the documents classified, the evidence model synthesizes an \texttt{EvidenceMemo}. The memo contains an answer, scope statement, variation statement, agreement/disagreement description, a sufficiency state, a confidence category, structured evidence statements and citations. Sufficiency is one of \texttt{sufficient}, \texttt{conflicting} or \texttt{insufficient}; confidence is \texttt{low}, \texttt{medium} or \texttt{high}.
+
+Each factual evidence statement is explicitly categorized as a tendency, context-sensitive practice, legal/institutional rule, or universal claim. The corresponding serialized labels are \texttt{tendency}, \texttt{context\_sensitive\_practice}, \texttt{legal\_institutional\_rule}, and \texttt{universal\_claim}. This mirrors the epistemic distinctions introduced in \cref{sec:tendency-rule-value}: a common practice should not silently become an obligation, and one local convention should not become a universal cultural truth. The memo instruction also requires unresolved disagreements to remain visible rather than being collapsed into artificial consensus.
+
+Citation structure is programmatically checked. Every citation must refer to an actually retrieved document identifier, the union of statement-level citations must equal the memo's overall citation set, and a memo marked sufficient or conflicting must contain citations. If no documents are available, the only structurally valid state is insufficient evidence with low confidence. These constraints make fabricated identifiers or uncited factual claims harder to pass through the pipeline.
+
+They do not prove semantic entailment. A cited source can be misread, an excerpt can omit decisive context, and the LLM can draw an unsupported inference even when the document identifier is valid. The distinction between citation integrity and evidence correctness is therefore maintained throughout the thesis. Human-grounded evaluation and trace inspection are required to determine whether the memo is substantively reliable.
+
 \section{Bounded Follow-Up}
-\mbox{}\par
+\label{sec:bounded-followup}
+
+The first evidence round always consists of the two initial questions. After the first memo is synthesized, one additional retrieval opportunity is available only when the memo is not marked \texttt{sufficient} and the configured maximum number of rounds is two. A follow-up stage may then generate one neutral, gap-specific question, or it may return no question if further search is unlikely to help. If a follow-up is generated, it is searched once, the new documents are added and a final memo is synthesized from all evidence. Search then terminates.
+
+This bounded policy serves three purposes. It limits cost, it prevents one difficult candidate from receiving an arbitrarily larger evidence-search budget, and it makes the search process easier to reproduce. The value of one optional follow-up is a design decision, not an empirically established optimum. The final experiment can assess its practical consequences, but the methodology does not claim that two retrieval rounds maximize cultural accuracy.
+
 \section{Evidence Freezing}
-\mbox{}\par
+\label{sec:evidence-freezing}
+
+A central ordering constraint is that evidence is finalized before the candidate proposition is reintroduced. The final \texttt{EvidenceMemo} is an immutable Pydantic object. The pipeline records a \texttt{memo\_frozen} event, computes a cryptographic digest of the memo, and only then passes the target and memo to the target-comparison stage. After comparison, the digest is computed again; any change raises an error. Trace validation also checks the links among target, questions and final memo.
+
+Freezing prevents a later comparator from rewriting the evidence summary after learning what the candidate actually claimed. It is therefore an implementation-level anti-post-hoc-editing mechanism. The thesis does not infer from this ordering alone that accuracy increases or bias disappears. The empirical contribution of this separation is one of the properties to be examined in the final comparative evaluation and qualitative error analysis.
+
 \section{Target Comparison}
-\mbox{}\par
+\label{sec:target-comparison}
+
+Only after the memo has been frozen does the comparator receive the material target again. It evaluates the proposition against that memo and returns one of four verdicts: \texttt{supported}, \texttt{contradicted}, \texttt{mixed} or \texttt{insufficient}. The verdict must contain the exact target identifier and memo identifier, which are validated before the result can be used downstream.
+
+The comparator instruction explicitly states that missing evidence is not contradiction and that scope and contextual variation matter. This is important in cultural evaluation because absence of evidence for a practice is not evidence that the practice is culturally wrong, and evidence of a common tendency does not imply a universal rule.
+
+A target verdict is not itself a cultural score. A response can contain a factually contradicted statement whose cultural relevance is minor, or a factually supported statement that is nevertheless inappropriate in the user's context. The dimension scorer therefore receives the verdict as one diagnostic input rather than applying a hard-coded mapping such as ``contradicted implies zero.''
+
 \section{D01--D10 Dimension Scoring}
-\mbox{}\par
-\section{Aggregation}
-\mbox{}\par
+\label{sec:dimension-scoring}
+
+The final semantic judgment is performed at dimension level. The scorer receives the original prompt, the full candidate response, validated context, frozen dimension plan, material targets, target verdicts, final evidence memos and the complete D01--D10 rubric. It must return exactly one score for every planned dimension and no score for an unplanned dimension.
+
+The possible outcomes are 0, 1, 2 or \texttt{abstain}, using the anchors defined in \cref{sec:framework-scoring}. The scorer is instructed to distinguish supported factuality from cultural appropriateness: a supported claim does not automatically deserve a high cultural score, and a contradicted target does not automatically force a zero. It must explain the material cultural relevance of the available evidence and preserve distinctions among common practice, obligation and preference.
+
+Every non-abstained score for a nonempty response must contain at least one exact response quotation. Any referenced target or memo identifier must exist, and the validator checks that the referenced target is linked to the dimension being scored. Memo references are likewise accepted only when the memo belongs to a target associated with that dimension. These checks make it possible to reconstruct why a dimension received a score and reduce the risk of free-floating rationales that cite unrelated evidence.
+
+Python does not validate whether a score of 0, 1 or 2 is semantically correct. If the scorer repeatedly returns structurally invalid output, or if an upstream stage fails, the candidate result receives \texttt{status=failed} and the applicable dimensions are represented as abstentions with an explicit failure rationale rather than fabricated scores. This failure state must be distinguished empirically from a legitimate completed evaluation that abstains because the evidence basis is insufficient.
+
+\section{Aggregation and Coverage}
+\label{sec:aggregation}
+
+Dimension scores are aggregated without primary/secondary weighting. Let $J$ be the set of applicable dimensions that received a numeric score, with $s_d \in \{0,1,2\}$ for dimension $d$. The candidate score is
+\begin{equation}
+S = \frac{1}{|J|}\sum_{d \in J}\frac{s_d}{2},
+\label{eq:verifier-score}
+\end{equation}
+which lies in $[0,1]$. If $J$ is empty, the overall score is \texttt{null} and the candidate is marked abstained. Internally, the implementation uses exact rational arithmetic for comparison and converts the result to a floating-point value only for the stored candidate output.
+
+Abstained dimensions are excluded from the mean. This makes the score interpretable as performance on dimensions the system actually judged, but it introduces a comparability issue: two candidates can have equal means over different subsets of dimensions. The result therefore records \texttt{applicable\_count}, \texttt{scored\_count} and the identifiers of abstained dimensions.
+
+The pipeline also reports \texttt{evidence\_coverage}. If $T_R$ is the number of material targets marked retrieval-appropriate and $T_S$ the number whose final evidence memo is marked \texttt{sufficient}, then
+\begin{equation}
+C_E = \frac{T_S}{T_R}
+\end{equation}
+when $T_R>0$; otherwise evidence coverage is \texttt{null}. This metric describes sufficiency coverage, not factual accuracy. A sufficient memo can still be semantically wrong, and a candidate requiring no external evidence is not assigned artificial perfect coverage.
+
 \section{Best-of-4 Ranking}
-\mbox{}\par
-\section{LIVE and REPLAY}
-\mbox{}\par
+\label{sec:bestof4-ranking}
+
+The public ranking interface requires exactly four responses. As described in \cref{sec:dimension-planning}, context extraction and dimension planning occur once from the shared prompt. Each candidate is then evaluated independently under that same plan, with a fresh semantic session and its own targets, evidence bundles, verdicts, scores and trace.
+
+Ranking uses the exact rational aggregate rather than rounded floating-point output. Among candidates with non-null scores, the highest exact value wins only if it is unique. If two or more candidates share the exact maximum, the system returns \texttt{no\_clear\_winner}; if all four candidates abstain, it likewise returns \texttt{no\_clear\_winner}. No arbitrary epsilon or tie margin is introduced.
+
+The ranking result also exposes \texttt{coverage\_comparable}, which is true when all candidates were scored on the same set of dimensions. The frozen ranking rule does not override the highest-score winner when coverage differs. Consequently, a candidate scored on fewer dimensions can in principle obtain a higher mean than a candidate with broader coverage. This is a known limitation and motivates reporting score together with coverage and abstention rather than interpreting the winner label in isolation.
+
+Execution failure is also kept separate from a substantive tie. A failed candidate generally produces no numeric overall score; if other candidates have valid scores, ranking proceeds among the available non-null scores. The final experiment therefore reports system failures separately from cultural abstentions and ranking outcomes.
+
+\section{LIVE and REPLAY Modes}
+\label{sec:live-replay}
+
+Evidence acquisition is divided into LIVE and REPLAY modes to separate collection of web evidence from repeated semantic evaluation. In LIVE mode the Tavily retriever is active. Each query produces an immutable retrieval snapshot stored under the evidence-cache directory. The snapshot contains the accepted documents, filtered results, provider identity, query object and a hash of the retrieval configuration. The system also stores an evidence schedule containing the initial questions, any follow-up question, exact queries, snapshot identifiers and snapshot hashes.
+
+An existing schedule is reused when its key matches the current questions, context, retrieval configuration, provider/model configuration, temperature and prompt-template digest. A genuinely new evidence collection should therefore use a new cache directory rather than silently overwriting frozen artifacts. This preservation step is part of the experimental protocol in \cref{ch:experiment}.
+
+In REPLAY mode the verifier does not retain a live retriever at all. It loads the frozen schedule and snapshots, verifies their identifiers, hashes, questions, queries and active leakage policy, and fails explicitly if material is missing or inconsistent. There is no live-search fallback. Query rewriting is not repeated for a frozen schedule; the stored queries are reused.
+
+REPLAY freezes the evidence acquisition path, not the whole semantic pipeline. Prompt-level context, planning and initial question generation are still semantic operations, and evidence memos, target comparison and dimension scoring still invoke the configured model. If nondeterminism changes the context or questions such that the frozen schedule no longer matches, replay fails rather than substituting a different search. Temperature zero and fixed evidence therefore reduce variability but do not guarantee bit-for-bit identical final judgments.
+
 \section{Traceability and Reproducibility}
-\mbox{}\par
+\label{sec:traceability}
+
+Every candidate evaluation writes a JSON trace to the configured trace directory. The trace records a run identifier, pipeline version, Git commit when available, UTC timestamp, LIVE/REPLAY mode, serialized configuration, hashes of the prompt, response, rubric and prompt templates, template versions, semantic call records, target-to-evidence links, ordering events, the complete candidate result and partial evidence state when a failure interrupts execution.
+
+Each semantic call record contains the stage name, attempt number, timestamp, input hash, structured output JSON when available and an error category when the attempt fails. API keys are not members of the configuration schema and are therefore not serialized into the trace. The top-level trace stores hashes rather than plain prompt and response fields; nevertheless, exact prompt spans, response quotations and semantic outputs contained deeper in the result can reproduce fragments of the original text. Traces should therefore be treated as research data rather than as automatically anonymized artifacts.
+
+Stable identifiers are derived from canonical JSON hashes for targets, questions, queries, documents, memos and snapshots. Atomic JSON writes reduce the risk of partially written artifact files. Trace validation then checks cross-object consistency: every verdict must link to an existing target and memo, every memo citation must refer to an available document, every query must match its snapshot, every content hash must match its text and every completed retrievable target must have a verdict. These properties support auditability and rerunning, but they do not substitute for semantic inspection of whether the evidence and cultural reasoning are substantively correct.
+
 \section{Implementation Verification}
-\mbox{}\par
+\label{sec:implementation-verification}
+
+The frozen implementation was validated as software before the final empirical study. In the recorded Python 3.12 environment, the active suite reports 55 passing tests and one explicitly gated live-provider test skipped. Ruff linting and format checks also pass. The tests cover context-span validation and recovery, D01--D10 rubric loading, target budgets, question shape, candidate-blind call boundaries, query inputs, source citations, provenance filtering, duplicate evidence, memo immutability, bounded follow-up, aggregation, abstention, exact ties, shared Best-of-4 planning, REPLAY integrity, failure traces, provider contracts, CLI behavior and package installation.
+
+These checks establish that the software follows its intended contracts under deterministic fixtures and mocked network boundaries. They do not establish cultural validity, evidence accuracy or superiority to reward models or direct LLM judging. The only end-to-end real-provider LIVE-to-REPLAY smoke test is intentionally gated and was not executed in the validation snapshot because final model/provider credentials were not configured. More importantly, no unit-test suite can answer the thesis's empirical research questions. Those require the held-out human-grounded comparison defined in \cref{ch:experiment}.
+
+\section{Methodological Summary and Residual Limitations}
+\label{sec:verifier-summary}
+
+The verifier's methodological contribution is the composition of several explicit boundaries: prompt-supported context before interpretation, shared prompt-level dimension planning, bounded target decomposition, candidate-derived but neutralized verification questions, a structurally candidate-blind evidence stage, provenance-filtered retrieval, source-aware evidence synthesis, one bounded follow-up, evidence freezing before target comparison, dimension-level abstention and exact equal-weight aggregation. The system is therefore more than a scalar judge, because it produces inspectable intermediate objects and preserves the evidence path that led to each decision.
+
+The same architecture leaves identifiable limitations. Candidate information can influence question wording before the blind boundary. Search uses provider excerpts rather than full documents. Source classification and evidence synthesis remain model judgments. Quote-based targets do not independently represent omissions. The shared prompt-level plan can miss candidate-introduced dimensions. Evidence coverage and scoring coverage can differ across candidates. REPLAY fixes retrieval artifacts but not language-model nondeterminism. Finally, no implementation constraint guarantees that the selected evidence represents a culture fairly or that a dimension score agrees with human judgment.
+
+These limitations are not exceptions to the method but part of its empirical evaluation target. The next chapter therefore freezes the experimental protocol needed to compare the standalone verifier with human reference judgments, the independent Skywork reward-model baseline and a direct LLM-as-a-judge baseline without allowing any of those comparators to influence the verifier itself.
