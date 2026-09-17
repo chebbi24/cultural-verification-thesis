@@ -1,34 +1,170 @@
 \chapter{Related Work and Research Gap}
 \label{ch:related}
+
+The literature on culture and large language models spans several research objectives that are easy to conflate. Some work measures what cultural knowledge a model contains; some tests whether its answers vary appropriately across social contexts; some adapts the generator through prompting, retrieval or fine-tuning; and some studies evaluators such as reward models. This chapter separates these objectives before positioning the contribution of this thesis. The aim is not to rank heterogeneous prior systems on a single scale, but to identify which parts of culturally situated evaluation are already addressed and which remain open for the present research question.
+
 \section{Cultural Evaluation of Large Language Models}
-\mbox{}\par
+
+Recent surveys show both rapid growth and conceptual fragmentation in culturally aware NLP. \textcite{adilazuarda2024culture} review more than ninety papers and observe that studies rarely begin from one explicit definition of culture. Instead, they operationalize selected demographic or semantic proxies, such as nationality, language, values, norms, food, traditions, or social practices. Their analysis also finds uneven coverage: values and objectives have received substantial attention, whereas many semantic facets and situated effects of cultural misrepresentation remain less studied. \textcite{liu2025culturallyaware} similarly argue that the absence of a shared understanding of culture makes progress difficult to compare and develop a fine-grained taxonomy for culturally aware and adapted NLP. \textcite{pawar2025culturalawareness} broaden the view to text and multimodal systems, emphasizing that cultural awareness is not reducible to multilinguality and surveying dataset construction, adaptation, benchmarking and ethical questions.
+
+These surveys support an important methodological distinction for this thesis. Cultural evaluation is not a single task with a universally accepted label space. A benchmark that asks factual multiple-choice questions about food and festivals, a benchmark that compares national opinion distributions, and a safety benchmark grounded in regional laws all probe different aspects of cultural behavior. An evaluator that performs well on one does not thereby establish competence on the others. The research problem is therefore better framed as one of \emph{operational coverage and evidence}: what culturally relevant aspect is being judged, under what context, by which reference, and with what diagnostic information?
+
+Empirical studies also caution against equating cultural adaptation with superficial steering. \textcite{tao2024culturalbias} compare model responses with national survey data and report cultural skew as well as changes under cultural prompting. GlobalOpinionQA similarly uses cross-national opinion distributions to examine how model outputs represent subjective global views; prompting can shift a model toward a requested national perspective, but can also amplify stereotypes or overstate homogeneity \parencite{durmus2023globalopinionqa}. These results motivate an evaluator that can represent uncertainty and variation rather than reward any response merely because it contains explicit cultural markers.
+
+A related issue is pluralism. Cultural groups are internally heterogeneous and can contain legitimate disagreement about values and practice. The objective is therefore not to force all culturally situated questions into one ``local'' answer. For the purpose of this thesis, the most relevant prior work is work that either (i) constructs human-grounded cultural evaluation data, (ii) explicitly models contextual norms or cultural variation, (iii) evaluates preference models for cultural awareness, or (iv) introduces retrieval or reasoning mechanisms intended to improve cultural adaptation.
+
 \section{Cultural Benchmarking}
-\mbox{}\par
-\section{CARB}
-\mbox{}\par
+\label{sec:cultural-benchmarking}
+
+Cultural benchmarks differ in the unit they evaluate, the source of cultural knowledge, and the degree to which their reference labels preserve contextual variation. Several representative directions are summarized in \cref{tab:related-cultural-work}. The table is intentionally descriptive: the systems solve different problems and should not be interpreted as contestants in one common benchmark.
+
+\begin{table}[htbp]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.13}
+\caption{Representative cultural-evaluation and cultural-alignment work relevant to this thesis. The systems address different research objectives and are not ranked against one common metric.}
+\label{tab:related-cultural-work}
+\begin{tabular}{p{2.0cm}p{2.4cm}p{4.3cm}p{5.1cm}}
+\toprule
+\textbf{Work} & \textbf{Primary objective} & \textbf{Cultural representation / data} & \textbf{Mechanism and relevance} \\
+\midrule
+CARB \parencite{zhang2026carb} & Evaluate RM cultural awareness & 10 cultures; four cultural domains; Best-of-N sets & RM ranking and robustness analysis; includes Think-as-Locals \\
+CulturalBench \parencite{chiu2025culturalbench} & Measure cultural knowledge & 1,696 human-written and verified questions; 45 regions; 17 topics & Human-AI red-teaming with multiple human annotators \\
+BLEnD \parencite{myung2024blend} & Test everyday cultural knowledge & 52.6k QA pairs; 16 countries/regions; 13 languages & Everyday/material-culture and multilingual coverage \\
+NormAd \parencite{rao2025normad} & Measure adaptation to social norms & Social situations with different norm specificity & Tests context-sensitive adaptation from values to explicit norms \\
+SafeWorld \parencite{yin2024safeworld} & Evaluate geo-diverse safety & Cultural norms and legal policies; 2,775 queries across 50 countries and 493 regions/races & Separates contextual cultural and institutional constraints \\
+CultureLLM \parencite{li2024culturellm} & Adapt generators to cultural values & WVS seed questions and semantic augmentation for nine culture/language settings & Fine-tuning changes the generator rather than verifying an arbitrary response \\
+ValuesRAG \parencite{seo2025valuesrag} & Improve alignment during generation & Retrieved culturally and demographically relevant context & Retrieval-augmented generation rather than candidate-blind post-hoc verification \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The benchmark landscape shows several complementary forms of grounding. BLEnD focuses on everyday knowledge that is often omitted from encyclopedic evaluation and spans both high- and low-resource settings \parencite{myung2024blend}. CANDLE treats cultural commonsense as context-conditioned knowledge and extracts facets such as food, clothing, rituals, traditions and behaviors at scale \parencite{nguyen2023candle}. CulturalBench emphasizes human authorship, human verification and broad topical/region coverage, with a final ACL dataset of 1,696 questions across 45 regions and 17 topics and five independent annotators per question \parencite{chiu2025culturalbench}. Together these works demonstrate that ``cultural knowledge'' extends well beyond value surveys or famous heritage facts.
+
+Other benchmarks move from knowledge toward situated behavior. NormAd evaluates whether models adapt to increasingly explicit social norms rather than relying on abstract value associations \parencite{rao2025normad}. SafeWorld combines regional cultural norms with legal and policy information in safety-relevant scenarios \parencite{yin2024safeworld}. GlobalOpinionQA and the analysis of \textcite{tao2024culturalbias} instead compare model outputs with empirical opinion distributions, making disagreement and population variation central rather than incidental. CultureBank contributes another form of grounding by collecting community-derived cultural knowledge and preserving contextualized self-narratives \parencite{shi2024culturebank}.
+
+The common lesson is not that one benchmark should replace the others. Rather, cultural evaluation benefits from multiple kinds of reference: curated knowledge, social norms, population distributions, legal rules and human judgments. This heterogeneity motivates the D01--D10 operational framework introduced in \cref{ch:framework}. It also motivates a verifier that can choose whether a target is externally verifiable, internally evaluable, or insufficiently supported instead of forcing every cultural issue into one retrieval pattern.
+
+\section{CARB: Cultural Awareness Reward Modeling Benchmark}
+\label{sec:carb}
+
+CARB is the closest prior work to the comparative setting of this thesis because it focuses specifically on the cultural awareness of reward models rather than only on the cultural behavior of generators. \textcite{zhang2026carb} argue that general reward-model benchmarks and translated multilingual variants do not directly test whether an RM can distinguish culturally appropriate from culturally mismatched content. They therefore construct a benchmark designed around cultural preference ranking and use it not only for evaluation, but also for diagnostic analysis and subsequent improvement of generative reward models.
+
 \subsection{Motivation and Task Design}
-\mbox{}\par
+
+CARB frames reward models as an important proxy in alignment pipelines: if the reward signal prefers culturally inappropriate responses, downstream optimization or Best-of-N selection can propagate that preference. The benchmark therefore asks whether an RM assigns the culturally preferred completion a higher score than several rejected alternatives. This Best-of-N design is stricter than a simple chosen/rejected pair because the chosen response must outrank all rejected responses within the set \parencite{zhang2026carb}.
+
+The benchmark covers ten culture/language settings: Arabic, Chinese, English, German, Japanese, Korean, Russian, Spanish, Thai and Vietnamese. The final benchmark contains 8,576 Best-of-N sets distributed over four umbrella domains: cultural commonsense knowledge, cultural values, cultural safety and cultural linguistics \parencite{zhang2026carb}. This breadth is directly relevant to the present thesis because it demonstrates that reward-model evaluation can be organized around explicitly cultural content rather than only translated general-preference examples.
+
 \subsection{Prompt and Data Sourcing}
-\mbox{}\par
+
+CARB uses domain-specific sources rather than one homogeneous prompt generator. For cultural commonsense knowledge, the authors draw on sources such as Cultural Atlas and MANGO and transform culturally relevant assertions into questions. The cultural-value domain uses questions derived from World Values Survey Wave 7. Cultural-safety prompts incorporate multilingual toxicity and safety datasets, while the linguistic domain draws on idioms and contextual language resources. The prompts undergo filtering and human refinement, and the paper reports three human annotators in this quality-assurance stage \parencite{zhang2026carb}.
+
+The completion-construction procedure is deliberately asymmetric. Chosen responses are generated with access to culturally matched references, whereas rejected completions are produced using deliberately mismatched cultural references and then filtered. A pool of 24 open- and closed-source LLMs is used to obtain completion diversity. This construction is well suited to testing whether an RM detects known cultural mismatches, but it also means that the benchmark's chosen/rejected structure is created from a controlled reference-generation process rather than from naturally occurring competing user-facing answers.
+
+CARB validates benchmark construction with both native annotators and automatic judging. The paper reports a human study sampling 100 Best-of-N sets per language, balanced across the four domains, with independent native annotators judging prompt appropriateness and completion alignment. It additionally uses GPT-4o for full-dataset automatic validation and reports substantial agreement with human annotators on a separate reliability sample; the reported GPT--human inter-annotator agreement is 0.664 \parencite{zhang2026carb}. These checks strengthen the benchmark's claim that its labels correspond to culturally informed preferences, while still leaving the broader question of within-culture disagreement beyond the benchmark's chosen/rejected formulation.
+
 \subsection{Four-Domain Framework}
-\mbox{}\par
+
+CARB's four domains provide broad coverage. Cultural commonsense knowledge concerns everyday or factual culture-related knowledge. Cultural value captures differences in attitudes and preferences, drawing in part on survey data. Cultural safety covers culturally and linguistically situated harmful or toxic content. Cultural linguistic evaluation addresses idioms and other language-specific cultural phenomena \parencite{zhang2026carb}.
+
+For the present thesis, this structure is an important reference but not a runtime taxonomy. The four domains are appropriate for CARB's purpose: evaluating whether RMs rank culturally matched completions above mismatched ones over a large multilingual benchmark. The verifier developed here has a different diagnostic objective. It must explain why a free-form response is or is not appropriate and distinguish, for example, interpersonal etiquette from law, religion from everyday material practice, or identity-related stereotyping from historical/heritage claims. Chapter~\ref{ch:framework} therefore synthesizes a finer-grained D01--D10 framework from broader literature rather than splitting CARB's four domains mechanically.
+
 \subsection{Evaluation Approach}
-\mbox{}\par
+
+CARB evaluates both classifier-based and generative reward models. For classifier RMs, candidate responses receive scalar rewards and a Best-of-N item is correct when the chosen completion outranks every rejected completion. Generative RMs instead use their language-generation capabilities to assess candidates. This distinction is useful because it separates two different evaluator mechanisms that can nevertheless be tested with the same preference-ranking objective \parencite{zhang2026carb}.
+
+The paper further studies whether CARB scores are meaningful beyond the benchmark by relating reward-model performance to downstream multilingual cultural alignment. It investigates two uses of reward signals: Best-of-N test-time selection and policy optimization through RLHF. The reported analysis finds a positive relationship between CARB performance and downstream cultural-alignment performance of models selected or optimized with the corresponding RMs \parencite{zhang2026carb}. This is a significant strength: the benchmark is not justified only by internal label agreement but is connected to downstream use of reward models.
+
 \subsection{Reported Empirical Findings}
-\mbox{}\par
+
+CARB's central empirical finding is not that reward models are uniformly incapable of cultural evaluation. Strong RMs can distinguish many culturally appropriate responses, but performance varies substantially across cultures, domains and model types. The paper reports a resource effect in which higher-resource languages achieve stronger and more consistent average performance than lower-resource settings. It also finds that the strongest generative reward models can be comparatively robust across languages, while several classifier RMs are more concentrated in high-resource languages \parencite{zhang2026carb}.
+
+The diagnostic analysis is particularly relevant to this thesis. CARB perturbs cultural examples in two conceptually different ways. Causal interventions change substantive cultural content while preserving superficial cultural cues; spurious interventions remove explicit cultural labels, change response language, or rephrase sentences while attempting to preserve the underlying cultural meaning. Stronger RMs are more sensitive to changes in the causal cultural content and less sensitive to superficial changes. Several weaker RMs show the reverse tendency, indicating that their scores can be driven by surface features rather than the cultural distinction humans intend to evaluate \parencite{zhang2026carb}.
+
+This diagnosis motivates a core concern of the present thesis: an evaluator can output the ``right'' winner for the wrong reason. A single scalar accuracy therefore provides limited information about whether the evaluator relied on a cultural fact, a linguistic cue, an explicit country name, a safety marker, or an unrelated stylistic feature. CARB addresses this problem through controlled perturbation analysis and, subsequently, through Think-as-Locals. The proposed verifier addresses a related problem through explicit target decomposition, evidence acquisition and dimension-level traces. The approaches are conceptually related but methodologically different.
+
+\subsection{Think-as-Locals}
+\label{sec:think-as-locals}
+
+Think-as-Locals is part of the CARB work rather than a separate paper. It is proposed after the robustness analysis identifies surface-feature dependence in reward-model judgments. The method targets \emph{generative reward models}: before issuing a preference judgment, the evaluator is trained to produce explicit, culturally grounded evaluation criteria and a structured reasoning trace. The training procedure adapts reinforcement learning with verifiable rewards (RLVR), with rewards designed both for the correctness of the final preference judgment and for the quality of the structured criteria \parencite{zhang2026carb}.
+
+The important conceptual contribution is that cultural evaluation criteria should be made explicit rather than left entirely latent in a scalar score. The case studies in the paper show the trained model generating task-sensitive rubrics and reasoning about actual response content instead of following superficial cues. The paper reports improved cultural reward-model performance and greater robustness to the spurious-feature interventions used in its diagnosis \parencite{zhang2026carb}.
+
+Think-as-Locals and the verifier in this thesis should nevertheless not be conflated. Think-as-Locals improves a generative RM through training and then uses that RM to judge preferences. The verifier here is a standalone post-hoc system that does not train on CARB labels and does not ingest reward-model scores. It separates evidence synthesis from candidate comparison and can abstain when its basis is insufficient. Consequently, CARB is both an important methodological antecedent and an independent point of comparison in the discussion, but it is not an internal component of the proposed pipeline.
+
 \subsection{Strengths and Limitations Relevant to this Thesis}
-\mbox{}\par
-\section{CultureLLM}
-\mbox{}\par
-\section{SafeWorld and Value/Ethical Reasoning}
-\mbox{}\par
-\section{Think-as-Locals and Related Cultural Reasoning Approaches}
-\mbox{}\par
+
+CARB contributes three strengths that directly influence this research. First, it demonstrates that cultural awareness deserves dedicated RM evaluation rather than being inferred from general preference benchmarks. Second, the Best-of-N structure provides a clear comparative setting in which multiple candidate responses can be ranked. Third, the perturbation analysis shows why evaluator reasoning must be diagnosed rather than inferred from aggregate accuracy.
+
+At the same time, CARB leaves a different research space open. Its benchmark is organized around a chosen completion and rejected completions constructed from benchmark references. Its primary output is preference correctness at the set level; its four domains are broad benchmark categories rather than a fine-grained diagnostic rubric for arbitrary user-facing responses. The benchmark does not provide an independent post-hoc retrieval stage that gathers contemporary external evidence for each response target, nor is its main objective to expose evidence sufficiency or abstain when support is inadequate. These observations do not constitute deficiencies relative to CARB's stated objective. They delimit the different objective pursued in this thesis.
+
+Finally, no direct numerical comparison with CARB is valid unless the systems are evaluated under a common protocol. A CARB percentage measured on its 8,576 constructed Best-of-N sets and a verifier agreement measured on this thesis's held-out human-annotated Best-of-4 set are different estimands. Unless a CARB-compatible baseline is actually reproduced on the same final cases, the thesis therefore treats CARB as prior work and compares findings conceptually rather than claiming head-to-head superiority.
+
+\section{CultureLLM: Cultural Adaptation by Fine-Tuning}
+
+CultureLLM addresses a different point in the system lifecycle: it seeks to make a generator more culturally aligned before the response is produced. \textcite{li2024culturellm} use the World Values Survey as seed data, select 50 survey questions over topics such as social values, migration, security, science and technology, religion, ethical values and political participation, and create semantically equivalent variants. The seed and augmented data are then used to fine-tune culture-specific and unified models.
+
+The work represents nine cultural/language settings: Arabic, Bengali, Chinese, English, German, Korean, Portuguese, Spanish and Turkish. The authors evaluate culture-specific models and a unified CultureLLM across culture-related downstream classification tasks and an open-ended generation setting \parencite{li2024culturellm}. A notable methodological choice is to model cultural differences primarily through opinions represented in WVS while using language/country mappings to define the target cultural settings.
+
+CultureLLM is highly relevant to the motivation for cultural adaptation, but it solves a generative rather than evaluative problem. Once a new response is produced by an arbitrary model, CultureLLM does not provide a standalone, source-traceable verification layer for determining whether that response is appropriate. Its contribution instead demonstrates that relatively small, culturally informed seed data can be semantically augmented and used to change model behavior. The present thesis is complementary: it assumes the candidate response already exists and asks how it can be evaluated independently of the generator.
+
+The distinction also matters for evidence. Fine-tuning encodes cultural information into model parameters; the end user cannot directly inspect which survey observation or cultural source caused a particular answer. By contrast, the proposed verifier attempts to expose the evidence used for retrievable claims. This does not make post-hoc verification intrinsically superior to cultural fine-tuning; it provides a different control point with different auditability properties.
+
+\section{SafeWorld and Deliberative Value Reasoning}
+
+SafeWorld shifts cultural evaluation toward geo-diverse safety. \textcite{yin2024safeworld} construct scenarios in which appropriate behavior depends on both cultural norms and legal or policy constraints. The final NeurIPS version reports 2,775 test queries covering 50 countries and 493 regions/races. The dataset provides grounded social norms, including legal policies and cultural norms, and therefore directly demonstrates why an evaluator should not treat informal cultural expectations and binding institutional rules as the same category.
+
+A subsequent ethical-reasoning approach by \textcite{wang2025ethicalreasoning} uses SafeWorld as its evaluation benchmark. The attribution is important: the five-step reasoning framework is proposed by Wang et al., not by the SafeWorld authors. The framework guides an LLM through contextual fact gathering, hierarchical identification of social norms, option generation, multi-lens ethical impact analysis, and reflection. The social-norm step explicitly distinguishes laws and policies, social values, and cultural norms. The impact analysis then considers deontology, common good, utilitarianism and justice \parencite{wang2025ethicalreasoning}.
+
+The authors evaluate the paradigm with GPT-4o, Qwen2.5-72B, Llama3.3-70B and DeepSeek-R1 and compare it with vanilla prompting and reasoning baselines. Their reported results show improved norm identification and value-alignment scores across the tested models \parencite{wang2025ethicalreasoning}. The work is relevant because it demonstrates a structured, interpretable reasoning procedure for context-dependent values and norms.
+
+However, it again operates primarily as a response-generation/alignment strategy. Its reasoning trace is produced by the same model process used to generate or improve the answer, and the evaluation uses SafeWorld references plus an LLM judge. The verifier in this thesis instead starts from an arbitrary completed response, isolates verifiable targets, retrieves external evidence where appropriate, freezes an evidence memo, and only then reintroduces the candidate for comparison. The shared insight is the need to separate contextual facts, norms and value conflicts; the implementation and experimental question are different.
+
+\section{Contextual Norms, Community Knowledge, and Plural Views}
+
+NormAd, CultureBank, GlobalOpinionQA and related work collectively challenge simplistic country-level representations. NormAd studies cultural adaptability by varying how explicitly a social norm is specified, showing that cultural behavior cannot be reduced to one abstract country-value vector \parencite{rao2025normad}. For the present thesis this is especially relevant to interpersonal etiquette: the same action can be appropriate or inappropriate depending on relationship, role and situation, so context extraction must precede judgment.
+
+CultureBank approaches the knowledge problem from a community perspective. Rather than treating culture only as a set of national survey averages, it constructs an online community-driven knowledge base of cultural descriptions \parencite{shi2024culturebank}. Such material makes visible that cultural knowledge can be situated, narrative and subgroup-specific. This supports the verifier's requirement to represent scope and variation in evidence memos instead of converting every retrieved statement into a universal norm.
+
+GlobalOpinionQA provides a complementary distributional perspective. It evaluates whether model opinions reflect cross-national survey distributions and examines the effects of steering models toward particular national perspectives \parencite{durmus2023globalopinionqa}. The results demonstrate that cultural prompting can move model outputs closer to a requested population while also creating stereotypical or exaggerated representations. \textcite{tao2024culturalbias} similarly compare models with national survey data and document cultural bias and changes under prompting. Together, these studies motivate a methodological rule that is central to this thesis: evidence for a majority tendency is not evidence for unanimity.
+
+This principle also affects human evaluation. A five-annotator majority in the final experiment is an operational reference label, not a declaration that a culture has one objectively correct answer. Cases with disagreement are therefore retained for analysis rather than automatically treated as annotation noise.
+
 \section{Retrieval-Based Cultural or Value Alignment}
-\mbox{}\par
+
+Retrieval offers a way to incorporate external cultural information without encoding all relevant knowledge through model weights. ValuesRAG uses retrieval-augmented contextual learning to retrieve culturally and demographically relevant value information and provide that information to an LLM during generation \parencite{seo2025valuesrag}. In that sense, it is closer to the present verifier than purely parametric fine-tuning because the model has access to explicit external context at inference time.
+
+The direction of information flow is nevertheless different. ValuesRAG retrieves information to help generate an aligned answer. The verifier retrieves evidence in order to evaluate an already-generated answer. More importantly, in the proposed verifier the evidence engine receives verification questions and context but not the candidate response itself after the question-generation boundary. The evidence is synthesized and frozen before the target is reintroduced. ValuesRAG does not aim to establish such a candidate-blind verification boundary because its objective is response generation, not evaluator independence.
+
+General RAG research provides the broader rationale for combining model reasoning with retrieved non-parametric information \parencite{lewis2020rag}, but cultural retrieval introduces specific complications. Search availability differs by language and region; current law and institutional guidance require temporal qualification; community practices may not be well represented by official sources; and retrieved statements can conflict. The thesis therefore treats retrieval as a source of auditable evidence rather than a guarantee of truth. Evidence sufficiency and source provenance become explicit outputs of the verification process.
+
 \section{Reward Models for Response Evaluation}
-\mbox{}\par
-\section{LLM-as-a-Judge}
-\mbox{}\par
+
+General RM evaluation provides the baseline tradition against which CARB and this thesis operate. RewardBench tests whether RMs correctly discriminate preferred responses over a broad range of prompt types \parencite{lambert2025rewardbench}. This is valuable for measuring preference-model quality but does not by itself test cultural knowledge, contextual norms or evidential justification. CARB extends the RM-evaluation paradigm into explicitly cultural domains, while the present thesis retains a general RM as an independent comparator.
+
+The selected baseline belongs to the Skywork-Reward-V2 family, which focuses on scaling preference-data curation through human--AI synergy \parencite{liu2026skyworkrewardv2}. Its role in this thesis is intentionally narrow: each candidate receives a general preference score, and the highest-scoring response can be compared with the aggregated human cultural judgment. Published Skywork benchmark performance is not transferred into this experiment, and the RM score is never used inside the verifier.
+
+This separation enables a focused empirical question. If the verifier and RM select the same response, the agreement can be quantified without assuming that they used the same reasoning. If they disagree, trace-level analysis can inspect whether the verifier's evidence or the RM's preference is more consistent with the human reference. The experiment therefore tests not only winner agreement but also the diagnostic value of the verifier's additional structure.
+
+\section{LLM-as-a-Judge as an Evaluation Baseline}
+
+Direct LLM judging occupies an intermediate position between scalar reward models and the proposed evidence-grounded verifier. Like the verifier, a judge can produce an explanation in natural language. Unlike the verifier, it usually sees the candidate responses while forming the judgment and need not retrieve independent evidence. \textcite{zheng2023llmjudge} show that strong LLM judges can be practical evaluators for general assistant responses, while documenting biases including position, verbosity and self-enhancement. \textcite{wang2024notfairevaluators} provide further evidence that response order can alter comparative judgments.
+
+These findings motivate the inclusion of a direct LLM judge as a separate final baseline. The baseline tests whether the additional machinery of target decomposition, evidence retrieval, evidence freezing, dimension scoring and abstention yields behavior that differs meaningfully from simply asking a strong model to judge cultural appropriateness. The judge configuration, response-order strategy, prompt and tie handling must therefore be frozen before final results are inspected.
+
+Importantly, the bias literature does not entitle this thesis to assume that the verifier is unbiased. Candidate-derived verification questions may still frame the evidence search; the semantic backbone can introduce its own priors; and retrieved web evidence can reflect representation biases. The comparison is empirical. The architecture creates auditable boundaries, while the held-out human study determines how those boundaries behave in practice.
+
 \section{Synthesis of the Research Gap}
-\mbox{}\par
+\label{sec:research-gap}
+
+The reviewed literature provides strong components for culturally aware evaluation, but the components are distributed across different research objectives. CulturalBench, BLEnD, CANDLE and related benchmarks demonstrate how to collect and test cultural knowledge across regions and topics. NormAd, GlobalOpinionQA and CultureBank emphasize contextual norms, population variation and situated knowledge. SafeWorld and the ethical-reasoning work distinguish cultural norms from laws and policies and show the value of structured reasoning. CultureLLM and ValuesRAG improve culturally aligned generation through fine-tuning or retrieval. CARB is the closest evaluator-focused antecedent: it demonstrates that reward models require dedicated cultural testing and that high aggregate preference accuracy can mask reliance on spurious cultural cues.
+
+What is not established by these works is a single standalone post-hoc evaluation process with the particular combination investigated in this thesis: (i) an explicit multi-dimensional cultural rubric for diagnostic scoring, (ii) decomposition of an arbitrary candidate into a bounded set of material targets, (iii) external evidence acquisition where the target is verifiable, (iv) a structural boundary that removes the candidate from the evidence-synthesis stage after verification questions are formed, (v) freezing of the evidence memo before candidate comparison, (vi) explicit abstention and evidence-coverage reporting, and (vii) reproducible evidence snapshots suitable for replay and trace-based error analysis.
+
+This gap should be interpreted narrowly. It is not a claim that no previous work retrieves cultural information, performs cultural judging, produces rationales, or uses fine-grained cultural categories. Several reviewed systems do one or more of these things. The research contribution lies in testing whether combining these properties in an independent verifier produces useful agreement and diagnostic behavior relative to human judgments, a general preference RM, and a direct LLM judge.
+
+Three design requirements follow from the literature synthesis. First, the evaluator must be \emph{context-sensitive}: norms, laws, language and values cannot be inferred from a country label alone. Second, it must be \emph{evidence-aware and uncertainty-aware}: externally verifiable claims should be connected to inspectable sources, and insufficient or conflicting evidence should remain visible. Third, it must be \emph{diagnostic}: a culturally situated failure should be localizable to a target, evidence memo and cultural dimension rather than represented only as a scalar preference.
+
+These requirements motivate the transition from prior work to the proposed framework. Chapter~\ref{ch:framework} operationalizes cultural appropriateness through ten literature-grounded but thesis-specific dimensions. Chapter~\ref{ch:verifier} then describes the standalone verifier that applies those dimensions through an evidence-grounded pipeline. The empirical chapters do not assume that this architecture is superior. They test its agreement with human judgments, compare it with the independent reward-model and direct-judge baselines, and analyze where the additional evidence and diagnostic structure helps, fails, or leads to abstention.
