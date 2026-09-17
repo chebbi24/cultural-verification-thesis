@@ -1,0 +1,18 @@
+\begin{table}[htbp]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.08}
+\caption{Independent systems in the primary comparative evaluation.}
+\label{tab:evaluation-systems}
+\begin{tabularx}{\textwidth}{p{3.0cm}p{2.6cm}p{2.5cm}X}
+\toprule
+\textbf{System} & \textbf{Input} & \textbf{Primary output} & \textbf{Information deliberately unavailable} \\
+\midrule
+Human reference & Prompt + A--D & Categorical vote + confidence & Verifier, RM and direct-judge outputs; provisional labels \\
+Standalone verifier & Prompt + one response at a time & D01--D10 scores, evidence trace, overall score/rank & Human labels, RM outputs, benchmark answers, expected issues \\
+Skywork RM & Prompt + one response & Raw reward and induced winner & D01--D10, retrieval evidence, human labels, verifier outputs \\
+Direct LLM judge & Prompt + A--D & A/B/C/D/no-clear-winner choice & Retrieval evidence, RM scores, human labels, verifier outputs \\
+\bottomrule
+\end{tabularx}
+\end{table}
