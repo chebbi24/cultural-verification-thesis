@@ -1,24 +1,114 @@
 \chapter{Experimental Design and Evaluation Protocol}
 \label{ch:experiment}
+
+This chapter defines the protocol for evaluating the standalone verifier against an external human reference and two independent baselines. The study is designed to answer whether the verifier agrees with human judgments, how that agreement compares with a preference-based reward model and a direct LLM judge, and what additional diagnostic information is provided by evidence grounding, abstention, and dimension-level scoring. Methodological choices are fixed before final comparative results are inspected. Values that are not yet scientifically frozen---most importantly the final semantic model, direct-judge configuration, and completed human annotations---remain explicit placeholders rather than being inferred from development runs.
+
 \section{Evaluation Objectives}
-\mbox{}\par
+
+The experiment maps directly to the research questions. RQ1 measures agreement between verifier and human reference judgments. RQ2 compares the verifier with Skywork-Reward-V2 and a direct LLM-as-a-judge baseline on the same Best-of-4 items. RQ3 analyzes verifier-specific diagnostics such as D01--D10 scores, evidence coverage, abstention, material targets, and evidence traces. RQ4 examines trace-backed failure modes in retrieval, question framing, target extraction, planning, and scoring.
+
+The primary empirical target is therefore agreement with the aggregated human reference, not agreement with CARB, provisional AI labels, or raw reward scores. The human reference is itself treated as an aggregated judgment rather than as objective cultural truth, consistent with pluralistic views of value alignment and cultural modeling \parencite{sorensen2024pluralistic,adilazuarda2024culture}.
+
 \section{Evaluation Dataset}
-\mbox{}\par
+\label{sec:eval-dataset}
+
+The project contains 30 Best-of-4 candidate sets, \texttt{PLT001}--\texttt{PLT030}. Each set contains one prompt and four preserved candidate responses. The long-format source records candidate positions C1--C4, generator provenance, and the generator model \texttt{llama3.2:3b}; a project script converts the data to one row per prompt with responses A--D. The same project also contains older provisional annotations labeled \texttt{synthetic\_model\_provisional} and \texttt{requires\_human\_verification}. These labels are development artifacts only and are excluded from the human reference and from all evaluated systems.
+
+Because the PLT items existed during the broader development process, the thesis will not automatically describe them as a strictly unseen held-out test set. Unless a provenance audit establishes otherwise, the scientifically accurate term is \emph{fixed evaluation set}. If an additional unseen confirmatory set is created before the final experiment, it will be reported separately. No item may be excluded after inspecting system outcomes; exclusions are allowed only for pre-declared structural problems such as a missing response or corrupted prompt and must be documented.
+
 \section{Best-of-4 Candidate Setup}
-\mbox{}\par
+
+For item $i$, the systems receive one prompt $p_i$ and four fixed responses $(r_{iA},r_{iB},r_{iC},r_{iD})$. Candidate text is never regenerated between baselines. The verifier uses one shared prompt-derived context and dimension plan for A--D and then evaluates candidates independently. Skywork scores each prompt--response pair separately. The direct judge receives the prompt and all four candidates in one comparison request.
+
+Candidate order is logged explicitly. The historical annotation materials preserve A--D order; therefore the thesis will report fixed human-survey order unless the final survey export proves that randomization was used. For the direct judge, a deterministic pre-generated permutation schedule will be frozen before execution and mapped back to canonical A--D labels, reducing systematic position effects while remaining reproducible. Order control is motivated by documented position bias in LLM evaluation \parencite{wang2024notfairevaluators}.
+
 \section{Human Evaluation}
-\mbox{}\par
+\label{sec:human-eval}
+
+Five student annotators are planned. For each item, annotators see the prompt and complete responses A--D and answer: \emph{Which response is the most culturally appropriate?} The choices are A, B, C, D, and \emph{No clear winner}. A second required question records confidence from 1 to 5. The interface must not expose verifier outputs, reward-model scores, provisional labels, expected issues, benchmark answers, or evidence traces.
+
+The annotators are not described as cultural experts unless their actual qualifications justify that description. The resulting label is therefore called a \emph{human reference judgment}, not cultural ground truth.
+
+\subsection{Reference aggregation and agreement}
+
+Primary aggregation uses unweighted categorical votes. Confidence does not weight the vote because no calibration model justifies treating higher self-reported confidence as greater correctness. With five annotators, at least three identical votes define a majority. A majority for A--D yields that candidate as reference winner; a majority for \emph{No clear winner} yields the corresponding reference category. If no option reaches three votes, the item is labeled \emph{unresolved human split} and excluded from primary winner-agreement accuracy while remaining in the disagreement analysis.
+
+Raw agreement is reported together with a chance-corrected reliability statistic. If every item has a complete five-rater nominal matrix, Fleiss' $\kappa$ is used \parencite{fleiss1971kappa}. If ratings are missing or the matrix is unbalanced, nominal Krippendorff's $\alpha$ is used instead \parencite{krippendorff2018content}. This decision rule is based on the realized annotation structure, not on which statistic produces the more favorable value. Per-item vote distributions and confidence summaries are retained for later error analysis.
+
 \section{Standalone Verifier Configuration}
-\mbox{}\par
+
+The experimental verifier is the frozen \texttt{cultverify-1.0.0} architecture from implementation commit \texttt{2e546a48ba0950e78f7bd244b5b37b7b475ccf2d}. The final run must additionally freeze the semantic model provider, exact model identifier or revision, experiment date, temperature, retry settings, retrieval configuration, rubric hash, and prompt-template hash.
+
+The implementation defaults are temperature 0, \texttt{top\_k}=3, at most three material targets, and at most two retrieval rounds. These are design defaults rather than empirically optimized hyperparameters. The final semantic model remains:
+
+\begin{center}
+\texttt{[FINAL VERIFIER MODEL / PROVIDER / REVISION TO BE FROZEN]}
+\end{center}
+
+The local \texttt{qwen3:4b} model used during software development is not treated as the final model unless a model-selection experiment explicitly selects it.
+
+\subsection{LIVE acquisition and REPLAY evaluation}
+
+The final protocol separates evidence acquisition from primary evaluation. A frozen configuration is first executed in LIVE mode to create evidence schedules and retrieval snapshots. These artifacts are archived. The primary reported verifier evaluation is then run in REPLAY mode using the same semantic configuration and frozen evidence.
+
+REPLAY has no live-search fallback. Missing schedules, changed questions, invalid hashes, or leakage-policy mismatches therefore remain visible failures. Because semantic stages are still rerun, REPLAY freezes the evidence set but does not guarantee bitwise deterministic LLM outputs. A REPLAY failure is reported as an execution failure rather than repaired by silently obtaining new evidence.
+
 \section{Independent Skywork Reward-Model Baseline}
-\mbox{}\par
+
+The preference baseline is \texttt{Skywork/Skywork-Reward-V2-Qwen3-4B} \parencite{liu2026skyworkrewardv2}. It receives only a prompt and one candidate response and remains independent of D01--D10, retrieval, human labels, and verifier outputs. Four raw rewards $(q_A,q_B,q_C,q_D)$ are stored per item; the largest reward determines the RM winner. The rewards are not interpreted as calibrated probabilities of cultural appropriateness.
+
+The current helper script resolves an exact maximum-score tie by dictionary order through Python's \texttt{max}. This must be corrected or wrapped before final evaluation. The frozen experimental rule is that an exact tie for the maximum reward yields \texttt{no\_clear\_winner}. This change affects only the independent baseline and not the verifier.
+
 \section{Direct LLM-as-a-Judge Baseline}
-\mbox{}\par
-\section{CARB and Prior-Work Comparison}
-\mbox{}\par
+
+The direct-judge baseline asks a single model to select A, B, C, D, or \texttt{no\_clear\_winner} from the prompt and four responses, without retrieval, verifier traces, reward scores, or human labels. Whenever provider constraints permit, the primary direct judge should use the same semantic backbone as the verifier. Holding model capability approximately constant makes the contrast more informative because differences are less easily attributed to using a stronger base model rather than to the evidence-grounded procedure itself.
+
+The exact judge model, temperature, prompt, ordering schedule, and seed must be frozen before execution:
+
+\begin{center}
+\texttt{[DIRECT JUDGE MODEL AND PROMPT TO BE FROZEN]}
+\end{center}
+
+This baseline reflects the common LLM-as-a-judge paradigm \parencite{zheng2023llmjudge}. Its deterministic candidate permutation is logged to control a known source of evaluation bias rather than ignored.
+
+\section{Role of CARB in the Experiment}
+
+CARB remains a central related-work reference, but it is not a primary numerical baseline. Its published results use a different benchmark, culture set, reward-model configuration, and evaluation protocol. Comparing its reported percentages directly with results on the PLT items would therefore not constitute a valid head-to-head comparison. CARB instead motivates the reward-model comparison and provides prior findings against which observed failure patterns can be discussed. A numerical CARB comparison would only be added if a CARB-style method were actually reproduced on the same items under a compatible metric.
+
 \section{Evaluation Metrics}
-\mbox{}\par
+\label{sec:evaluation-metrics}
+
+The primary metric is winner agreement on items with a resolved human reference. Let $H_i$ denote that reference and $Y_{i,s}$ the output of system $s$. Then
+
+\begin{equation}
+A_s = \frac{1}{|I_H|}\sum_{i\in I_H}\mathbb{1}[Y_{i,s}=H_i],
+\end{equation}
+
+where $I_H$ excludes unresolved human splits. A human \texttt{no\_clear\_winner} is a valid reference category and matches only the same system outcome.
+
+Verifier abstention, technical failure, and \texttt{no\_clear\_winner} remain distinct. For systems capable of abstaining, predictive coverage is
+
+\begin{equation}
+C_s = \frac{|I_{s,\mathrm{pred}}|}{|I_H|},
+\end{equation}
+
+and selective agreement is additionally reported on $I_{s,\mathrm{pred}}$. This prevents an evaluator from appearing accurate merely by avoiding difficult cases. The verifier's internal \emph{evidence coverage} is reported separately because it measures the proportion of retrieval-appropriate targets whose final memo is sufficient, not prediction correctness.
+
+Secondary diagnostics include D01--D10 score distributions, abstained dimensions, \texttt{coverage\_comparable}, evidence sufficiency, exact ties, execution failures, human confidence, vote disagreement, and RM reward margins. Per-dimension results are treated descriptively when sample counts are small or imbalanced.
+
+Efficiency is reported where supported by logs: wall-clock time, semantic-call count, retrieval-call count, and API cost. Current traces do not contain token-level billing data, so missing cost values are reported as unavailable rather than reconstructed from unsupported assumptions.
+
 \section{Statistical Analysis}
-\mbox{}\par
-\section{Reproducibility}
-\mbox{}\par
+
+Because every system is evaluated on the same items, uncertainty is analyzed at item level. Bootstrap confidence intervals for the main agreement estimates are obtained by resampling whole items with replacement \parencite{efron1993bootstrap}; the replicate count and random seed are frozen in the analysis script before the final result table is produced.
+
+Pairwise system comparisons use paired binary correctness relative to the resolved human reference. McNemar's test evaluates whether the discordant correct/incorrect outcomes differ systematically between two systems \parencite{mcnemar1947correlated}. With small discordant counts, the exact binomial form is preferred to the asymptotic $\chi^2$ approximation. Tests are two-sided because superiority is not assumed in advance.
+
+The report includes effect sizes in addition to $p$-values: absolute agreement differences, discordant counts, and confidence intervals. Exploratory analyses, for example stratification by human confidence or evidence coverage, are labeled separately from the pre-declared primary comparisons.
+
+\section{Reproducibility and Experimental Freeze}
+\label{sec:experiment-freeze}
+
+Before comparative results are inspected, an experiment manifest will freeze the evaluation-set hash and item IDs, annotation-export hash, verifier commit/version, model identifiers and dates, rubric and prompt hashes, retrieval configuration, evidence-cache inventory, Skywork identifier and tie rule, direct-judge prompt/order schedule, and statistical-analysis seed.
+
+The execution order is also fixed: (1) finalize and hash human annotations; (2) freeze evaluation items without consulting system outcomes; (3) freeze verifier and direct-judge model configurations; (4) collect and archive LIVE evidence; (5) run the verifier in REPLAY; (6) run Skywork; (7) run the direct judge; (8) compute pre-declared metrics and paired statistics; and only then (9) select trace-backed cases for qualitative error analysis. Deviations from this order or configuration must be recorded rather than silently incorporated. Chapter~\ref{ch:results} will contain only results generated under the documented freeze.
