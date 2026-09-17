@@ -1,0 +1,26 @@
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  node distance=5mm and 5mm,
+  box/.style={draw, rounded corners=2pt, align=center, minimum height=8mm, text width=2.45cm, font=\footnotesize},
+  shared/.style={box, fill=black!7},
+  arrow/.style={-{Latex[length=2mm]}, thick}
+]
+\node[box] (prompt) {Shared prompt};
+\node[shared, right=of prompt] (context) {Shared context frame};
+\node[shared, right=of context] (plan) {Shared D01--D10 plan};
+\draw[arrow] (prompt) -- (context);
+\draw[arrow] (context) -- (plan);
+
+\node[box, below left=10mm and 24mm of plan] (a) {Candidate A\\independent evaluation};
+\node[box, right=of a] (b) {Candidate B\\independent evaluation};
+\node[box, right=of b] (c) {Candidate C\\independent evaluation};
+\node[box, right=of c] (d) {Candidate D\\independent evaluation};
+\foreach \x in {a,b,c,d} {\draw[arrow] (plan) -- (\x);}
+
+\node[box, below=10mm of b, xshift=13mm] (rank) {Exact-score comparison\\highest unique score wins; exact tie $\rightarrow$ no clear winner};
+\foreach \x in {a,b,c,d} {\draw[arrow] (\x) -- (rank);}
+\end{tikzpicture}
+\caption{Best-of-4 evaluation with shared prompt-level planning and independent candidate evaluation. Primary/secondary dimension roles do not change score weights.}
+\label{fig:best-of4}
+\end{figure}
