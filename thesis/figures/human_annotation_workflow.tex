@@ -1,0 +1,23 @@
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  node distance=6mm and 5mm,
+  box/.style={draw, rounded corners=2pt, align=center, minimum height=8mm, text width=2.7cm, font=\footnotesize},
+  arrow/.style={-{Latex[length=2mm]}, thick}
+]
+\node[box] (item) {Prompt + responses A--D};
+\node[box, right=of item] (task) {Choose most culturally appropriate: A/B/C/D/No clear winner};
+\node[box, right=of task] (conf) {Confidence 1--5};
+\draw[arrow] (item) -- (task);
+\draw[arrow] (task) -- (conf);
+
+\node[box, below=10mm of task] (five) {Five independent annotator records};
+\node[box, left=of five] (majority) {$\geq 3$ identical votes\\$\rightarrow$ majority reference};
+\node[box, right=of five] (split) {No category reaches 3\\$\rightarrow$ unresolved split};
+\draw[arrow] (conf) -- (five);
+\draw[arrow] (five) -- (majority);
+\draw[arrow] (five) -- (split);
+\end{tikzpicture}
+\caption{Human annotation and reference-construction protocol. Confidence is retained as a secondary measure and does not weight the primary categorical vote.}
+\label{fig:human-annotation}
+\end{figure}
