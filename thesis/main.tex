@@ -1,0 +1,57 @@
+\documentclass[11pt,a4paper,oneside]{report}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[english]{babel}
+\usepackage{microtype}
+\usepackage{csquotes}
+\emergencystretch=2em
+\usepackage{geometry}
+\geometry{margin=2.7cm}
+\usepackage{setspace}
+\onehalfspacing
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{hyperref}
+\usepackage[nameinlink,capitalise]{cleveref}
+\usepackage[backend=biber,style=authoryear,maxcitenames=2]{biblatex}
+\addbibresource{bibliography/references.bib}
+
+\title{\textbf{Working Title}\\Evidence-Grounded Verification of Cultural Appropriateness in Large Language Model Outputs}
+\author{Bachelor Thesis in Computer Science}
+\date{\today}
+
+\begin{document}
+\pagenumbering{roman}
+\maketitle
+
+\chapter*{Abstract}
+% TODO-ABSTRACT: Write only after methods and results are stable.
+This abstract is intentionally left as a structured placeholder until the final empirical evaluation is complete.
+
+\tableofcontents
+\clearpage
+\pagenumbering{arabic}
+
+\include{chapters/01_introduction}
+\include{chapters/02_background}
+\include{chapters/03_related_work}
+\include{chapters/04_cultural_framework}
+\include{chapters/05_verifier_methodology}
+\include{chapters/06_experimental_methodology}
+\include{chapters/07_evaluation_results}
+\include{chapters/08_error_analysis_discussion}
+\include{chapters/09_limitations_validity}
+\include{chapters/10_conclusion}
+
+\appendix
+\include{appendices/appendix_rubric}
+\include{appendices/appendix_prompts}
+\include{appendices/appendix_human_annotation}
+\include{appendices/appendix_reproducibility}
+
+\printbibliography
+\end{document}
