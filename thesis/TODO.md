@@ -26,13 +26,14 @@
 - [x] Add dedicated family/gender/generational support for D07 (Georgas et al.; Inglehart & Norris, Run 4).
 - [x] Add dedicated work/participation support for D08 (Schwartz; Inglehart & Baker, Run 4).
 - [x] Add dedicated collective-memory support for D09 (Assmann & Czaplicka, Run 4).
+- [x] Keep Chapter 5 literature claims within the source-to-claim boundaries established in Run 2 (Run 5).
 - [ ] Continue claim-by-claim source verification during prose drafting; the bibliography is a validated seed, not a closed literature set.
 
 ## Writing still required
 
 - [x] Write Chapters 2 and 3 (Run 3).
 - [x] Write literature-grounded D01--D10 derivation and operational framework in Chapter 4 (Run 4).
-- [ ] Write code-grounded Chapter 5.
+- [x] Write code-grounded Chapter 5 and validate it against the frozen implementation (Run 5).
 - [ ] Finalize Chapter 6.
 - [ ] Populate Chapter 7 only from real outputs.
 - [ ] Populate Chapter 8 only from real comparative cases.
@@ -42,3 +43,4 @@
 
 - [ ] Revisit Chapter 3 during the final whole-thesis editing pass if the main-text page budget requires trimming; the Run-3 draft is approximately one page above its provisional 9--10 page target.
 - [x] Keep Chapter 4 within its 6--7 page target during Run 4 (current compiled span: pp. 20--26).
+- [x] Keep Chapter 5 within its 12--13 page target during Run 5 (current compiled span: pp. 27--39).
