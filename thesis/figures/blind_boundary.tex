@@ -1,0 +1,29 @@
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  node distance=5mm,
+  box/.style={draw, rounded corners=2pt, align=center, minimum height=8mm, text width=3.25cm, font=\footnotesize},
+  blind/.style={box, fill=black!7},
+  arrow/.style={-{Latex[length=2mm]}, thick}
+]
+\node[box] (candidate) {Candidate response + material target};
+\node[box, right=9mm of candidate] (questions) {Neutral baseline + variation questions};
+\draw[arrow] (candidate) -- (questions);
+
+\node[blind, below=9mm of questions] (query) {Question + explicit context only};
+\node[blind, left=9mm of query] (retrieve) {Query rewriting + retrieval};
+\node[blind, left=9mm of retrieve] (memo) {Evidence synthesis + frozen memo};
+\draw[arrow] (questions) -- node[right,font=\scriptsize]{blind boundary} (query);
+\draw[arrow] (query) -- (retrieve);
+\draw[arrow] (retrieve) -- (memo);
+
+\node[box, below=9mm of memo] (compare) {Target reintroduced for comparison};
+\node[box, right=9mm of compare] (score) {Dimension scoring + aggregation};
+\draw[arrow] (memo) -- node[left,font=\scriptsize]{candidate reintroduced} (compare);
+\draw[arrow] (compare) -- (score);
+
+\node[draw,dashed,rounded corners=3pt,fit=(query)(retrieve)(memo),inner sep=5pt,label={[font=\scriptsize]above:Candidate-blind evidence stage}] {};
+\end{tikzpicture}
+\caption{Location of the candidate-blind boundary. Blindness begins only after target-derived verification questions have been generated; question wording can therefore still transmit framing.}
+\label{fig:blind-boundary}
+\end{figure}
