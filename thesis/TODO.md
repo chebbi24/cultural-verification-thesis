@@ -32,30 +32,34 @@
 - [x] Add statistical-method references required by the pre-declared human-agreement and paired-comparison protocol (Run 6).
 - [ ] Continue claim-by-claim source verification during prose drafting; the bibliography is a validated seed, not a closed literature set.
 
-## Writing still required
+## Writing and presentation
 
 - [x] Write Chapters 2 and 3 (Run 3).
 - [x] Write literature-grounded D01--D10 derivation and operational framework in Chapter 4 (Run 4).
 - [x] Write code-grounded Chapter 5 and validate it against the frozen implementation (Run 5).
 - [x] Finalize Chapter 6 experimental design and evaluation protocol (Run 6).
-- [ ] Populate Chapter 7 only from real frozen outputs.
+- [x] Build the non-result methodology/evaluation figures and tables, complete reproducibility appendices, and add List of Figures/Tables (Run 7).
+- [ ] Populate Chapter 7 only from real frozen outputs and replace all `TBD` cells in the result table.
+- [ ] Generate result-dependent plots only from final frozen data (agreement, per-dimension outcomes, coverage/abstention, efficiency as supported).
 - [ ] Populate Chapter 8 only from real comparative cases and trace-backed errors.
 - [ ] Finalize Chapter 9 threats to validity after the realized annotation and experiment properties are known.
 - [ ] Finalize Introduction, Abstract, and Conclusion last.
+- [ ] If the final verifier prompt-template hash differs from the Run-7 appendix snapshot, regenerate Appendix B before submission.
 
-## Run 6 experimental freeze follow-up
+## Run 6/7 experimental freeze follow-up
 
 - [ ] Decide whether PLT001--PLT030 remain the sole final evaluation sample or add a genuinely unseen confirmatory set.
 - [ ] Freeze and archive the final five-annotator export before system-result analysis.
 - [ ] Record whether the human survey randomized candidate order; if not, report fixed order as a limitation.
 - [ ] Implement or wrap tie-aware Skywork ranking so an exact top-score tie yields `no_clear_winner`.
-- [ ] Freeze the primary direct-judge prompt, backbone model, deterministic permutation schedule, and seed.
+- [ ] Freeze the primary direct-judge prompt, backbone model, deterministic permutation schedule, and seed; then insert the exact prompt into Appendix B.
 - [ ] Freeze the bootstrap replicate count and statistical-analysis seed in the analysis script.
-- [ ] Create the final experiment manifest before inspecting comparative results.
+- [ ] Replace all pending fields in Appendix D with the final experiment manifest before inspecting comparative results.
 
 ## Page-budget follow-up
 
-- [ ] Revisit Chapter 3 during the final whole-thesis editing pass if the main-text page budget requires trimming; the Run-3 draft is approximately one page above its provisional 9--10 page target.
-- [x] Keep Chapter 4 within its 6--7 page target during Run 4 (compiled span: pp. 20--26 at that stage).
-- [x] Keep Chapter 5 within its 12--13 page target during Run 5 (compiled span: pp. 27--39 at that stage).
-- [ ] Recheck Chapter 6 page allocation during the final whole-thesis compile after Chapters 7--10 are populated; the current 64-page project count includes unfinished later chapters and appendices.
+- [ ] Revisit Chapter 3 during the final whole-thesis editing pass if the main-text page budget requires trimming; the Run-3 draft was approximately one page above its provisional 9--10 page target.
+- [x] Keep Chapter 4 within its 6--7 page target during Run 4 (current numbered span remains pp. 20--26 after Run 7).
+- [ ] Revisit Chapter 5 during final compression: after adding Run-7 explanatory figures its current numbered span is pp. 27--40 (14 pages), one page above the original 12--13 page target.
+- [x] Chapter 6 currently occupies pp. 41--48 (8 pages), within its planned 7--8 page range.
+- [ ] Recalculate the final 60--65 page main-body target only after Chapters 1 and 7--10 are substantively complete; the current numbered main body ends at p. 54 but later chapters are still scaffolds.
