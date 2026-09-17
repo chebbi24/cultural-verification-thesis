@@ -1,0 +1,20 @@
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  node distance=6mm and 5mm,
+  box/.style={draw, rounded corners=2pt, align=center, minimum height=9mm, text width=2.6cm, font=\footnotesize},
+  ref/.style={box, fill=black!7},
+  arrow/.style={-{Latex[length=2mm]}, thick}
+]
+\node[box] (item) {Prompt + fixed responses A--D};
+\node[ref, below left=8mm and 29mm of item] (human) {Five-annotator human reference};
+\node[box, below left=8mm and 10mm of item] (verifier) {Standalone verifier};
+\node[box, below right=8mm and 10mm of item] (rm) {Skywork reward model};
+\node[box, below right=8mm and 29mm of item] (judge) {Direct LLM judge};
+\foreach \x in {human,verifier,rm,judge} {\draw[arrow] (item) -- (\x);}
+\node[box, below=18mm of item] (compare) {Common comparison layer\\winner agreement, coverage, paired statistics, diagnostics};
+\foreach \x in {human,verifier,rm,judge} {\draw[arrow] (\x) -- (compare);}
+\end{tikzpicture}
+\caption{Overall empirical design. The human reference and three automated systems operate independently on the same fixed Best-of-4 items before comparative analysis.}
+\label{fig:research-design}
+\end{figure}
