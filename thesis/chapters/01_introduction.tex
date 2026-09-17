@@ -1,16 +1,84 @@
 \chapter{Introduction}
 \label{ch:introduction}
+
 \section{Motivation}
-\mbox{}\par
-% TODO-WRITING: Finalize after Chapters 2--9 are mature.
+
+Large language models (LLMs) are increasingly used as general-purpose interfaces for information seeking, advice, writing assistance, education, workplace communication and decision support. In these settings, the quality of a response depends on more than grammatical fluency or factual correctness. Many requests are situated in a cultural context: they involve local practices, forms of address, social expectations, legal or institutional constraints, religious sensitivities, value conflicts, historical references, or identity-related concerns. A response can therefore be linguistically well formed and factually plausible while still being poorly adapted to the situation in which it is used.
+
+This problem is difficult because culture is not a single stable variable that can be reduced to nationality. Institutional and scholarly accounts describe culture through overlapping features such as ways of life, values, traditions, beliefs, identities, language and social participation, while surveys of cultural NLP show that computational work operationalizes different subsets of these facets depending on the task \parencite{unesco2001culturaldiversity,cescr2009gc21,adilazuarda2024culture,liu2025culturallyaware,pawar2025culturalawareness}. Cultural appropriateness is consequently context-dependent and often plural. A greeting that is natural in one region may be marked in another; a common social tendency does not imply a binding rule; a legally required procedure cannot be inferred from informal custom; and a majority preference cannot be treated as moral unanimity. Systems intended to serve diverse users must therefore handle both contextual specificity and legitimate variation.
+
+Recent research has made these limitations increasingly visible. Cultural benchmarks test everyday knowledge, values, language use, social norms and culturally situated safety across multiple regions and languages \parencite{myung2024blend,chiu2025culturalbench,rao2025normad,yin2024safeworld}. CARB specifically studies cultural awareness in reward models and shows why preference-based evaluators require culture-sensitive analysis rather than being assumed to transfer uniformly across settings \parencite{zhang2026carb}. Other approaches attempt to improve generators directly, for example through culture-specific fine-tuning or retrieval-augmented cultural context \parencite{li2024culturellm,seo2025valuesrag}. These lines of work demonstrate that cultural alignment is both an evaluation problem and a generation problem.
+
+This thesis focuses on the evaluation side. Once an LLM has produced an answer, a user, developer or auditor may need to know whether that particular answer is culturally appropriate for the stated context and, crucially, why. A scalar preference score alone offers limited diagnostic value. Direct LLM judges can provide natural-language rationales, but prior work has documented sensitivities such as position bias and other evaluator effects \parencite{zheng2023llmjudge,wang2024notfairevaluators}. A useful verification layer should therefore do more than choose a preferred response: it should expose the culturally relevant dimensions, distinguish externally verifiable claims from non-verifiable value statements, retrieve evidence where appropriate, preserve uncertainty, and leave a trace that can be inspected after the decision.
+
+The central motivation of this work is thus to investigate a standalone, evidence-grounded verification architecture for culturally situated LLM outputs. The verifier is intentionally independent of the generator, reward model and human reference labels. It is designed as a post-hoc layer that can receive a prompt and candidate response, identify the cultural aspects that matter, gather candidate-blind external evidence for retrievable claims, score the response under an explicit D01--D10 framework, abstain when the basis is insufficient, and preserve the intermediate artifacts needed for later audit.
+
 \section{Problem Statement}
-\mbox{}\par
+
+The technical problem addressed in this thesis is the post-hoc assessment of cultural appropriateness in open-ended LLM responses. Given a user prompt $p$ and a response $r$, the verifier should determine which cultural dimensions are relevant to the situation, whether material claims or recommendations in $r$ are supported by context-appropriate evidence, and how well the response handles the applicable cultural considerations. In a Best-of-4 setting, the same procedure should be applied consistently to four fixed candidates $(r_A,r_B,r_C,r_D)$ so that the resulting scores can support a transparent ranking without relying on hidden benchmark answers or human labels at runtime.
+
+Several requirements make this problem substantially harder than ordinary factual verification. First, cultural interpretation depends on explicit context. A claim about etiquette, language, religion or institutional practice may be appropriate only for a particular region, relationship, setting or time. Inferring missing demographic or geographic information would itself introduce bias, so the verifier must distinguish stated context from assumptions.
+
+Second, not every culturally relevant statement is a factual claim that should be checked through web retrieval. Some response properties are internal, such as whether the answer respects an explicit user constraint. Others concern contested values for which external evidence can describe viewpoints but cannot establish one objectively correct position. The verification process therefore needs an epistemic distinction between external facts, descriptive norms, context-dependent recommendations, internal response quality and non-verifiable value statements.
+
+Third, retrieved evidence can itself introduce bias or contamination. If the candidate response is visible during retrieval and evidence synthesis, the search process may become implicitly oriented toward proving or disproving that candidate. Benchmark repositories, annotation files or leaked answer artifacts may also enter the evidence set. Retrieval therefore needs provenance controls, explicit exclusions and a structural boundary between candidate-dependent question formation and candidate-blind evidence gathering. General retrieval-augmented generation research motivates the use of external non-parametric evidence, while benchmark-contamination research motivates careful provenance and exclusion policies; neither, however, guarantees that any particular retrieval design is unbiased or complete \parencite{lewis2020rag,deng2024contamination}.
+
+Fourth, uncertainty must remain visible. Cultural evidence is often sparse, inconsistent or unevenly distributed across languages and communities. A verifier that always forces a score risks turning missing evidence into false certainty. The system therefore requires explicit abstention at the dimension level and separate reporting of evidence coverage, rather than treating uncertainty as an ordinary midpoint score.
+
+Finally, the evaluation itself must be scientifically controlled. A verifier can only be assessed meaningfully if candidate text is fixed, human reference judgments are collected independently, comparison systems receive equivalent items, tie and abstention semantics are declared in advance, and final quantitative claims are computed only after configurations and evidence have been frozen. The problem is therefore not only to implement a cultural verifier, but also to design an evaluation protocol that separates software correctness, methodological design and empirical validity.
+
 \section{Research Gap}
-\mbox{}\par
+
+Existing work addresses important parts of this problem but does not directly provide the verification layer investigated here. Cultural benchmarks such as BLEnD, CulturalBench, NormAd and CARB operationalize cultural knowledge, social norms or reward-model behavior under curated evaluation settings \parencite{myung2024blend,chiu2025culturalbench,rao2025normad,zhang2026carb}. Their principal goal is to measure model capabilities or evaluator behavior over benchmark items rather than to verify arbitrary generated responses through an auditable evidence pipeline.
+
+A second group of approaches changes the generator itself. CultureLLM uses culturally grounded data and fine-tuning to adapt language models, while ValuesRAG retrieves value-related context to improve generation \parencite{li2024culturellm,seo2025valuesrag}. These methods are relevant because they show that external cultural information can improve contextual alignment, but they do not solve the independent post-hoc question of whether an already-produced response should be accepted, rejected, qualified or abstained on.
+
+A third line of work concerns general-purpose evaluators. Reward models are designed to discriminate preferences and are commonly used as optimization or ranking signals, but their scalar scores do not inherently provide source-grounded cultural diagnostics \parencite{lambert2025rewardbench}. Direct LLM judges can compare responses and provide explanations, yet their decisions remain sensitive to prompt design, candidate order and model-specific biases \parencite{zheng2023llmjudge,wang2024notfairevaluators}. For the present thesis, these systems are therefore useful independent baselines rather than substitutes for an evidence-grounded verifier.
+
+Taken together, the reviewed literature leaves a practical methodological gap at the intersection of these areas: a standalone post-hoc verifier that combines an explicit multidimensional cultural framework with bounded external evidence, structural separation between candidate text and evidence synthesis, abstention, reproducible evidence snapshots, and traceable Best-of-4 scoring. This thesis does not claim that these design choices are inherently superior. Instead, it implements them as a testable architecture and evaluates whether the resulting judgments agree with an independently collected human reference and how they differ from a preference-based reward model and a direct LLM judge.
+
 \section{Research Questions}
-\mbox{}\par
-% TODO-RQ: Freeze wording after experiment design is finalized.
+
+The thesis is organized around four research questions. Their wording is deliberately non-directional: no question presupposes that the proposed verifier will outperform the comparison systems.
+
+\begin{enumerate}
+    \item[\textbf{RQ1}] To what extent does the standalone evidence-grounded verifier agree with aggregated human reference judgments when selecting the most culturally appropriate response in fixed Best-of-4 items?
+
+    \item[\textbf{RQ2}] How does the verifier's agreement with the human reference compare with an independent Skywork-Reward-V2 reward-model baseline and a direct LLM-as-a-judge baseline evaluated on the same items?
+
+    \item[\textbf{RQ3}] What additional diagnostic information is provided by the verifier's D01--D10 dimension scores, material targets, retrieved evidence, evidence sufficiency, coverage and abstention behavior in cases of agreement and disagreement?
+
+    \item[\textbf{RQ4}] Which failure modes arise in context extraction, dimension planning, target formulation, retrieval, evidence synthesis and scoring, and what do these failures imply for the reliability and limitations of evidence-grounded cultural verification?
+\end{enumerate}
+
+RQ1 and RQ2 provide the principal comparative evaluation. RQ3 addresses the core motivation for a verifier that exposes more than a single preference score. RQ4 treats failure analysis as part of the scientific contribution rather than as an afterthought, because retrieval quality, evidence availability and semantic-stage errors can directly affect the validity of the final judgment.
+
 \section{Contributions}
-\mbox{}\par
+
+This thesis makes five main contributions.
+
+\begin{enumerate}
+    \item \textbf{An operational framework for cultural appropriateness.} The thesis develops D01--D10 as a literature-grounded synthesis covering everyday and material culture; language, discourse and pragmatics; social etiquette; values and moral pluralism; law and institutional rules; religion and ritual; family, gender and generations; work, education and civic participation; heritage and collective memory; and identity and intergroup relations. The framework is presented as an operational design, not as a universal or exhaustive theory of culture.
+
+    \item \textbf{A standalone evidence-grounded verifier.} The implemented \texttt{cultverify-1.0.0} pipeline separates prompt-level context and dimension planning from candidate-specific target extraction, generates neutral verification questions, performs candidate-blind evidence retrieval and memo construction, freezes the evidence before reintroducing the target, and produces traceable D01--D10 scores with explicit abstention.
+
+    \item \textbf{A reproducibility-oriented evidence architecture.} The system records source provenance, applies repository/domain/path exclusions, stores immutable retrieval snapshots, distinguishes LIVE evidence acquisition from REPLAY evaluation, hashes relevant artifacts, and preserves semantic call and evidence links in structured traces. These mechanisms establish reproducibility and auditability properties of the software; they are not treated as proof that retrieved evidence is complete or culturally unbiased.
+
+    \item \textbf{A controlled comparative evaluation protocol.} The thesis defines a common fixed Best-of-4 evaluation setting with a five-annotator human reference, an independent Skywork reward-model baseline and a direct LLM judge. The protocol pre-declares majority handling, no-clear-winner semantics, unresolved human splits, exact-tie behavior, coverage reporting, paired statistical comparison and configuration freezing before final results are inspected.
+
+    \item \textbf{Trace-backed diagnostic analysis.} Beyond winner agreement, the evaluation is designed to examine dimension-level scores, evidence sufficiency, abstention, retrieval coverage and qualitative failure modes. This allows the final analysis to distinguish disagreement caused by cultural reasoning from disagreement caused by missing evidence, planning errors, retrieval limitations or evaluator behavior.
+\end{enumerate}
+
+The contribution is therefore not a claim that external evidence automatically solves cultural evaluation. Rather, it is the design, implementation and controlled assessment of a verifier architecture that makes its evidential basis and uncertainty more inspectable than an opaque scalar preference score. The empirical chapters determine how useful this architecture is in practice; no superiority claim is assumed in advance.
+
 \section{Thesis Structure}
-\mbox{}\par
+
+The remainder of the thesis follows the progression from conceptual foundations to operationalization, implementation and empirical assessment. \Cref{ch:background} introduces LLM alignment, reward models, LLM-as-a-judge evaluation, cultural appropriateness, retrieval-based evidence and the evaluation concepts required later in the thesis. \Cref{ch:related} reviews cultural benchmarks and alignment approaches, with particular attention to CARB, CultureLLM, SafeWorld, Think-as-Locals, retrieval-based cultural alignment, reward models and direct LLM judging, and derives the research gap addressed here.
+
+\Cref{ch:framework} develops the D01--D10 operational framework and explains the distinction between cultural tendencies, interpersonal norms, formal rules and contested values. \Cref{ch:verifier} then describes the proposed verifier end to end, from context extraction and shared dimension planning through target extraction, candidate-blind evidence retrieval, evidence freezing, dimension scoring, aggregation, ranking, LIVE/REPLAY execution and traceability.
+
+\Cref{ch:experiment} specifies the experimental protocol, including the fixed Best-of-4 dataset, five-person human evaluation, standalone verifier configuration, independent Skywork reward-model baseline, direct LLM judge, metrics, statistical tests and reproducibility freeze. \Cref{ch:results} is reserved for the quantitative results produced under that frozen protocol. \Cref{ch:discussion} analyzes trace-backed agreements, disagreements and failure modes, while \Cref{ch:limitations} consolidates threats to construct validity, internal validity, external validity and reproducibility. Finally, \Cref{ch:conclusion} answers the research questions in light of the completed empirical evidence and identifies directions for future work.
+
+% TODO-FINAL-INTRO: After the final frozen experiment, add at most one concise sentence in
+% the Contributions section summarizing the central empirical result; do not rewrite the
+% research questions or introduce post-hoc success criteria.
