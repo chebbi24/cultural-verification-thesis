@@ -30,20 +30,23 @@
 - [x] Add dedicated collective-memory support for D09 (Assmann & Czaplicka, Run 4).
 - [x] Keep Chapter 5 literature claims within the source-to-claim boundaries established in Run 2 (Run 5).
 - [x] Add statistical-method references required by the pre-declared human-agreement and paired-comparison protocol (Run 6).
-- [ ] Continue claim-by-claim source verification during prose drafting; the bibliography is a validated seed, not a closed literature set.
+- [x] Draft the Introduction from the already-validated literature and implemented methodology without introducing result claims (post-Run-7).
+- [ ] Continue claim-by-claim source verification during final prose editing; the bibliography is a validated seed, not a closed literature set.
 
 ## Writing and presentation
 
+- [x] Write the full Introduction: motivation, problem statement, research gap, RQ1--RQ4, contributions, and thesis structure (post-Run-7).
 - [x] Write Chapters 2 and 3 (Run 3).
 - [x] Write literature-grounded D01--D10 derivation and operational framework in Chapter 4 (Run 4).
 - [x] Write code-grounded Chapter 5 and validate it against the frozen implementation (Run 5).
 - [x] Finalize Chapter 6 experimental design and evaluation protocol (Run 6).
 - [x] Build the non-result methodology/evaluation figures and tables, complete reproducibility appendices, and add List of Figures/Tables (Run 7).
+- [ ] After final frozen results exist, add only the concise empirical takeaway needed to calibrate the Introduction; do not change the pre-declared RQs post hoc.
 - [ ] Populate Chapter 7 only from real frozen outputs and replace all `TBD` cells in the result table.
 - [ ] Generate result-dependent plots only from final frozen data (agreement, per-dimension outcomes, coverage/abstention, efficiency as supported).
 - [ ] Populate Chapter 8 only from real comparative cases and trace-backed errors.
 - [ ] Finalize Chapter 9 threats to validity after the realized annotation and experiment properties are known.
-- [ ] Finalize Introduction, Abstract, and Conclusion last.
+- [ ] Finalize Abstract and Conclusion after the empirical results and discussion are complete.
 - [ ] If the final verifier prompt-template hash differs from the Run-7 appendix snapshot, regenerate Appendix B before submission.
 
 ## Run 6/7 experimental freeze follow-up
@@ -62,4 +65,5 @@
 - [x] Keep Chapter 4 within its 6--7 page target during Run 4 (current numbered span remains pp. 20--26 after Run 7).
 - [ ] Revisit Chapter 5 during final compression: after adding Run-7 explanatory figures its current numbered span is pp. 27--40 (14 pages), one page above the original 12--13 page target.
 - [x] Chapter 6 currently occupies pp. 41--48 (8 pages), within its planned 7--8 page range.
-- [ ] Recalculate the final 60--65 page main-body target only after Chapters 1 and 7--10 are substantively complete; the current numbered main body ends at p. 54 but later chapters are still scaffolds.
+- [ ] Revisit the Introduction during final compression if needed; the current full draft spans six numbered pages and is intentionally result-neutral.
+- [ ] Recalculate the final 60--65 page main-body target only after Chapters 7--10 are substantively complete.
