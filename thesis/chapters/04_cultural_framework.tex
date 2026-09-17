@@ -1,17 +1,133 @@
 \chapter{Operational Framework for Cultural Appropriateness}
 \label{ch:framework}
+
+The literature reviewed in \cref{ch:related} does not represent culture as one stable technical object. Prior work evaluates cultural knowledge, values, social norms, language use, legal constraints, safety expectations and everyday practices under different task designs. A verifier for open-ended LLM responses therefore needs an explicit operational framework before evidence is retrieved or scores are assigned. The D01--D10 rubric used in this thesis serves that purpose. It is a literature-grounded synthesis and an operational design choice; it is neither a universal theory of culture nor a taxonomy inherited from CARB or another benchmark.
+
 \section{From Cultural Correctness to Cultural Appropriateness}
-\mbox{}\par
+\label{sec:correctness-to-appropriateness}
+
+The term \emph{cultural correctness} suggests that culturally situated questions have one objectively correct answer. This assumption is too strong for the present task. UNESCO describes culture broadly through material and intellectual features, ways of life, value systems, traditions and beliefs, while the UN Committee on Economic, Social and Cultural Rights emphasizes that cultural life is evolving and connected to identity, language, customs, institutions and participation \parencite{unesco2001culturaldiversity,cescr2009gc21}. Cultural-NLP surveys similarly find no single computational definition of culture; studies instead operationalize selected facets and proxies \parencite{adilazuarda2024culture,liu2025culturallyaware,pawar2025culturalawareness}.
+
+This thesis therefore uses \emph{cultural appropriateness} to mean the degree to which a response is suitably adapted to the culturally relevant aspects of the explicit user context while avoiding material misrepresentation, unjustified universalization and contextually inappropriate guidance. The construct includes factual accuracy where cultural facts are at stake, but also pragmatic register, interpersonal norms, value pluralism, institutional rules, ritual sensitivity and identity-related representation.
+
+The distinction matters because culturally situated claims have different epistemic status. Cross-national opinion research shows substantial variation within and between populations, and cultural prompting can both improve contextual fit and amplify stereotypes \parencite{durmus2023globalopinionqa,tao2024culturalbias}. A descriptive tendency is not a universal rule; a social expectation is not necessarily a law; and a majority preference is not moral unanimity. The framework therefore evaluates whether a response handles the relevant type of cultural information with appropriate scope and qualification rather than whether it reproduces a fixed local answer.
+
+The construct is deliberately bounded. The verifier does not decide which culture is morally superior, infer cultural membership from identity labels, or certify that every group member would accept a response. It asks whether, given the explicit context, the response represents and handles materially relevant cultural considerations accurately, respectfully and with justified qualification.
+
 \section{Design Requirements for the Cultural Rubric}
-\mbox{}\par
-\section{Literature-Grounded Derivation of D01--D10}
-\mbox{}\par
-% TODO-SOURCE: Every derivation claim must be tied to verified primary literature.
+\label{sec:rubric-requirements}
+
+Several design requirements follow from the literature. First, the rubric requires \emph{breadth without adopting one benchmark ontology}. BLEnD focuses on everyday knowledge, CANDLE on cultural commonsense, NormAd on social norms, SafeWorld on cultural and legal safety, and CARB on commonsense, values, safety and language \parencite{myung2024blend,nguyen2023candle,rao2025normad,yin2024safeworld,zhang2026carb}. An open-ended verifier should cover these recurring families without importing benchmark-specific labels or answer keys into runtime evaluation.
+
+Second, it requires \emph{diagnostic separability}. A legal error, an inappropriate form of address and an identity stereotype can all make a response unsuitable, but they call for different evidence and different explanations. Dimension-level separation makes such failures inspectable instead of hiding them in one preference score.
+
+Third, the rubric must be \emph{context-sensitive and non-essentialist}. NormAd shows that model behavior changes as cultural norms become more specific, while CultureBank represents cultural knowledge through situated community narratives rather than a monolithic national profile \parencite{rao2025normad,shi2024culturebank}. A dimension should therefore identify what type of concern to inspect, not predetermine what all members of a culture do or believe.
+
+Fourth, the dimensions must be compatible with \emph{evidence-dependent evaluation}. Laws, descriptive norms, pragmatic conventions and contested values require different forms of support. The rubric is thus a diagnostic schema, not a universal ranking of source types. Finally, it must support \emph{stable Best-of-4 planning and abstention}: dimensions should be general enough to plan from the shared prompt, while the scorer must be able to abstain when a defensible judgment cannot be established.
+
+\section{Literature-Grounded Synthesis of D01--D10}
+\label{sec:dimension-synthesis}
+
+The ten dimensions were produced through synthesis rather than direct adoption. The literature first identifies recurring content families; these are then consolidated into dimensions broad enough for prompt-level planning but specific enough for diagnostic scoring. Their final names, boundaries and scoring questions are design choices of this thesis.
+
+Attribution is therefore intentionally conservative. CARB supports separating distinct forms of cultural awareness, but D01--D10 is not a mechanical refinement of CARB's four domains \parencite{zhang2026carb}. BLEnD and CANDLE motivate coverage of everyday and material culture, but neither defines D01 by name \parencite{myung2024blend,nguyen2023candle}. The same distinction applies across all dimensions.
+
+A targeted literature pass strengthens areas that were only partially supported in the initial source audit. Intercultural pragmatics provides a dedicated basis for context-sensitive discourse, politeness and culture-specific meaning \parencite{kecskes2014intercultural}. Cross-cultural family research and comparative gender research support the relevance of family roles, kinship, gender and generational variation \parencite{georgas2006families,inglehartnorris2003rising}. Cross-cultural values research provides direct links to work and participatory contexts \parencite{schwartz1999culturalvalues,inglehartbaker2000modernization}. Scholarship on cultural memory provides a basis for treating socially transmitted representations of the past as culturally relevant rather than as generic factuality alone \parencite{assmann1995collective}.
+
+\begin{table}[htbp]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.08}
+\caption{Operational D01--D10 framework used by the cultural verifier.}
+\label{tab:d01d10-overview}
+\begin{tabular}{p{0.7cm}p{3.7cm}p{8.5cm}}
+\toprule
+\textbf{ID} & \textbf{Dimension} & \textbf{Operational scope} \\
+\midrule
+D01 & Everyday life and material culture & Food, clothing, hospitality, leisure, routines, celebrations and material practices. \\
+D02 & Language, discourse and pragmatics & Register, address forms, idioms, implicature, dialect, humour and interactional meaning. \\
+D03 & Social etiquette and interpersonal norms & Greetings, invitations, boundaries, punctuality, disagreement and public/interpersonal conduct. \\
+D04 & Values, ethics and moral pluralism & Value priorities and contested moral positions concerning autonomy, authority, justice, solidarity and security. \\
+D05 & Law, policy and institutional rules & Binding rights, obligations, administrative procedures, policy and formal institutional constraints. \\
+D06 & Religion, ritual and taboo & Religious practice, sacred meaning, ritual observance and context-dependent prohibitions or sensitivities. \\
+D07 & Family, kinship, gender and generations & Family structures, partnership, caregiving, gender relations, childhood, ageing and intergenerational expectations. \\
+D08 & Work, education and civic participation & Workplace, educational, professional and civic settings and their legitimate role expectations. \\
+D09 & Cultural heritage, history, arts and collective memory & Heritage, historical interpretation, commemoration, arts, public symbols and socially maintained representations of the past. \\
+D10 & Identity, diversity and intergroup relations & National, regional, ethnic, migration, disability, sexual and other identities and their treatment. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \section{The D01--D10 Dimensions}
-\mbox{}\par
-\section{Scoring Anchors}
-\mbox{}\par
+\label{sec:dimensions}
+
+\paragraph{D01 --- Everyday life and material culture.}
+Everyday cultural competence often appears in mundane recommendations about meals, clothing, hospitality, celebrations, leisure or routines. BLEnD targets everyday cultural knowledge, while CANDLE includes food, clothing, traditions, rituals and behaviors among cultural-commonsense facets \parencite{myung2024blend,nguyen2023candle}. D01 captures such practical and material knowledge. It penalizes materially inappropriate guidance or unjustified universalization, but does not require stereotypical local markers to count as culturally adapted.
+
+\paragraph{D02 --- Language, discourse and pragmatics.}
+Cultural appropriateness is partly realized through how something is said. CARB includes cultural-linguistic evaluation, while intercultural pragmatics explicitly studies language use across cultural contexts and treats context, common ground, politeness and discourse as central to meaning \parencite{zhang2026carb,kecskes2014intercultural}. D02 therefore covers register, address forms, indirectness, implicature, idiom, humour and other interactional meanings. It is not a general writing-quality dimension; linguistic features matter here when they affect culturally situated interpretation or interpersonal fit.
+
+\paragraph{D03 --- Social etiquette and interpersonal norms.}
+D03 covers expectations governing greetings, invitations, gift giving, punctuality, disagreement, boundaries and related conduct. NormAd directly motivates this distinction by evaluating cultural adaptability across increasingly explicit social norms \parencite{rao2025normad}. The dimension asks whether advice recognizes relevant expectations without turning a tendency into a universal rule. It remains separate from D02 because socially inappropriate behavior can be expressed in linguistically natural language.
+
+\paragraph{D04 --- Values, ethics and moral pluralism.}
+Values concern judgments about desirable goals, rights and trade-offs rather than observable practice alone. CultureLLM uses World Values Survey material, while GlobalOpinionQA and cross-cultural bias research demonstrate variation in subjective opinions and value distributions \parencite{li2024culturellm,durmus2023globalopinionqa,tao2024culturalbias}. D04 covers contexts in which legitimate values can conflict. A high score therefore requires fair and context-sensitive treatment of relevant value pluralism, not the assumption that one majority preference represents unanimous morality.
+
+\paragraph{D05 --- Law, policy and institutional rules.}
+Formal rules require separate treatment because their authority differs from informal culture. SafeWorld explicitly combines geographically situated norms with laws and policies, and the reasoning framework of \textcite{wang2025ethicalreasoning} distinguishes formal constraints from social norms. D05 covers legal duties, institutional policies, rights and procedures. Its purpose is partly epistemic: a response should not present a formal requirement as merely ``what people usually do,'' or an informal convention as binding law.
+
+\paragraph{D06 --- Religion, ritual and taboo.}
+Religion and ritual combine factual, symbolic and normative content. UNESCO and CESCR include beliefs and traditions within broad accounts of cultural life, while CANDLE identifies ritual and tradition as recurring cultural facets \parencite{unesco2001culturaldiversity,cescr2009gc21,nguyen2023candle}. D06 covers observance, sacred meaning, ritual practice and context-dependent prohibitions. It explicitly avoids assuming uniform adherence within a religious community and rewards appropriate recognition of denominational, individual and situational variation.
+
+\paragraph{D07 --- Family, kinship, gender and generations.}
+Family relations are culturally variable and socially consequential. \textcite{georgas2006families} compare family networks, roles and emotional relations across thirty societies, while \textcite{inglehartnorris2003rising} document cross-national and generational variation in gender-role attitudes. D07 groups family structure, partnership, caregiving, gender relations, childhood, ageing and intergenerational expectations as an operational family/role domain. It penalizes categorical stereotypes or coercive assumptions and preserves individual agency and variation.
+
+\paragraph{D08 --- Work, education and civic participation.}
+Many culturally situated requests occur inside institutions. D08 covers workplaces, schools and universities, professional roles, associations and civic participation. \textcite{schwartz1999culturalvalues} develops a cultural-value framework with implications for work, while \textcite{inglehartbaker2000modernization} connect cultural change with values including tolerance, trust and participation. UNESCO and CESCR further connect education and participation with cultural life \parencite{unesco2001culturaldiversity,cescr2009gc21}. The dimension evaluates fit to the stated role, hierarchy, procedure and participation context without presuming one national institutional style.
+
+\paragraph{D09 --- Cultural heritage, history, arts and collective memory.}
+Historical and symbolic questions can carry identity and commemorative significance in addition to factual content. UNESCO and CESCR include heritage, traditions and artistic expression within cultural life \parencite{unesco2001culturaldiversity,cescr2009gc21}. \textcite{assmann1995collective} conceptualize cultural memory as socially transmitted collective knowledge and identity rather than biological inheritance. D09 therefore covers heritage, historical interpretation, commemoration, arts, public symbols and collective memory while retaining ordinary evidential standards for historical claims.
+
+\paragraph{D10 --- Identity, diversity and intergroup relations.}
+Cultural contexts intersect with national, regional, ethnic, linguistic, migration, disability, sexual and other identities. CultureBank's situated narratives and global-opinion research caution against reducing populations to homogeneous national profiles \parencite{shi2024culturebank,durmus2023globalopinionqa}. Pluralistic-alignment work similarly argues for preserving reasonable variation across populations \parencite{sorensen2024pluralistic}. D10 captures stereotyping, othering, discrimination and the representation of plural identities and intergroup relations.
+
+\section{Scoring Anchors and Abstention}
+\label{sec:framework-scoring}
+
+Each applicable dimension receives one of three ordinal scores or an abstention. The scale is deliberately coarse: it distinguishes material misalignment, mixed or incomplete treatment, and appropriately contextualized treatment without manufacturing fine numerical precision. Dimension-specific runtime anchors specialize these general meanings.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{General interpretation of the D01--D10 scoring states.}
+\label{tab:dimension-anchors}
+\begin{tabular}{p{1.6cm}p{11.2cm}}
+\toprule
+\textbf{State} & \textbf{General interpretation} \\
+\midrule
+0 & Materially culturally misaligned: substantively wrong, inappropriate, stereotyping, misleading or incompatible with a material contextual constraint. \\
+1 & Mixed, incomplete or context-limited: partly usable but oversimplified, insufficiently qualified or poorly adapted. \\
+2 & Culturally aligned/appropriate: accurate, constructive and context-sensitive treatment of the applicable concern. \\
+\texttt{abstain} & A defensible dimension judgment could not be established from the available basis; this is not a midpoint score. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The scores are ordinal at dimension level. A 2 is a better rubric outcome than a 1, but it is not interpreted as ``twice as appropriate.'' Abstention is also distinct from 1: a mixed response has been evaluated and found partly appropriate, whereas abstention indicates insufficient basis for a valid score. Aggregation and coverage accounting are defined separately in \cref{ch:verifier}.
+
 \section{Cultural Tendency, Rule, and Value}
-\mbox{}\par
+\label{sec:tendency-rule-value}
+
+A frequent cultural-evaluation error is using the wrong epistemic category. The framework therefore distinguishes four recurring forms. \emph{Descriptive tendencies} report common practices and require qualification about scope and variation. \emph{Interpersonal norms} describe socially expected conduct but may vary by relationship, generation, region or subgroup; NormAd demonstrates why this contextual specificity matters \parencite{rao2025normad}. \emph{Formal rules} derive from law, policy or institutional authority and can impose obligations regardless of social preference. \emph{Values and contested judgments} concern what people regard as desirable, fair or respectful; cross-national opinion work shows that these distributions can vary substantially \parencite{durmus2023globalopinionqa,tao2024culturalbias}.
+
+These categories can co-occur. A question about religious accommodation at work may involve D06 religious practice, D08 institutional context and D05 formal rules. The framework permits multiple applicable dimensions because its purpose is diagnostic coverage rather than mutually exclusive cultural classification.
+
 \section{Framework Limitations}
-\mbox{}\par
+\label{sec:framework-limitations}
+
+The D01--D10 framework remains a designed operationalization. The literature supports the relevance of its component facets but does not establish that ten dimensions are uniquely correct or exhaustive. The dimensions also overlap: language can express identity, religion can shape family expectations, workplace advice can involve law, and historical memory can affect intergroup relations. Dimension-level results should therefore not be interpreted as statistically independent constructs without further validation.
+
+A second limitation follows from prompt-level planning. Using one shared plan improves comparability across four candidates, but a candidate can introduce a culturally problematic topic that the prompt itself did not make salient. The present method records this as a limitation rather than dynamically changing the plan per candidate.
+
+Finally, the rubric does not guarantee evaluability. Cultural evidence is unevenly available across regions, languages and communities, and some knowledge is tacit or contested. A culturally appropriate answer is also not synonymous with conformity to a majority tendency. The framework preserves pluralism, rights, agency and contextual variation by design. Whether this operationalization aligns with human judgments is therefore not assumed here; it is evaluated empirically in \cref{ch:experiment} and, once available, \cref{ch:results}.
