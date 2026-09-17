@@ -1,0 +1,22 @@
+\begin{table}[htbp]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.08}
+\caption{Pre-declared primary and secondary evaluation quantities.}
+\label{tab:evaluation-metrics}
+\begin{tabularx}{\textwidth}{p{3.5cm}p{3.2cm}X}
+\toprule
+\textbf{Quantity} & \textbf{Scope} & \textbf{Interpretation} \\
+\midrule
+Winner agreement & Primary & Exact categorical match to resolved human reference, including \texttt{no\_clear\_winner} \\
+Predictive coverage & Primary diagnostic & Fraction of resolved-reference items on which a system produces a prediction rather than abstaining/failing \\
+Selective agreement & Secondary & Winner agreement restricted to items with a system prediction; reported together with coverage \\
+Inter-annotator agreement & Human reference & Fleiss' $\kappa$ for a complete balanced matrix, otherwise nominal Krippendorff's $\alpha$ \\
+Evidence coverage & Verifier diagnostic & Fraction of retrieval-appropriate targets whose final memo is marked sufficient; not an accuracy measure \\
+Dimension outcomes & Verifier diagnostic & D01--D10 score and abstention distributions, with small cells treated descriptively \\
+Paired correctness difference & Comparative & Item-level difference in human-reference correctness between systems, with paired inference \\
+Efficiency & Descriptive & Wall-clock time, semantic/retrieval calls and supported API cost information \\
+\bottomrule
+\end{tabularx}
+\end{table}
