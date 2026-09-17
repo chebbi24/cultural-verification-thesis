@@ -24,6 +24,27 @@
 \usepackage{hyperref}
 \usepackage[nameinlink,capitalise]{cleveref}
 \lstset{basicstyle=\ttfamily\scriptsize,breaklines=true,columns=fullflexible,keepspaces=true,showstringspaces=false,frame=single}
+
+% Run-7 visual integration. These hooks place the prepared figures/tables at
+% the end of the relevant methodological sections without rewriting the frozen
+% Run-5/Run-6 prose. The section counter still denotes the section that has just
+% finished when the next \section command reaches this hook.
+\AddToHook{cmd/section/before}{%
+  \ifnum\value{chapter}=5
+    \ifnum\value{section}=0 \input{figures/verifier_architecture}\fi
+    \ifnum\value{section}=7 \input{figures/blind_boundary}\fi
+    \ifnum\value{section}=10 \input{tables/source_types}\fi
+    \ifnum\value{section}=17 \input{figures/best_of4_shared_plan}\fi
+    \ifnum\value{section}=18 \input{figures/live_replay}\fi
+  \fi
+  \ifnum\value{chapter}=6
+    \ifnum\value{section}=1 \input{figures/research_design}\input{tables/evaluation_systems}\fi
+    \ifnum\value{section}=4 \input{figures/human_annotation_workflow}\fi
+    \ifnum\value{section}=5 \input{tables/experiment_freeze}\fi
+    \ifnum\value{section}=9 \input{tables/evaluation_metrics}\fi
+  \fi
+}
+
 \usepackage[backend=biber,style=authoryear,maxcitenames=2]{biblatex}
 \addbibresource{bibliography/references.bib}
 \addbibresource{bibliography/run3_sources.bib}
