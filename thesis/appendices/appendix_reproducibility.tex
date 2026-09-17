@@ -1,3 +1,51 @@
 \chapter{Reproducibility Manifest}
 \label{app:repro}
-% TODO-EXPERIMENT: Insert commit, model revisions, provider, prompts, retrieval config, and experiment dates.
+
+This appendix separates values already fixed by the implementation from values that must be frozen immediately before the final experiment. It is a manifest template, not evidence that the pending runs have occurred.
+
+\begin{longtable}{p{4.6cm}p{9.0cm}}
+\caption{Reproducibility manifest for the final experiment.}\label{tab:repro-manifest}\\
+\toprule
+\textbf{Field} & \textbf{Value / status} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Field} & \textbf{Value / status} \\
+\midrule
+\endhead
+Implementation repository & \texttt{chebbi24/cultural-verification-thesis} \\
+Authoritative implementation branch & \texttt{agent/final-verifier} \\
+Implementation commit & \texttt{2e546a48ba0950e78f7bd244b5b37b7b475ccf2d} \\
+Pipeline version & \texttt{cultverify-1.0.0} \\
+Validation environment & Python 3.12; exact validation dependency versions stored in \texttt{requirements.lock} \\
+Software validation snapshot & 55 tests passed, 1 gated live-provider test skipped; Ruff lint and format checks passed. This is software validation, not cultural accuracy. \\
+Runtime rubric & \texttt{src/cultverify/resources/rubric.csv}; exact content reproduced in \cref{app:rubric} \\
+Semantic prompt templates & Versioned templates from \texttt{src/cultverify/prompts.py}; current text reproduced in \cref{app:prompts} \\
+Final verifier model/provider/revision & \texttt{[TO BE FROZEN]} \\
+Verifier temperature & Current design value 0; confirm in final manifest \\
+Semantic retry budget & Maximum one semantic repair retry \\
+Transport retry budget & Current configured value to be recorded from final run \\
+LLM timeout & Current default 180 s; record final configuration \\
+Retrieval timeout & Current default 45 s; record final configuration \\
+Retriever & Tavily in LIVE mode; advanced search depth in current default configuration \\
+Accepted documents per query & \texttt{top\_k}=3 in current default configuration \\
+Maximum material targets & 3 \\
+Maximum retrieval rounds & 2 (two initial questions plus at most one follow-up question) \\
+Evidence cache directory/inventory & \texttt{[TO BE ARCHIVED AND HASHED]} \\
+Evaluation set IDs/hash & PLT001--PLT030 currently fixed; final sample decision and file hash \texttt{[TO BE FROZEN]} \\
+Human annotation export/hash & \texttt{[TO BE FROZEN BEFORE SYSTEM RESULT ANALYSIS]} \\
+Skywork baseline & \texttt{Skywork/Skywork-Reward-V2-Qwen3-4B}; exact-top tie rule must be wrapped to \texttt{no\_clear\_winner} \\
+Direct judge model/prompt/order seed & \texttt{[TO BE FROZEN]} \\
+Bootstrap replicate count/seed & \texttt{[TO BE FROZEN]} \\
+Statistical analysis code commit & \texttt{[TO BE FROZEN]} \\
+Experiment date(s) & \texttt{[TO BE RECORDED]} \\
+\bottomrule
+\end{longtable}
+
+\section*{Required execution order}
+The final run follows the pre-declared sequence from \cref{sec:experiment-freeze}: finalize and hash human annotations; freeze the evaluation sample; freeze model configurations and analysis seeds; acquire and archive LIVE evidence; evaluate the verifier in REPLAY; run the independent Skywork baseline; run the direct judge; compute the pre-declared metrics and paired statistics; and only then select trace-backed cases for qualitative analysis. Deviations must be recorded explicitly.
+
+\section*{Artifact inventory}
+The final submission archive should contain, or provide stable repository references to, the evaluation-set file, annotation export, experiment manifest, verifier traces, evidence schedules/snapshots, Skywork outputs, direct-judge outputs, statistical-analysis outputs, figure-generation scripts, and the exact thesis source used for submission.
+
+% TODO-EXPERIMENT: Replace all [TO BE FROZEN] values with the final manifest before submission.
