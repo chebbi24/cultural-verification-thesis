@@ -1,0 +1,35 @@
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  node distance=5mm and 4mm,
+  box/.style={draw, rounded corners=2pt, align=center, minimum height=8mm, text width=2.25cm, font=\footnotesize},
+  blind/.style={box, fill=black!7},
+  arrow/.style={-{Latex[length=2mm]}, thick}
+]
+\node[box] (prompt) {Prompt};
+\node[box, right=of prompt] (context) {Context\\extraction};
+\node[box, right=of context] (plan) {D01--D10\\planning};
+\node[box, right=of plan] (targets) {Material\\targets};
+\node[box, right=of targets] (questions) {Neutral\\questions};
+
+\node[blind, below=9mm of questions] (evidence) {Candidate-blind\\evidence engine};
+\node[blind, left=of evidence] (memo) {Frozen\\evidence memo};
+\node[box, left=of memo] (verdict) {Target\\comparison};
+\node[box, left=of verdict] (scores) {D01--D10\\scores};
+\node[box, left=of scores] (aggregate) {Aggregate\\score / rank};
+
+\draw[arrow] (prompt) -- (context);
+\draw[arrow] (context) -- (plan);
+\draw[arrow] (plan) -- (targets);
+\draw[arrow] (targets) -- (questions);
+\draw[arrow] (questions) -- (evidence);
+\draw[arrow] (evidence) -- (memo);
+\draw[arrow] (memo) -- (verdict);
+\draw[arrow] (verdict) -- (scores);
+\draw[arrow] (scores) -- (aggregate);
+
+\node[draw,dashed,rounded corners=3pt,fit=(evidence)(memo),inner sep=4pt,label={[font=\scriptsize]below:Candidate-blind stage}] {};
+\end{tikzpicture}
+\caption{Architecture of the standalone evidence-grounded cultural verifier. The shaded stage is structurally separated from candidate and target objects after verification-question generation.}
+\label{fig:verifier-architecture}
+\end{figure}
