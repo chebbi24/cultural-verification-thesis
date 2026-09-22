@@ -48,11 +48,15 @@ def load_cases(path: Path) -> list[dict[str, str]]:
             raise ValueError(f"Smoke case {index} is not an object")
         forbidden = FORBIDDEN_CASE_KEYS & set(item)
         if forbidden:
-            raise ValueError(f"Smoke case {item.get('case_id', index)!r} contains labels/expectations: {sorted(forbidden)}")
+            case_name = item.get("case_id", index)
+            raise ValueError(
+                f"Smoke case {case_name!r} contains labels/expectations: {sorted(forbidden)}"
+            )
         allowed = {"case_id", "prompt", "response"}
         extra = set(item) - allowed
         if extra:
-            raise ValueError(f"Smoke case {item.get('case_id', index)!r} contains unsupported keys: {sorted(extra)}")
+            case_name = item.get("case_id", index)
+            raise ValueError(f"Smoke case {case_name!r} contains unsupported keys: {sorted(extra)}")
         case_id = item.get("case_id")
         prompt = item.get("prompt")
         response = item.get("response")
