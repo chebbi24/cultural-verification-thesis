@@ -165,7 +165,7 @@ dimensions divided by two; if none can be scored it is `null`. There are no caps
 primary/secondary weighting differences. Ranking uses exact rational comparison,
 so floating-point rounding cannot break a mathematical tie. No tie margin is added.
 
-- `evidence_coverage`: proportion of retrievable targets with a sufficient final memo;
+- `evidence_coverage`: proportion of retrievable targets whose final memo is not `insufficient` (`sufficient` or `conflicting`);
   `null` when no target required external evidence. This is not factual accuracy.
 - `scored_count`, `applicable_count`, `abstained_dimensions`: scoring coverage.
 - `coverage_comparable`: whether all candidates scored the same dimension set.

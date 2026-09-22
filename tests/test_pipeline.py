@@ -342,3 +342,32 @@ def test_citation_trace_score_reference_validation(setup):
         validate_trace_links(
             trace.model_copy(update={"result": result.model_copy(update={"dimension_scores": (bad_score,)})})
         )
+
+
+def test_conflicting_final_memo_counts_as_evidence_coverage(setup):
+    config, _, retriever, _ = setup
+
+    def conflicting(payload):
+        ids = [d["document_id"] for d in payload["documents"]]
+        return {
+            "answer": "The retrieved sources do not resolve the question consistently.",
+            "scope": "The documented context",
+            "variation": "Relevant sources differ.",
+            "agreement": "Conflicting evidence",
+            "sufficiency": "conflicting",
+            "confidence": "medium",
+            "citations": ids,
+            "statements": [
+                {
+                    "text": "The retrieved sources do not resolve the question consistently.",
+                    "kind": "context_sensitive_practice",
+                    "citations": ids,
+                }
+            ],
+        }
+
+    llm = FixtureLLM(config, overrides={"evidence_memo_v1": conflicting})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert result.evidence[0].memos[-1].sufficiency == "conflicting"
+    assert result.evidence_coverage == 1

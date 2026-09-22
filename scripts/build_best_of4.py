@@ -49,9 +49,7 @@ def load_annotations(path: Path | None) -> dict[str, tuple[str, str]]:
         try:
             position = int(preferred.rsplit("-C", 1)[1])
         except (IndexError, ValueError):
-            raise ValueError(
-                f"Could not parse preferred_candidate_id={preferred!r} for {set_id}"
-            )
+            raise ValueError(f"Could not parse preferred_candidate_id={preferred!r} for {set_id}")
         if position not in POSITION_TO_LABEL:
             raise ValueError(f"Candidate position must be 1..4, got {position} for {set_id}")
         annotations[set_id] = (POSITION_TO_LABEL[position], source)
@@ -95,9 +93,7 @@ def build_rows(
         prompt = prompts.pop()
 
         prompt_ids = {
-            (row.get("legacy_prompt_id") or "").strip()
-            for row in rows
-            if (row.get("legacy_prompt_id") or "").strip()
+            (row.get("legacy_prompt_id") or "").strip() for row in rows if (row.get("legacy_prompt_id") or "").strip()
         }
         if len(prompt_ids) > 1:
             raise ValueError(f"Candidates in {set_id} have conflicting legacy_prompt_id values")

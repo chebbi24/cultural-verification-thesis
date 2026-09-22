@@ -112,7 +112,7 @@ class CulturalVerifier:
             errors.append(str(exc) if isinstance(exc, (StageError, RetrievalError)) else type(exc).__name__)
             scores = abstain_scores(plan, "Pipeline could not produce structurally valid evidence/scoring")
         external_count = sum(t.retrieval_appropriate for t in targets)
-        supported_count = sum(b.memos[-1].sufficiency == "sufficient" for b in bundles)
+        covered_count = sum(b.memos[-1].sufficiency != "insufficient" for b in bundles)
         overall = aggregate(scores)
         result = CandidateResult(
             run_id=run_id,
@@ -126,7 +126,7 @@ class CulturalVerifier:
             applicable_count=len(plan.dimensions),
             scored_count=sum(s.score != "abstain" for s in scores),
             abstained_dimensions=tuple(s.dimension_id for s in scores if s.score == "abstain"),
-            evidence_coverage=supported_count / external_count if external_count else None,
+            evidence_coverage=covered_count / external_count if external_count else None,
             candidate_abstained=overall is None,
             targets_truncated=truncated,
             status=status,
