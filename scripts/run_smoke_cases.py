@@ -49,9 +49,7 @@ def load_cases(path: Path) -> list[dict[str, str]]:
         forbidden = FORBIDDEN_CASE_KEYS & set(item)
         if forbidden:
             case_name = item.get("case_id", index)
-            raise ValueError(
-                f"Smoke case {case_name!r} contains labels/expectations: {sorted(forbidden)}"
-            )
+            raise ValueError(f"Smoke case {case_name!r} contains labels/expectations: {sorted(forbidden)}")
         allowed = {"case_id", "prompt", "response"}
         extra = set(item) - allowed
         if extra:
