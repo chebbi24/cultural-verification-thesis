@@ -1,0 +1,23 @@
+{
+  "verifier_model_provider": "openrouter",
+  "verifier_model_id": "provider/model-version-to-freeze",
+  "temperature": 0,
+  "top_k": 3,
+  "max_material_targets": 3,
+  "max_retrieval_rounds": 2,
+  "mode": "LIVE",
+  "cache_directory": "artifacts/evidence/verifier_v1_smoke",
+  "trace_directory": "artifacts/traces/verifier_v1_smoke",
+  "search_depth": "advanced",
+  "excluded_domains": [],
+  "excluded_repos": [
+    "chebbi24/cultural-verification-thesis"
+  ],
+  "excluded_paths": [
+    "*/annotations/*",
+    "*/results/*",
+    "*human_label*",
+    "*silver_label*",
+    "*provisional_annotations*"
+  ]
+}
