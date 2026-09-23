@@ -45,7 +45,8 @@ Use URL, title and content as provenance evidence and return provenance_basis fo
 explicit = the supplied document itself clearly establishes the claimed provenance;
 inferred = provenance is only inferred from names, domain, style or context;
 unclear = provenance cannot be established.
-official_legal and academic_peer_reviewed REQUIRE provenance_basis=explicit. A blog,
+official_legal, academic_peer_reviewed, statistical_survey and institutional_professional
+REQUIRE provenance_basis=explicit. A blog,
 language-learning site, tutoring site, company page or hosting platform is not official_legal or
 academic_peer_reviewed merely because it sounds authoritative. The selected enum MUST agree with
 the reason and provenance_basis. Do not invent category names outside the schema.""",
