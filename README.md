@@ -19,10 +19,9 @@ One explicitly configured, stateless LLM backbone performs every semantic stage.
 Temperature defaults to zero; there is no model fallback. Python validates structure,
 quotes, citations, links and budgets; it does not decide cultural appropriateness.
 Each nonempty dimension plan has one primary dimension, but **all dimensions have
-equal scoring weight**. External facts and descriptive cultural norms always require evidence retrieval. No external
-search is performed for internal-quality or non-verifiable-value targets; those are assessed
-directly in dimension scoring. Context-dependent recommendations retrieve evidence when their
-assessment depends on external cultural or institutional claims.
+equal scoring weight**. External facts, descriptive cultural norms and context-dependent recommendations always require
+evidence retrieval. No external search is performed for internal-quality or non-verifiable-value
+targets; those are assessed directly in dimension scoring.
 
 The runtime rubric preserves the existing D01–D10 definitions and scoring anchors.
 Its packaged copy standardizes the requested names, removes benchmark parent mappings,
