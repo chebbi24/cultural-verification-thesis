@@ -97,6 +97,11 @@ def test_target_limit_and_epistemic_retrieval_routing():
             **{**target, "epistemic_type": "descriptive_cultural_norm", "retrieval_appropriate": False},
             target_id="t",
         )
+    with pytest.raises(ValidationError):
+        MaterialTarget(
+            **{**target, "epistemic_type": "context_dependent_recommendation", "retrieval_appropriate": False},
+            target_id="t",
+        )
 
 
 def test_configured_target_limit(setup):
