@@ -106,21 +106,16 @@ def validate_sources(batch, documents):
     require(set(found) == {d.document_id for d in documents}, "Classify each document once")
 
 
-def validate_scores(batch, response, plan, targets, verdicts, memos):
+def validate_score_drafts(batch, response, plan, targets, verdicts):
     ids = [s.dimension_id for s in batch.scores]
     require(len(ids) == len(set(ids)), "Duplicate dimension score")
     require(set(ids) == {d.dimension_id for d in plan.dimensions}, "Score every planned dimension only")
     targets_by_id = {t.target_id: t for t in targets}
     verdicts_by_target = {v.target_id: v for v in verdicts}
-    memo_ids = {m.memo_id for m in memos}
-    memo_target = {m.memo_id: t for m, t in zip(memos, (t for t in targets if t.retrieval_appropriate))}
     for score in batch.scores:
         for quote in score.response_quotes:
             validate_response_quote(quote, response)
         require(set(score.target_ids) <= targets_by_id.keys(), "Unknown target ID")
-        require(set(score.memo_ids) <= memo_ids, "Unknown memo ID")
-        for memo_id in score.memo_ids:
-            require(score.dimension_id in memo_target[memo_id].dimension_ids, "Memo/dimension mismatch")
         for tid in score.target_ids:
             require(score.dimension_id in targets_by_id[tid].dimension_ids, "Target/dimension mismatch")
         relevant_verdicts = [
@@ -135,6 +130,19 @@ def validate_scores(batch, response, plan, targets, verdicts, memos):
             )
         if score.score != "abstain" and response:
             require(bool(score.response_quotes), "A scored response requires a supporting quote")
+
+
+def validate_scores(batch, response, plan, targets, verdicts, memos):
+    validate_score_drafts(batch, response, plan, targets, verdicts)
+    memo_ids = {m.memo_id for m in memos}
+    memo_target = {v.memo_id: v.target_id for v in verdicts}
+    targets_by_id = {t.target_id: t for t in targets}
+    for score in batch.scores:
+        require(set(score.memo_ids) <= memo_ids, "Unknown memo ID")
+        for memo_id in score.memo_ids:
+            target_id = memo_target.get(memo_id)
+            require(target_id is not None, "Memo is not linked to a target verdict")
+            require(score.dimension_id in targets_by_id[target_id].dimension_ids, "Memo/dimension mismatch")
 
 
 def validate_verdict(verdict, target, memo):
