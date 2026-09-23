@@ -1,7 +1,7 @@
 """Blind evidence engine: its public input contains no candidate or target object."""
 
 from .config import PIPELINE_VERSION
-from .llm import SemanticSession
+from .llm import SemanticSession, StageError
 from .prompts import COMMON, PROMPTS
 from .retrieval import RetrievalError
 from .schemas import (
@@ -14,6 +14,8 @@ from .schemas import (
     QueryDraft,
     SearchQuery,
     SourceBatch,
+    SourceClassification,
+    SourceType,
     VerificationQuestion,
 )
 from .trace import digest, stable_id, write_json
@@ -123,14 +125,51 @@ class BlindEvidenceEngine:
                         }
                         for d in new
                     ]
-                    classified = session.call(
-                        "source_classifier_v1",
-                        {"documents": classifier_documents},
-                        SourceBatch,
-                        lambda b: validate_sources(b, new),
-                    )
-                    types = {s.document_id: s.source_type for s in classified.sources}
-                    classes.extend(classified.sources)
+                    try:
+                        classified = session.call(
+                            "source_classifier_v1",
+                            {"documents": classifier_documents},
+                            SourceBatch,
+                            lambda b: validate_sources(b, new),
+                        )
+                        normalized = []
+                        for source in classified.sources:
+                            reason = source.reason.lower()
+                            source_type = source.source_type
+                            if source_type == SourceType.ACADEMIC and any(
+                                phrase in reason
+                                for phrase in (
+                                    "not peer-reviewed",
+                                    "not peer reviewed",
+                                    "not academic",
+                                    "not a peer-reviewed",
+                                )
+                            ):
+                                source_type = SourceType.UNKNOWN
+                            if source_type == SourceType.OFFICIAL and any(
+                                phrase in reason
+                                for phrase in (
+                                    "not official",
+                                    "not an official",
+                                    "not legal",
+                                    "not a legal",
+                                    "not government",
+                                )
+                            ):
+                                source_type = SourceType.UNKNOWN
+                            normalized.append(source.model_copy(update={"source_type": source_type}))
+                        classified_sources = tuple(normalized)
+                    except StageError:
+                        classified_sources = tuple(
+                            SourceClassification(
+                                document_id=d.document_id,
+                                source_type=SourceType.UNKNOWN,
+                                reason="Source classification was unavailable; conservatively marked unknown.",
+                            )
+                            for d in new
+                        )
+                    types = {s.document_id: s.source_type for s in classified_sources}
+                    classes.extend(classified_sources)
                     docs.extend(d.model_copy(update={"source_type": types[d.document_id]}) for d in new)
 
             def synthesize():
@@ -144,6 +183,21 @@ class BlindEvidenceEngine:
                     MemoDraft,
                     lambda m: validate_document_citation(m, docs),
                 )
+                # A cultural norm is not a legal/institutional rule unless cited evidence
+                # includes an official/legal source. Downgrade the label rather than failing.
+                documents_by_id = {d.document_id: d for d in docs}
+                normalized_statements = tuple(
+                    statement.model_copy(update={"kind": "context_sensitive_practice"})
+                    if statement.kind == "legal_institutional_rule"
+                    and not any(
+                        documents_by_id[c].source_type == SourceType.OFFICIAL
+                        for c in statement.citations
+                        if c in documents_by_id
+                    )
+                    else statement
+                    for statement in memo.statements
+                )
+                memo = memo.model_copy(update={"statements": normalized_statements})
                 frozen = EvidenceMemo(
                     **memo.model_dump(),
                     memo_id=stable_id("memo", [key, len(memos), memo.model_dump(mode="json")]),
@@ -171,10 +225,13 @@ class BlindEvidenceEngine:
                 )
                 followup_reason = decision.reason
                 if decision.question:
-                    followup = VerificationQuestion(
-                        **decision.question.model_dump(),
-                        question_id=stable_id("question", decision.question.model_dump(mode="json")),
-                    )
+                    candidate_text = " ".join(decision.question.text.lower().split())
+                    existing_texts = {" ".join(q.text.lower().split()) for q in all_questions}
+                    if candidate_text not in existing_texts:
+                        followup = VerificationQuestion(
+                            **decision.question.model_dump(),
+                            question_id=stable_id("question", decision.question.model_dump(mode="json")),
+                        )
             if followup:
                 all_questions.append(followup)
                 retrieve(followup, 2)
