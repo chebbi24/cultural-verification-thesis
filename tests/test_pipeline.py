@@ -173,9 +173,7 @@ def test_llm_evidence_payload_truncates_text_but_keeps_full_snapshot(setup):
         if call["stage"] in {"source_classifier_v1", "evidence_memo_v1"}:
             assert all(len(d["text"]) <= LLM_DOCUMENT_TEXT_LIMIT for d in call["payload"]["documents"])
         if call["stage"] == "evidence_memo_v1":
-            assert all(
-                "source_ref" not in d and "document_id" not in d for d in call["payload"]["documents"]
-            )
+            assert all("source_ref" not in d and "document_id" not in d for d in call["payload"]["documents"])
 
 
 def test_classifier_failure_falls_back_to_unknown(setup):
