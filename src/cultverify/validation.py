@@ -34,19 +34,17 @@ def validate_targets(batch, response, plan, limit):
 
 
 def validate_memo_draft(memo, documents):
-    valid_refs = set(range(1, len(documents) + 1))
-    statement_refs = {support.source_ref for statement in memo.statements for support in statement.supports}
-    require(statement_refs <= valid_refs, "support source_refs must reference supplied documents")
+    support_count = 0
     for statement in memo.statements:
-        refs = [support.source_ref for support in statement.supports]
-        require(len(refs) == len(set(refs)), "A statement may cite each source_ref only once")
+        quotes = [support.quote for support in statement.supports]
+        require(len(quotes) == len(set(quotes)), "A statement may use each support quote only once")
         for support in statement.supports:
-            require(
-                support.quote in documents[support.source_ref - 1].text,
-                "Support quote must occur verbatim in the referenced document",
-            )
+            matches = [document for document in documents if support.quote in document.text]
+            require(bool(matches), "Support quote must occur verbatim in a supplied document")
+            require(len(matches) == 1, "Support quote must identify exactly one supplied document")
+            support_count += 1
     if memo.sufficiency != "insufficient":
-        require(bool(statement_refs), "Sufficient/conflicting evidence needs grounded supports")
+        require(bool(support_count), "Sufficient/conflicting evidence needs grounded supports")
     if not documents:
         require(
             memo.sufficiency == "insufficient" and memo.confidence == "low",
