@@ -148,7 +148,6 @@ class SourceBatch(Record):
 
 
 class EvidenceSupportDraft(Record):
-    source_ref: Annotated[int, Field(strict=True, ge=1)]
     quote: Annotated[str, Field(min_length=1, max_length=300)]
 
 
