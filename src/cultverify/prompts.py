@@ -19,15 +19,24 @@ only for externally checkable facts, descriptive norms or context-dependent reco
 Do not search for internal response quality or non-verifiable values. If other material
 units cannot fit the budget, set truncated=true. Do not confuse caution with failure.""",
     "verification_question_v1": """Produce exactly two neutral questions: baseline/descriptive then
-scope/variation. Ask what is documented and what contextual variation matters. Do not assume
-the target is true, false, good or bad. Remove candidate wording, evaluations and identifiers;
-retain only the subject necessary to investigate. Do not presuppose disputed premises.
-Questions must not request proof for or against a candidate. Do not add demographic facts.""",
+scope/variation. The baseline should start at the broadest justified cultural or institutional
+scope needed to assess the proposition. Do not make a named city or region a hard evidence
+requirement merely because it appears in the prompt; normally test locality in the variation
+question unless the proposition itself claims a locality-specific practice or rule. Ask what is
+documented and what contextual variation matters. Do not assume the target is true, false, good
+or bad. Remove candidate wording, evaluations and identifiers; retain only the subject necessary
+to investigate. Do not presuppose disputed premises. Questions must not request proof for or
+against a candidate. Do not add demographic facts.""",
     "query_rewriter_v1": """Rewrite the neutral question into one effective search query using
-only supplied explicit context. Preserve neutrality and relevant scope; do not add a verdict.""",
-    "source_classifier_v1": """Classify every provided document once by source type, using available
-provenance and content. Do not infer peer review merely from formal language. Use unknown
-when uncertain. Classification is not a numerical quality score.""",
+only supplied explicit context. Preserve neutrality and relevant scope; do not add a verdict.
+When appropriate, phrase the query to favor authoritative evidence such as academic or linguistic
+research, official or institutional sources, and surveys. Do not force a source category when
+credible community or professional evidence is more suitable for lived cultural practice.""",
+    "source_classifier_v1": """Classify every provided document once by source type, using its URL,
+title and content as provenance evidence. Determine the type independently from those fields.
+Do not infer peer review merely from formal language or from a hosting platform alone; use unknown
+when the source's provenance genuinely cannot establish a type. Classification is not a numerical
+quality score.""",
     "evidence_memo_v1": """Answer the provided questions using ONLY retrieved documents. Include
 scope, variation and agreement/disagreement. Every factual statement in any memo field must
 be represented in statements with supporting document citations. Citations must be exact
@@ -39,9 +48,10 @@ sources for binding rules; empirical/linguistic work for language; empirical and
 community evidence for lived practice. A lone weak commercial source cannot establish a
 high-confidence cultural norm. Report unresolved disagreements, not artificial consensus.""",
     "followup_v1": """Given questions, context and a memo with conflicting or insufficient evidence,
-optionally propose ONE neutral, gap-specific followup question with kind=followup. Explain
-what gap it addresses. Return question=null if further search is not useful. Do not repeat
-search until satisfied and do not invent missing evidence.""",
+identify the single most important unresolved evidence gap. If that gap is reasonably searchable,
+produce exactly ONE neutral, gap-specific question with kind=followup; if further search is not
+useful, return question=null. Explain the decision in 1-2 concise sentences only. Do not repeat
+the same reasoning, search until satisfied, or invent missing evidence.""",
     "target_comparator_v1": """Compare only the supplied target with the frozen evidence memo.
 Return its exact target_id and memo_id, supported/contradicted/mixed/insufficient and a brief
 reason. Missing evidence is not contradiction. Scope and contextual variation matter.""",
