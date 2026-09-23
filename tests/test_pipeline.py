@@ -146,8 +146,6 @@ def test_source_classifier_does_not_receive_placeholder_type(setup):
             assert "source_type" not in document
 
 
-
-
 def test_classifier_failure_falls_back_to_unknown(setup):
     config, _, retriever, _ = setup
     llm = FixtureLLM(config, overrides={"source_classifier_v1": {"sources": []}})
@@ -182,10 +180,7 @@ def test_unsupported_legal_label_is_downgraded(setup):
     llm = FixtureLLM(config, overrides={"evidence_memo_v1": legal_memo})
     result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
     assert result.status == "completed"
-    assert all(
-        statement.kind == "context_sensitive_practice"
-        for statement in result.evidence[0].memos[-1].statements
-    )
+    assert all(statement.kind == "context_sensitive_practice" for statement in result.evidence[0].memos[-1].statements)
 
 
 def test_duplicate_followup_is_skipped(setup):
