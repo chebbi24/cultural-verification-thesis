@@ -33,19 +33,23 @@ def validate_targets(batch, response, plan, limit):
         require(set(target.dimension_ids) <= allowed, "Target dimensions must be planned")
 
 
-def validate_document_citation(memo, documents):
+def validate_memo_draft(memo, documents):
     ids = {d.document_id for d in documents}
-    citations = set(memo.citations)
-    require(citations <= ids, "Citations must reference retrieved documents")
     statement_citations = {c for s in memo.statements for c in s.citations}
-    require(statement_citations == citations, "Every citation must ground a statement")
+    require(statement_citations <= ids, "Citations must reference retrieved documents")
     if memo.sufficiency != "insufficient":
-        require(bool(citations), "Sufficient/conflicting evidence needs citations")
+        require(bool(statement_citations), "Sufficient/conflicting evidence needs citations")
     if not documents:
         require(
             memo.sufficiency == "insufficient" and memo.confidence == "low",
             "No documents requires insufficient/low evidence",
         )
+
+
+def validate_document_citation(memo, documents):
+    validate_memo_draft(memo, documents)
+    statement_citations = {c for s in memo.statements for c in s.citations}
+    require(set(memo.citations) == statement_citations, "Memo citations must equal statement citation union")
 
 
 def validate_sources(batch, documents):
