@@ -61,25 +61,6 @@ def matching_support_documents(quote, documents):
     )
 
 
-def validate_memo_draft(memo, documents):
-    support_count = 0
-    for statement in memo.statements:
-        quotes = [support.quote for support in statement.supports]
-        require(len(quotes) == len(set(quotes)), "A statement may use each support quote only once")
-        for support in statement.supports:
-            matches = matching_support_documents(support.quote, documents)
-            require(bool(matches), "Support quote must match a supplied document after safe normalization")
-            require(len(matches) == 1, "Support quote must identify exactly one supplied document")
-            support_count += 1
-    if memo.sufficiency != "insufficient":
-        require(bool(support_count), "Sufficient/conflicting evidence needs grounded supports")
-    if not documents:
-        require(
-            memo.sufficiency == "insufficient" and memo.confidence == "low",
-            "No documents requires insufficient/low evidence",
-        )
-
-
 def validate_statement_relevance(batch, statement_count):
     indices = [judgment.statement_index for judgment in batch.judgments]
     require(len(indices) == len(set(indices)), "Duplicate statement relevance judgments")
@@ -118,15 +99,27 @@ def validate_score_drafts(batch, response, plan, targets, verdicts):
         require(set(score.target_ids) <= targets_by_id.keys(), "Unknown target ID")
         for tid in score.target_ids:
             require(score.dimension_id in targets_by_id[tid].dimension_ids, "Target/dimension mismatch")
+        relevant_targets = [t for t in targets if score.dimension_id in t.dimension_ids]
         relevant_verdicts = [
-            verdicts_by_target[t.target_id]
-            for t in targets
-            if score.dimension_id in t.dimension_ids and t.target_id in verdicts_by_target
+            verdicts_by_target[t.target_id] for t in relevant_targets if t.target_id in verdicts_by_target
         ]
-        if any(v.verdict in {"supported", "mixed", "contradicted"} for v in relevant_verdicts):
+        directional = any(v.verdict in {"supported", "mixed", "contradicted"} for v in relevant_verdicts)
+        if directional:
             require(
                 score.score != "abstain",
                 "Directional evidence exists for this dimension; score 0, 1 or 2 instead of abstain",
+            )
+        external_targets = [t for t in relevant_targets if t.retrieval_appropriate]
+        direct_targets = [t for t in relevant_targets if not t.retrieval_appropriate]
+        all_external_insufficient = bool(external_targets) and all(
+            verdicts_by_target.get(t.target_id) is not None
+            and verdicts_by_target[t.target_id].verdict == "insufficient"
+            for t in external_targets
+        )
+        if all_external_insufficient and not direct_targets:
+            require(
+                score.score == "abstain",
+                "All relevant retrievable targets are insufficient; this dimension must abstain",
             )
         if score.score != "abstain" and response:
             require(bool(score.response_quotes), "A scored response requires a supporting quote")
