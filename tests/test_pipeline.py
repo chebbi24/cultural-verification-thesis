@@ -405,7 +405,6 @@ def test_conflicting_final_memo_counts_as_evidence_coverage(setup):
     assert result.evidence_coverage == 1
 
 
-
 def test_insufficient_memo_cannot_produce_directional_verdict(setup):
     config, _, _, _ = setup
     retriever = FixtureRetriever(empty=True)
