@@ -170,7 +170,7 @@ class EvidenceMemo(MemoDraft):
 
 class Followup(Record):
     question: QuestionDraft | None
-    reason: Text
+    reason: Annotated[str, Field(min_length=1, max_length=400)]
 
     @model_validator(mode="after")
     def kind(self):
