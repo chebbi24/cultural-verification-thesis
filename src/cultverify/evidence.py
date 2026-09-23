@@ -73,9 +73,7 @@ def _normalized_source_classification(source):
             "not a professional body",
         ),
     }
-    contradicts_selected = any(
-        phrase in reason for phrase in explicit_contradictions.get(source_type, ())
-    )
+    contradicts_selected = any(phrase in reason for phrase in explicit_contradictions.get(source_type, ()))
     contradicts_enum = any(
         other is not source_type
         and (
