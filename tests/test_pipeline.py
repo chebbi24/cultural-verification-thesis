@@ -298,7 +298,7 @@ def test_self_contradictory_institutional_label_is_downgraded(setup):
 def test_support_matching_normalizes_whitespace_case_and_typographic_quotes():
     doc = make_document(text="Du is used:\n\n By equal peers, family, friends and lovers. It is someone’s choice.")
     matches = matching_support_documents(
-        "du is used: by equal peers, family, friends and lovers. it is someone's choice.",
+        "DU IS USED: BY EQUAL PEERS, FAMILY, FRIENDS AND LOVERS. IT IS SOMEONE'S CHOICE.",
         (doc,),
     )
     assert matches == (doc,)
@@ -823,6 +823,25 @@ def test_replay_no_live_calls_and_no_query_rewrite(setup):
     assert replay.evidence[0].snapshots == live.evidence[0].snapshots
     assert not any(c["stage"] == "query_rewriter_v1" for c in llm.calls)
     assert replay.evidence[0].memos == live.evidence[0].memos
+
+
+def test_result_summary_invariants_are_trace_validated(setup):
+    _, _, _, verifier = setup
+    result = verifier.verify(PROMPT, RESPONSE)
+    trace = RunTrace.model_validate_json(Path(result.trace_path).read_text())
+
+    with pytest.raises(ValueError, match="Overall score mismatch"):
+        validate_trace_links(
+            trace.model_copy(update={"result": result.model_copy(update={"overall_score": 0.123})})
+        )
+    with pytest.raises(ValueError, match="Evidence coverage summary mismatch"):
+        validate_trace_links(
+            trace.model_copy(update={"result": result.model_copy(update={"evidence_coverage": 0.123})})
+        )
+    with pytest.raises(ValueError, match="Abstained dimension summary mismatch"):
+        validate_trace_links(
+            trace.model_copy(update={"result": result.model_copy(update={"abstained_dimensions": ("D01",)})})
+        )
 
 
 def test_trace_links_and_corruption(setup):
