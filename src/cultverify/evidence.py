@@ -32,10 +32,9 @@ from .validation import (
 LLM_DOCUMENT_TEXT_LIMIT = 2000
 
 
-def _llm_document(document, source_ref):
+def _llm_document(document):
     data = document.model_dump(mode="json")
     data.pop("document_id")
-    data["source_ref"] = source_ref
     data["text"] = document.text[:LLM_DOCUMENT_TEXT_LIMIT]
     return data
 
@@ -44,33 +43,56 @@ def _normalized_source_classification(source):
     reason = " ".join(source.reason.casefold().split())
     source_type = source.source_type
     provenance_basis = source.provenance_basis
-    official_contradictions = (
-        "not official",
-        "not an official",
-        "not government",
-        "not a government",
-        "not legal",
-        "not a legal",
-        "not primary government",
-        "not a primary government",
+    strong_types = {
+        SourceType.OFFICIAL,
+        SourceType.ACADEMIC,
+        SourceType.SURVEY,
+        SourceType.INSTITUTIONAL,
+    }
+    explicit_contradictions = {
+        SourceType.OFFICIAL: (
+            "not official",
+            "not an official",
+            "not government",
+            "not a government",
+            "not legal",
+            "not a legal",
+            "not public-authority",
+            "not a public authority",
+        ),
+        SourceType.ACADEMIC: (
+            "not peer-reviewed",
+            "not peer reviewed",
+            "not academic",
+            "not an academic",
+            "not scholarly",
+        ),
+        SourceType.INSTITUTIONAL: (
+            "not a recognized institution",
+            "not a recognised institution",
+            "not a professional body",
+        ),
+    }
+    contradicts_selected = any(
+        phrase in reason for phrase in explicit_contradictions.get(source_type, ())
     )
-    academic_contradictions = (
-        "not peer-reviewed",
-        "not peer reviewed",
-        "not academic",
-        "not an academic",
-        "not a peer-reviewed",
-        "not a peer reviewed",
+    contradicts_enum = any(
+        other is not source_type
+        and (
+            f"should be {other.value}" in reason
+            or f"should be classified as {other.value}" in reason
+            or f"source type should be {other.value}" in reason
+        )
+        for other in SourceType
     )
-    strong_type_contradicted = (
-        source_type == SourceType.OFFICIAL and any(phrase in reason for phrase in official_contradictions)
-    ) or (source_type == SourceType.ACADEMIC and any(phrase in reason for phrase in academic_contradictions))
-    if (
-        source_type in {SourceType.ACADEMIC, SourceType.OFFICIAL} and provenance_basis != "explicit"
-    ) or strong_type_contradicted:
+    if (source_type in strong_types and provenance_basis != "explicit") or contradicts_selected or contradicts_enum:
         source_type = SourceType.UNKNOWN
         provenance_basis = "unclear"
     return source.model_copy(update={"source_type": source_type, "provenance_basis": provenance_basis})
+
+
+def _downgrade_confidence(confidence):
+    return {"high": "medium", "medium": "low", "low": "low"}[confidence]
 
 
 class BlindEvidenceEngine:
@@ -206,13 +228,12 @@ class BlindEvidenceEngine:
                     {
                         "questions": [q.model_dump(mode="json") for q in all_questions],
                         "context": context.model_dump(mode="json"),
-                        "documents": [_llm_document(d, i) for i, d in enumerate(docs, start=1)],
+                        "documents": [_llm_document(d) for d in docs],
                     },
                     MemoDraft,
                 )
-                # Ground supports deterministically. A malformed/paraphrased support is discarded
-                # instead of crashing the whole memo; any grounding loss conservatively downgrades
-                # the memo to insufficient/low so unsupported material cannot yield a directional verdict.
+                # Ground supports deterministically. Malformed/paraphrased supports are discarded
+                # rather than allowed to influence downstream judgments.
                 mapped_statements = []
                 grounding_loss = False
                 for statement in memo.statements:
@@ -252,8 +273,9 @@ class BlindEvidenceEngine:
                         )
                     )
 
-                # Independent blind semantic gate: grounded evidence must materially answer at
-                # least one verification question. Retrieval noise is discarded before freezing.
+                # Independent blind semantic gate: a grounded claim must both be supported
+                # by its quoted spans and materially answer at least one verification question.
+                semantic_filter_loss = False
                 if mapped_statements:
                     try:
                         relevance = session.call(
@@ -273,18 +295,28 @@ class BlindEvidenceEngine:
                             StatementRelevanceBatch,
                             lambda batch: validate_statement_relevance(batch, len(mapped_statements)),
                         )
-                        relevant_indices = {
-                            judgment.statement_index for judgment in relevance.judgments if judgment.relevant
+                        accepted_indices = {
+                            judgment.statement_index
+                            for judgment in relevance.judgments
+                            if judgment.supported_by_quotes and judgment.relevant
                         }
+                        semantic_filter_loss = len(accepted_indices) != len(mapped_statements)
                         mapped_statements = [
-                            statement for index, statement in enumerate(mapped_statements) if index in relevant_indices
+                            statement for index, statement in enumerate(mapped_statements) if index in accepted_indices
                         ]
                     except StageError:
+                        semantic_filter_loss = True
                         mapped_statements = []
 
                 citations = tuple(dict.fromkeys(c for statement in mapped_statements for c in statement.citations))
-                sufficiency = "insufficient" if grounding_loss or not mapped_statements else memo.sufficiency
-                confidence = "low" if grounding_loss or not mapped_statements else memo.confidence
+                if not mapped_statements:
+                    sufficiency = "insufficient"
+                    confidence = "low"
+                else:
+                    sufficiency = memo.sufficiency
+                    confidence = "low" if sufficiency == "insufficient" else memo.confidence
+                    if sufficiency != "insufficient" and (grounding_loss or semantic_filter_loss):
+                        confidence = _downgrade_confidence(confidence)
                 frozen_payload = {
                     "answer": memo.answer,
                     "scope": memo.scope,
