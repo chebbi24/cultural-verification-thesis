@@ -56,6 +56,7 @@ VERBATIM span copied from one supplied document (maximum 300 characters). Choose
 that occurs in exactly one supplied document. Never paraphrase it. Do not return source_ref,
 document IDs, URLs or a top-level citations field; Python locates the exact document containing each
 quote, maps it to the frozen document ID and derives the citation union deterministically.
+If you are not sure of the exact source wording, omit that support/statement rather than paraphrasing it.
 With no adequate source, state the limitation, use insufficient/low, and do not invent facts.
 Use tendency for broad recurring patterns, context_sensitive_practice for norms that vary by
 setting/group/region, legal_institutional_rule ONLY for an actual binding law, policy or formal
