@@ -55,7 +55,8 @@ def main(argv=None):
             if getattr(args, arg) is not None:
                 values[key] = getattr(args, arg)
         config = Config.model_validate(values)
-        llm = HTTPModel(config, os.getenv("OPENROUTER_API_KEY"))
+        api_key = os.getenv("OPENROUTER_API_KEY") if config.verifier_model_provider == "openrouter" else None
+        llm = HTTPModel(config, api_key)
         retriever = TavilyRetriever(os.getenv("TAVILY_API_KEY"), config.search_depth) if config.mode == "LIVE" else None
         verifier = CulturalVerifier(llm=llm, retriever=retriever, config=config)
         prompt = args.prompt_file.read_text(encoding="utf-8") if args.prompt_file else args.prompt
