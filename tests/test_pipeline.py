@@ -360,8 +360,7 @@ def test_comparator_and_scorer_receive_statement_level_evidence_only(setup):
     )
     scorer_call = next(call for call in llm.calls if call["stage"] == "dimension_scorer_v1")
     assert all(
-        set(memo) == {"memo_id", "sufficiency", "confidence", "statements"}
-        for memo in scorer_call["payload"]["memos"]
+        set(memo) == {"memo_id", "sufficiency", "confidence", "statements"} for memo in scorer_call["payload"]["memos"]
     )
 
 
