@@ -49,7 +49,7 @@ _SUPPORT_TRANSLATION = str.maketrans(
 
 def normalize_support_text(text):
     normalized = unicodedata.normalize("NFKC", text).translate(_SUPPORT_TRANSLATION)
-    return re.sub(r"\s+", " ", normalized).strip().lower()
+    return re.sub(r"\s+", " ", normalized).strip().casefold()
 
 
 def matching_support_documents(quote, documents):
@@ -210,5 +210,26 @@ def validate_trace_links(trace):
                 ),
                 "Score memo has no dimension-linked target",
             )
-    require(result.scored_count == sum(s.score != "abstain" for s in result.dimension_scores), "Scored count mismatch")
+    scored = tuple(s for s in result.dimension_scores if s.score != "abstain")
+    abstained = tuple(s.dimension_id for s in result.dimension_scores if s.score == "abstain")
+    require(result.scored_count == len(scored), "Scored count mismatch")
     require(result.applicable_count == len(result.dimension_plan.dimensions), "Applicable count mismatch")
+    require(result.abstained_dimensions == abstained, "Abstained dimension summary mismatch")
+    expected_overall = sum(s.score for s in scored) / (2 * len(scored)) if scored else None
+    require(result.overall_score == expected_overall, "Overall score mismatch")
+    require(result.candidate_abstained == (expected_overall is None), "Candidate abstention mismatch")
+
+    external_targets = tuple(t for t in result.targets if t.retrieval_appropriate)
+    if external_targets:
+        require(len(result.evidence) == len(external_targets), "Evidence bundle coverage mismatch")
+        covered = sum(bundle.memos[-1].sufficiency != "insufficient" for bundle in result.evidence)
+        require(result.evidence_coverage == covered / len(external_targets), "Evidence coverage summary mismatch")
+    else:
+        require(result.evidence_coverage is None, "Evidence coverage must be null without retrievable targets")
+
+    if result.status == "completed":
+        final_memos = {bundle.final_memo_id for bundle in result.evidence}
+        require(
+            {link.memo_id for link in trace.target_evidence_links} == final_memos,
+            "Target links must reference exactly the final frozen memos",
+        )
