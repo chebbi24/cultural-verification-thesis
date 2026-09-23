@@ -18,10 +18,16 @@ from .schemas import (
     SourceBatch,
     SourceClassification,
     SourceType,
+    StatementRelevanceBatch,
     VerificationQuestion,
 )
 from .trace import digest, stable_id, write_json
-from .validation import matching_support_documents, require, validate_sources
+from .validation import (
+    matching_support_documents,
+    require,
+    validate_sources,
+    validate_statement_relevance,
+)
 
 LLM_DOCUMENT_TEXT_LIMIT = 2000
 
@@ -32,6 +38,44 @@ def _llm_document(document, source_ref):
     data["source_ref"] = source_ref
     data["text"] = document.text[:LLM_DOCUMENT_TEXT_LIMIT]
     return data
+
+
+def _normalized_source_classification(source):
+    reason = " ".join(source.reason.casefold().split())
+    source_type = source.source_type
+    provenance_basis = source.provenance_basis
+    official_contradictions = (
+        "not official",
+        "not an official",
+        "not government",
+        "not a government",
+        "not legal",
+        "not a legal",
+        "not primary government",
+        "not a primary government",
+    )
+    academic_contradictions = (
+        "not peer-reviewed",
+        "not peer reviewed",
+        "not academic",
+        "not an academic",
+        "not a peer-reviewed",
+        "not a peer reviewed",
+    )
+    strong_type_contradicted = (
+        source_type == SourceType.OFFICIAL and any(phrase in reason for phrase in official_contradictions)
+    ) or (
+        source_type == SourceType.ACADEMIC and any(phrase in reason for phrase in academic_contradictions)
+    )
+    if (
+        source_type in {SourceType.ACADEMIC, SourceType.OFFICIAL}
+        and provenance_basis != "explicit"
+    ) or strong_type_contradicted:
+        source_type = SourceType.UNKNOWN
+        provenance_basis = "unclear"
+    return source.model_copy(
+        update={"source_type": source_type, "provenance_basis": provenance_basis}
+    )
 
 
 class BlindEvidenceEngine:
@@ -144,16 +188,9 @@ class BlindEvidenceEngine:
                             SourceBatch,
                             lambda b: validate_sources(b, new),
                         )
-                        normalized = []
-                        for source in classified.sources:
-                            source_type = source.source_type
-                            if (
-                                source_type in {SourceType.ACADEMIC, SourceType.OFFICIAL}
-                                and source.provenance_basis != "explicit"
-                            ):
-                                source_type = SourceType.UNKNOWN
-                            normalized.append(source.model_copy(update={"source_type": source_type}))
-                        classified_sources = tuple(normalized)
+                        classified_sources = tuple(
+                            _normalized_source_classification(source) for source in classified.sources
+                        )
                     except StageError:
                         classified_sources = tuple(
                             SourceClassification(
@@ -219,6 +256,39 @@ class BlindEvidenceEngine:
                             supports=tuple(resolved_supports),
                         )
                     )
+
+                # Independent blind semantic gate: grounded evidence must materially answer at
+                # least one verification question. Retrieval noise is discarded before freezing.
+                if mapped_statements:
+                    try:
+                        relevance = session.call(
+                            "evidence_relevance_v1",
+                            {
+                                "questions": [q.model_dump(mode="json") for q in all_questions],
+                                "statements": [
+                                    {
+                                        "statement_index": index,
+                                        "text": statement.text,
+                                        "kind": statement.kind,
+                                        "support_quotes": [support.quote for support in statement.supports],
+                                    }
+                                    for index, statement in enumerate(mapped_statements)
+                                ],
+                            },
+                            StatementRelevanceBatch,
+                            lambda batch: validate_statement_relevance(batch, len(mapped_statements)),
+                        )
+                        relevant_indices = {
+                            judgment.statement_index for judgment in relevance.judgments if judgment.relevant
+                        }
+                        mapped_statements = [
+                            statement
+                            for index, statement in enumerate(mapped_statements)
+                            if index in relevant_indices
+                        ]
+                    except StageError:
+                        mapped_statements = []
+
                 citations = tuple(dict.fromkeys(c for statement in mapped_statements for c in statement.citations))
                 sufficiency = "insufficient" if grounding_loss or not mapped_statements else memo.sufficiency
                 confidence = "low" if grounding_loss or not mapped_statements else memo.confidence
