@@ -34,11 +34,11 @@ def validate_targets(batch, response, plan, limit):
 
 
 def validate_memo_draft(memo, documents):
-    ids = {d.document_id for d in documents}
-    statement_citations = {c for s in memo.statements for c in s.citations}
-    require(statement_citations <= ids, "Citations must reference retrieved documents")
+    valid_refs = set(range(1, len(documents) + 1))
+    statement_refs = {ref for statement in memo.statements for ref in statement.source_refs}
+    require(statement_refs <= valid_refs, "source_refs must reference supplied documents")
     if memo.sufficiency != "insufficient":
-        require(bool(statement_citations), "Sufficient/conflicting evidence needs citations")
+        require(bool(statement_refs), "Sufficient/conflicting evidence needs source refs")
     if not documents:
         require(
             memo.sufficiency == "insufficient" and memo.confidence == "low",
@@ -47,9 +47,17 @@ def validate_memo_draft(memo, documents):
 
 
 def validate_document_citation(memo, documents):
-    validate_memo_draft(memo, documents)
+    ids = {d.document_id for d in documents}
     statement_citations = {c for s in memo.statements for c in s.citations}
+    require(statement_citations <= ids, "Citations must reference retrieved documents")
     require(set(memo.citations) == statement_citations, "Memo citations must equal statement citation union")
+    if memo.sufficiency != "insufficient":
+        require(bool(statement_citations), "Sufficient/conflicting evidence needs citations")
+    if not documents:
+        require(
+            memo.sufficiency == "insufficient" and memo.confidence == "low",
+            "No documents requires insufficient/low evidence",
+        )
 
 
 def validate_sources(batch, documents):
