@@ -182,7 +182,16 @@ class BlindEvidenceEngine:
                 # Map simple local source refs back to exact frozen document IDs.
                 mapped_statements = []
                 for statement in memo.statements:
-                    cited_docs = tuple(docs[support.source_ref - 1] for support in statement.supports)
+                    resolved_supports = []
+                    for support in statement.supports:
+                        matching_document = next(document for document in docs if support.quote in document.text)
+                        resolved_supports.append(
+                            EvidenceSupport(document_id=matching_document.document_id, quote=support.quote)
+                        )
+                    cited_docs = tuple(
+                        next(document for document in docs if document.document_id == support.document_id)
+                        for support in resolved_supports
+                    )
                     kind = statement.kind
                     if kind == "legal_institutional_rule" and not any(
                         document.source_type == SourceType.OFFICIAL for document in cited_docs
@@ -192,14 +201,8 @@ class BlindEvidenceEngine:
                         EvidenceStatement(
                             text=statement.text,
                             kind=kind,
-                            citations=tuple(document.document_id for document in cited_docs),
-                            supports=tuple(
-                                EvidenceSupport(
-                                    document_id=docs[support.source_ref - 1].document_id,
-                                    quote=support.quote,
-                                )
-                                for support in statement.supports
-                            ),
+                            citations=tuple(dict.fromkeys(document.document_id for document in cited_docs)),
+                            supports=tuple(resolved_supports),
                         )
                     )
                 citations = tuple(dict.fromkeys(c for statement in mapped_statements for c in statement.citations))
