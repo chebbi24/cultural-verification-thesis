@@ -74,7 +74,7 @@ def validate_sources(batch, documents):
             require(
                 not any(
                     phrase in reason
-                    for phrase in ("not official", "not legal", "not a legal", "not government")
+                    for phrase in ("not official", "not an official", "not legal", "not a legal", "not government")
                 ),
                 "official_legal contradicts classifier reasoning",
             )
