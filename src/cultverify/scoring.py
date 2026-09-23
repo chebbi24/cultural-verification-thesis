@@ -34,7 +34,7 @@ def score_dimensions(session, prompt, response, context, plan, targets, verdicts
             "rubric": rubric,
         },
         ScoreBatch,
-        lambda b: validate_scores(b, response, plan, targets, memos),
+        lambda b: validate_scores(b, response, plan, targets, verdicts, memos),
     )
     return result.scores
 
