@@ -536,7 +536,9 @@ def test_all_external_insufficient_requires_dimension_abstention(setup):
 def test_invalid_followup_output_keeps_current_memo(setup):
     config, _, _, _ = setup
     retriever = FixtureRetriever(empty=True)
-    llm = FixtureLLM(config, overrides={"followup_v1": {"question": {"kind": "baseline", "text": "bad"}, "reason": "x"}})
+    llm = FixtureLLM(
+        config, overrides={"followup_v1": {"question": {"kind": "baseline", "text": "bad"}, "reason": "x"}}
+    )
     result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
     assert result.status == "completed"
     assert len(result.evidence[0].memos) == 1
