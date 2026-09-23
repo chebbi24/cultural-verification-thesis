@@ -73,7 +73,6 @@ class FixtureLLM:
                 "agreement": "Limited evidence",
                 "sufficiency": "sufficient" if ids else "insufficient",
                 "confidence": "medium" if ids else "low",
-                "citations": ids,
                 "statements": [
                     {
                         "text": "The organiser publishes arrangements.",
