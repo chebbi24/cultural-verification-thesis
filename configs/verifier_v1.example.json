@@ -1,6 +1,6 @@
 {
-  "verifier_model_provider": "openrouter",
-  "verifier_model_id": "provider/model-version-to-freeze",
+  "verifier_model_provider": "ollama",
+  "verifier_model_id": "qwen3:4b",
   "temperature": 0,
   "top_k": 3,
   "max_material_targets": 3,
@@ -8,6 +8,7 @@
   "mode": "LIVE",
   "cache_directory": "artifacts/evidence/verifier_v1_smoke",
   "trace_directory": "artifacts/traces/verifier_v1_smoke",
+  "ollama_url": "http://localhost:11434/api/chat",
   "search_depth": "advanced",
   "excluded_domains": [],
   "excluded_repos": [
