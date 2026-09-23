@@ -147,7 +147,10 @@ class BlindEvidenceEngine:
                         normalized = []
                         for source in classified.sources:
                             source_type = source.source_type
-                            if source_type in {SourceType.ACADEMIC, SourceType.OFFICIAL} and source.provenance_basis != "explicit":
+                            if (
+                                source_type in {SourceType.ACADEMIC, SourceType.OFFICIAL}
+                                and source.provenance_basis != "explicit"
+                            ):
                                 source_type = SourceType.UNKNOWN
                             normalized.append(source.model_copy(update={"source_type": source_type}))
                         classified_sources = tuple(normalized)
