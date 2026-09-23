@@ -141,9 +141,9 @@ The two neutral questions necessarily convey the issue under investigation; this
 is a structural candidate-blind boundary, **not proof that question wording is unbiased**.
 Source text is untrusted data in all semantic prompts.
 
-The memo and its nested records/collections are immutable. Free-form memo summaries are
-not passed to the follow-up planner, target comparator or dimension scorer; those stages
-receive only grounded frozen statement-level evidence. Only after the memo is frozen
+The memo and its nested records/collections are immutable. Free-form memo summaries and statement paraphrases are not passed to the follow-up planner,
+target comparator or dimension scorer. Post-freeze decisions use exact retrieved support
+quotes plus structured IDs/verdict labels; comparator reasoning is also excluded from scoring. Only after the memo is frozen
 does target comparison receive the target again. Trace events record this ordering.
 Every cited factual statement links to retrieved document IDs. Python resolves citations
 only from source spans that match retrieved text after conservative formatting
