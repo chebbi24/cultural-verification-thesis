@@ -1,6 +1,6 @@
 """Structural validation only. Scores and cultural conclusions belong to the LLM."""
 
-from .schemas import ContextFact, SourceType
+from .schemas import ContextFact
 from .trace import digest
 
 
@@ -39,14 +39,6 @@ def validate_document_citation(memo, documents):
     require(citations <= ids, "Citations must reference retrieved documents")
     statement_citations = {c for s in memo.statements for c in s.citations}
     require(statement_citations == citations, "Every citation must ground a statement")
-    documents_by_id = {d.document_id: d for d in documents}
-    for statement in memo.statements:
-        if statement.kind == "legal_institutional_rule":
-            cited_types = {documents_by_id[c].source_type for c in statement.citations if c in documents_by_id}
-            require(
-                bool(cited_types & {SourceType.OFFICIAL, SourceType.INSTITUTIONAL}),
-                "legal_institutional_rule needs official or institutional provenance",
-            )
     if memo.sufficiency != "insufficient":
         require(bool(citations), "Sufficient/conflicting evidence needs citations")
     if not documents:
@@ -60,24 +52,6 @@ def validate_sources(batch, documents):
     found = [s.document_id for s in batch.sources]
     require(len(found) == len(set(found)), "Duplicate source classifications")
     require(set(found) == {d.document_id for d in documents}, "Classify each document once")
-    for source in batch.sources:
-        reason = source.reason.lower()
-        if source.source_type == SourceType.ACADEMIC:
-            require(
-                not any(
-                    phrase in reason
-                    for phrase in ("not peer-reviewed", "not peer reviewed", "not academic", "not a peer-reviewed")
-                ),
-                "academic_peer_reviewed contradicts classifier reasoning",
-            )
-        if source.source_type == SourceType.OFFICIAL:
-            require(
-                not any(
-                    phrase in reason
-                    for phrase in ("not official", "not an official", "not legal", "not a legal", "not government")
-                ),
-                "official_legal contradicts classifier reasoning",
-            )
 
 
 def validate_scores(batch, response, plan, targets, memos):
