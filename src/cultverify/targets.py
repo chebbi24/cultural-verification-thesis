@@ -12,8 +12,7 @@ def extract_targets(session, prompt, response, context, plan):
             "context": context.model_dump(mode="json"),
             "dimension_plan": {
                 "dimensions": [
-                    {"dimension_id": dimension.dimension_id, "role": dimension.role}
-                    for dimension in plan.dimensions
+                    {"dimension_id": dimension.dimension_id, "role": dimension.role} for dimension in plan.dimensions
                 ]
             },
             "max_material_targets": session.config.max_material_targets,
