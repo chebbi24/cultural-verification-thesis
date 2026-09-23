@@ -1,5 +1,12 @@
 from fractions import Fraction
-from .schemas import DimensionScore, RankingResult, ScoreBatch, ScoreDraftBatch, TargetVerdict, TargetVerdictDraft
+from .schemas import (
+    DimensionScore,
+    RankingResult,
+    ScoreBatch,
+    ScoreDraftBatch,
+    TargetVerdict,
+    TargetVerdictDraft,
+)
 from .validation import validate_score_drafts, validate_scores, validate_verdict
 
 
@@ -37,7 +44,9 @@ def _verdict_scoring_view(verdict):
 
 
 def _plan_scoring_view(plan):
-    return {"dimensions": [{"dimension_id": dimension.dimension_id} for dimension in plan.dimensions]}
+    return {
+        "dimensions": [{"dimension_id": dimension.dimension_id} for dimension in plan.dimensions]
+    }
 
 
 def compare_target(session, target, memo):
@@ -67,9 +76,15 @@ def _forced_abstain_dimensions(plan, targets, verdicts):
     verdicts_by_target = {verdict.target_id: verdict for verdict in verdicts}
     forced = set()
     for dimension in plan.dimensions:
-        relevant_targets = [target for target in targets if dimension.dimension_id in target.dimension_ids]
-        external_targets = [target for target in relevant_targets if target.retrieval_appropriate]
-        direct_targets = [target for target in relevant_targets if not target.retrieval_appropriate]
+        relevant_targets = [
+            target for target in targets if dimension.dimension_id in target.dimension_ids
+        ]
+        external_targets = [
+            target for target in relevant_targets if target.retrieval_appropriate
+        ]
+        direct_targets = [
+            target for target in relevant_targets if not target.retrieval_appropriate
+        ]
         if (
             external_targets
             and not direct_targets
@@ -83,7 +98,9 @@ def _forced_abstain_dimensions(plan, targets, verdicts):
     return forced
 
 
-def score_dimensions(session, prompt, response, context, plan, targets, verdicts, memos, rubric):
+def score_dimensions(
+    session, prompt, response, context, plan, targets, verdicts, memos, rubric
+):
     forced_abstentions = _forced_abstain_dimensions(plan, targets, verdicts)
     result = session.call(
         "dimension_scorer_v1",
@@ -119,7 +136,10 @@ def score_dimensions(session, prompt, response, context, plan, targets, verdicts
         score.model_copy(
             update={
                 "score": "abstain",
-                "rationale": "All relevant retrievable targets are insufficient; dimension abstained deterministically.",
+                "rationale": (
+                    "All relevant retrievable targets are insufficient; "
+                    "dimension abstained deterministically."
+                ),
                 "response_quotes": (),
                 "target_ids": targets_by_dimension[score.dimension_id],
             }
@@ -134,7 +154,9 @@ def score_dimensions(session, prompt, response, context, plan, targets, verdicts
             **score.model_dump(mode="json"),
             memo_ids=tuple(
                 dict.fromkeys(
-                    memo_by_target[target_id] for target_id in score.target_ids if target_id in memo_by_target
+                    memo_by_target[target_id]
+                    for target_id in score.target_ids
+                    if target_id in memo_by_target
                 )
             ),
         )
@@ -172,7 +194,18 @@ def aggregate(scores):
 def rank_results(candidates):
     scores = [exact_score(c.dimension_scores) for c in candidates]
     comparable = (
-        len({tuple(sorted(s.dimension_id for s in c.dimension_scores if s.score != "abstain")) for c in candidates})
+        len(
+            {
+                tuple(
+                    sorted(
+                        s.dimension_id
+                        for s in c.dimension_scores
+                        if s.score != "abstain"
+                    )
+                )
+                for c in candidates
+            }
+        )
         <= 1
     )
     if any(candidate.status != "completed" for candidate in candidates):
@@ -183,7 +216,11 @@ def rank_results(candidates):
             coverage_comparable=False,
         )
     available = [s for s in scores if s is not None]
-    tied = tuple(i for i, s in enumerate(scores) if s is not None and s == max(available)) if available else ()
+    tied = (
+        tuple(i for i, s in enumerate(scores) if s is not None and s == max(available))
+        if available
+        else ()
+    )
     # Implements the frozen highest-score rule, with an explicit coverage diagnostic.
     return RankingResult(
         candidates=tuple(candidates),
