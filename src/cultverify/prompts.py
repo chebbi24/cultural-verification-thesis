@@ -47,8 +47,9 @@ sounds authoritative. The selected enum MUST agree with the reason. If the reaso
 not peer-reviewed, do not select academic_peer_reviewed; if it says it is not official/legal, do not
 select official_legal. Do not invent category names outside the schema.""",
     "evidence_memo_v1": """Answer the provided questions using ONLY retrieved documents. Keep
-answer, scope, variation and agreement concise. Put substantive evidence claims in statements
-with exact document IDs; overall citations must equal the union of statement citations.
+answer, scope, variation and agreement concise. Return at most five substantive evidence
+statements, each with exact document IDs. Do not return a top-level citations field; the pipeline
+derives the citation union deterministically from statement citations.
 With no adequate source, state the limitation, use insufficient/low, and do not invent facts.
 Use tendency for broad recurring patterns, context_sensitive_practice for norms that vary by
 setting/group/region, legal_institutional_rule ONLY for an actual binding law, policy or formal
