@@ -182,7 +182,7 @@ def test_unsupported_legal_label_is_downgraded(setup):
     config, _, retriever, _ = setup
 
     def legal_memo(payload):
-        supports = [{"source_ref": d["source_ref"], "quote": d["text"][:300]} for d in payload["documents"]]
+        supports = [{"quote": d["text"][:300]} for d in payload["documents"]]
         return {
             "answer": "Documented cultural guidance.",
             "scope": "x",
@@ -227,7 +227,7 @@ def test_inferred_strong_provenance_is_downgraded(setup):
     assert all(s.source_type == "unknown" for s in result.evidence[0].source_classifications)
 
 
-def test_support_quote_must_match_referenced_document(setup):
+def test_support_quote_must_match_one_supplied_document(setup):
     config, _, retriever, _ = setup
 
     def bad_support(payload):
@@ -242,7 +242,7 @@ def test_support_quote_must_match_referenced_document(setup):
                 {
                     "text": "Unsupported",
                     "kind": "context_sensitive_practice",
-                    "supports": [{"source_ref": 1, "quote": "not present in the retrieved document"}],
+                    "supports": [{"quote": "not present in the retrieved document"}],
                 }
             ],
         }
@@ -321,6 +321,7 @@ def test_scope_and_query_prompts_prefer_general_then_authoritative():
     assert "provenance_basis" in PROMPTS["source_classifier_v1"]
     assert "REQUIRE provenance_basis=explicit" in PROMPTS["source_classifier_v1"]
     assert "VERBATIM span" in PROMPTS["evidence_memo_v1"]
+    assert "Do not return source_ref" in PROMPTS["evidence_memo_v1"]
     assert "ONLY for an actual binding law" in PROMPTS["evidence_memo_v1"]
     assert "genuinely unscorable only" in PROMPTS["dimension_scorer_v1"]
 
@@ -341,13 +342,11 @@ def test_max_two_rounds_one_followup(setup):
     assert not any(c["stage"] == "target_comparator_v1" for c in llm.calls)
 
 
-def test_memo_source_refs_map_to_exact_document_ids(setup):
+def test_memo_quotes_map_to_exact_document_ids(setup):
     _, llm, _, verifier = setup
     result = verifier.verify(PROMPT, RESPONSE)
     memo_call = next(c for c in llm.calls if c["stage"] == "evidence_memo_v1")
-    refs = {d["source_ref"]: d for d in memo_call["payload"]["documents"]}
-    assert set(refs) == set(range(1, len(refs) + 1))
-    assert all("document_id" not in d for d in refs.values())
+    assert all("document_id" not in d for d in memo_call["payload"]["documents"])
 
     memo = result.evidence[0].memos[-1]
     documents = {document.document_id: document for document in result.evidence[0].documents}
@@ -372,7 +371,7 @@ def test_memo_draft_rejects_more_than_five_statements():
     statement = {
         "text": "x",
         "kind": "context_sensitive_practice",
-        "supports": [{"source_ref": 1, "quote": "x"}],
+        "supports": [{"quote": "x"}],
     }
     with pytest.raises(ValidationError):
         MemoDraft(
@@ -553,7 +552,7 @@ def test_broken_score_memo_links_retry_then_abstain(setup):
     assert sum(c["stage"] == "dimension_scorer_v1" for c in llm.calls) == 2
 
 
-def test_invalid_source_ref_fails_before_target_comparison(setup):
+def test_ungrounded_support_fails_before_target_comparison(setup):
     config, _, retriever, _ = setup
     llm = FixtureLLM(
         config,
@@ -569,7 +568,7 @@ def test_invalid_source_ref_fails_before_target_comparison(setup):
                     {
                         "text": "Unsupported fact",
                         "kind": "context_sensitive_practice",
-                        "supports": [{"source_ref": 999, "quote": "x"}],
+                        "supports": [{"quote": "not present in any supplied document"}],
                     }
                 ],
             }
@@ -597,7 +596,7 @@ def test_conflicting_final_memo_counts_as_evidence_coverage(setup):
     config, _, retriever, _ = setup
 
     def conflicting(payload):
-        supports = [{"source_ref": d["source_ref"], "quote": d["text"][:300]} for d in payload["documents"]]
+        supports = [{"quote": d["text"][:300]} for d in payload["documents"]]
         return {
             "answer": "The retrieved sources do not resolve the question consistently.",
             "scope": "The documented context",
