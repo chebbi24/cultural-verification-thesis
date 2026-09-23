@@ -1,5 +1,5 @@
 from fractions import Fraction
-from .schemas import DimensionScore, RankingResult, ScoreBatch, ScoreDraftBatch, TargetVerdict
+from .schemas import DimensionScore, RankingResult, ScoreBatch, ScoreDraftBatch, TargetVerdict, TargetVerdictDraft
 from .validation import validate_score_drafts, validate_scores, validate_verdict
 
 
@@ -49,12 +49,18 @@ def compare_target(session, target, memo):
             verdict="insufficient",
             reasoning="Frozen evidence memo is insufficient; no directional verdict is permitted.",
         )
-    return session.call(
+    draft = session.call(
         "target_comparator_v1",
         {"target": _target_comparison_view(target), "memo": _memo_evidence_view(memo)},
-        TargetVerdict,
-        lambda v: validate_verdict(v, target, memo),
+        TargetVerdictDraft,
     )
+    verdict = TargetVerdict(
+        **draft.model_dump(mode="json"),
+        target_id=target.target_id,
+        memo_id=memo.memo_id,
+    )
+    validate_verdict(verdict, target, memo)
+    return verdict
 
 
 def score_dimensions(session, prompt, response, context, plan, targets, verdicts, memos, rubric):
