@@ -146,6 +146,12 @@ class SourceBatch(Record):
     sources: tuple[SourceClassification, ...]
 
 
+class EvidenceStatementDraft(Record):
+    text: Text
+    kind: Literal["tendency", "context_sensitive_practice", "legal_institutional_rule", "universal_claim"]
+    source_refs: tuple[Annotated[int, Field(strict=True, ge=1)], ...] = Field(min_length=1)
+
+
 class EvidenceStatement(Record):
     text: Text
     kind: Literal["tendency", "context_sensitive_practice", "legal_institutional_rule", "universal_claim"]
@@ -159,10 +165,17 @@ class MemoDraft(Record):
     agreement: Text
     sufficiency: Literal["sufficient", "conflicting", "insufficient"]
     confidence: Literal["low", "medium", "high"]
+    statements: tuple[EvidenceStatementDraft, ...] = Field(max_length=5)
+
+
+class EvidenceMemo(Record):
+    answer: Text
+    scope: Text
+    variation: Text
+    agreement: Text
+    sufficiency: Literal["sufficient", "conflicting", "insufficient"]
+    confidence: Literal["low", "medium", "high"]
     statements: tuple[EvidenceStatement, ...] = Field(max_length=5)
-
-
-class EvidenceMemo(MemoDraft):
     citations: tuple[Text, ...]
     memo_id: Text
     question_ids: tuple[Text, ...]
