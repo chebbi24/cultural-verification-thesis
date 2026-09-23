@@ -46,6 +46,23 @@ def test_smoke_cases_are_unlabelled_and_outside_gold_set():
         assert case["prompt"].strip() and case["response"].strip()
 
 
+def test_active_verifier_contains_no_case_specific_cultural_answers():
+    source = "\n".join(path.read_text(encoding="utf-8").casefold() for path in sorted(PACKAGE.rglob("*.py")))
+    # Regression sentinels from development/smoke cases. The runtime may encode schemas,
+    # rubric structure and safety invariants, but never case-specific cultural conclusions.
+    for literal in (
+        "stuttgart",
+        "bavaria",
+        "schnitzel",
+        "sauerbraten",
+        "ramadan",
+        "shop employee",
+        "use 'du'",
+        'use "du"',
+    ):
+        assert literal not in source
+
+
 def test_active_verifier_does_not_reference_project_data_files():
     source = "\n".join(path.read_text(encoding="utf-8").lower() for path in sorted(PACKAGE.rglob("*.py")))
     assert "data/" not in source
