@@ -10,6 +10,7 @@ from .schemas import (
     EvidenceMemo,
     EvidenceSchedule,
     EvidenceStatement,
+    EvidenceSupport,
     Followup,
     MemoDraft,
     QueryDraft,
@@ -145,28 +146,8 @@ class BlindEvidenceEngine:
                         )
                         normalized = []
                         for source in classified.sources:
-                            reason = source.reason.lower()
                             source_type = source.source_type
-                            if source_type == SourceType.ACADEMIC and any(
-                                phrase in reason
-                                for phrase in (
-                                    "not peer-reviewed",
-                                    "not peer reviewed",
-                                    "not academic",
-                                    "not a peer-reviewed",
-                                )
-                            ):
-                                source_type = SourceType.UNKNOWN
-                            if source_type == SourceType.OFFICIAL and any(
-                                phrase in reason
-                                for phrase in (
-                                    "not official",
-                                    "not an official",
-                                    "not legal",
-                                    "not a legal",
-                                    "not government",
-                                )
-                            ):
+                            if source_type in {SourceType.ACADEMIC, SourceType.OFFICIAL} and source.provenance_basis != "explicit":
                                 source_type = SourceType.UNKNOWN
                             normalized.append(source.model_copy(update={"source_type": source_type}))
                         classified_sources = tuple(normalized)
@@ -175,6 +156,7 @@ class BlindEvidenceEngine:
                             SourceClassification(
                                 document_id=d.document_id,
                                 source_type=SourceType.UNKNOWN,
+                                provenance_basis="unclear",
                                 reason="Source classification was unavailable; conservatively marked unknown.",
                             )
                             for d in new
@@ -197,7 +179,7 @@ class BlindEvidenceEngine:
                 # Map simple local source refs back to exact frozen document IDs.
                 mapped_statements = []
                 for statement in memo.statements:
-                    cited_docs = tuple(docs[ref - 1] for ref in dict.fromkeys(statement.source_refs))
+                    cited_docs = tuple(docs[support.source_ref - 1] for support in statement.supports)
                     kind = statement.kind
                     if kind == "legal_institutional_rule" and not any(
                         document.source_type == SourceType.OFFICIAL for document in cited_docs
@@ -208,6 +190,13 @@ class BlindEvidenceEngine:
                             text=statement.text,
                             kind=kind,
                             citations=tuple(document.document_id for document in cited_docs),
+                            supports=tuple(
+                                EvidenceSupport(
+                                    document_id=docs[support.source_ref - 1].document_id,
+                                    quote=support.quote,
+                                )
+                                for support in statement.supports
+                            ),
                         )
                     )
                 citations = tuple(dict.fromkeys(c for statement in mapped_statements for c in statement.citations))
