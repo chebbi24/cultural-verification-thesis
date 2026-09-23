@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 import pytest
+import requests
 from pydantic import ValidationError
 from cultverify import CulturalVerifier
 from cultverify.evidence import BlindEvidenceEngine, LLM_DOCUMENT_TEXT_LIMIT
@@ -606,6 +607,55 @@ def test_invalid_followup_output_keeps_current_memo(setup):
     assert result.evidence[0].memos[-1].sufficiency == "insufficient"
     assert "Follow-up planning unavailable" in result.evidence[0].followup_reason
     assert result.verdicts[0].verdict == "insufficient"
+
+
+def test_followup_memo_timeout_keeps_round_one_frozen_memo(setup):
+    config, _, retriever, _ = setup
+    memo_calls = {"n": 0}
+
+    def memo_then_timeout(payload):
+        memo_calls["n"] += 1
+        if memo_calls["n"] > 1:
+            raise requests.ReadTimeout("fixture timeout")
+        supports = [{"quote": d["text"][:300]} for d in payload["documents"]]
+        return {
+            "answer": "Some grounded evidence exists, but it is not sufficient.",
+            "scope": "The documented event",
+            "variation": "More specific evidence would help.",
+            "agreement": "Limited evidence",
+            "sufficiency": "insufficient",
+            "confidence": "low",
+            "statements": [
+                {
+                    "text": "The organiser publishes arrangements.",
+                    "kind": "context_sensitive_practice",
+                    "supports": supports,
+                }
+            ],
+        }
+
+    llm = FixtureLLM(config, overrides={"evidence_memo_v1": memo_then_timeout})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+
+    assert result.status == "completed"
+    assert len(result.evidence) == 1
+    bundle = result.evidence[0]
+    assert len(bundle.memos) == 1
+    assert bundle.memos[-1].sufficiency == "insufficient"
+    assert len(bundle.questions) == 2
+    assert len(bundle.queries) == 2
+    assert len(bundle.snapshots) == 2
+    assert "Follow-up evidence refinement unavailable" in bundle.followup_reason
+    assert result.verdicts[0].verdict == "insufficient"
+    assert result.candidate_abstained
+
+    trace = RunTrace.model_validate_json(Path(result.trace_path).read_text())
+    timeout_calls = [
+        call
+        for call in trace.calls
+        if call.stage == "evidence_memo_v1" and call.error and "ReadTimeout" in call.error
+    ]
+    assert timeout_calls
 
 
 def test_followup_receives_only_grounded_statement_level_memo(setup):
