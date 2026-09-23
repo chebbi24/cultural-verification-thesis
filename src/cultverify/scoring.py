@@ -92,6 +92,13 @@ def rank_results(candidates):
         len({tuple(sorted(s.dimension_id for s in c.dimension_scores if s.score != "abstain")) for c in candidates})
         <= 1
     )
+    if any(candidate.status != "completed" for candidate in candidates):
+        return RankingResult(
+            candidates=tuple(candidates),
+            winner="no_clear_winner",
+            tied_indices=(),
+            coverage_comparable=False,
+        )
     available = [s for s in scores if s is not None]
     tied = tuple(i for i, s in enumerate(scores) if s is not None and s == max(available)) if available else ()
     # Implements the frozen highest-score rule, with an explicit coverage diagnostic.
