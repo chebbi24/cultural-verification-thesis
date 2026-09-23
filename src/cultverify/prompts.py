@@ -54,8 +54,8 @@ answer, scope, variation and agreement concise. Return at most five substantive 
 statements. Each statement must contain supports. Every support contains ONLY quote: a short
 VERBATIM span copied from one supplied document (maximum 300 characters). Choose a distinctive span
 that occurs in exactly one supplied document. Never paraphrase it. Do not return source_ref,
-document IDs, URLs or a top-level citations field; Python locates the exact document containing each
-quote, maps it to the frozen document ID and derives the citation union deterministically.
+document IDs, URLs, source references or a top-level citations field; Python locates the exact
+document containing each quote, maps it to the frozen document ID and derives the citation union deterministically.
 If you are not sure of the exact source wording, omit that support/statement rather than paraphrasing it.
 With no adequate source, state the limitation, use insufficient/low, and do not invent facts.
 Use tendency for broad recurring patterns, context_sensitive_practice for norms that vary by
@@ -66,12 +66,15 @@ because a source presents them as rules. Do not turn often into always. Assess s
 official primary sources for binding rules; empirical/linguistic work for language; empirical and
 credible community evidence for lived practice. Weak explanatory/commercial sources alone should
 not produce high-confidence claims. Report unresolved disagreement rather than artificial consensus.""",
-    "evidence_relevance_v1": """Judge each grounded evidence statement ONLY for whether it materially
-helps answer at least one supplied verification question. Return one judgment for every statement_index.
-Relevant means the statement itself, together with its quoted supports, bears on the substance of a
-verification question. Merely sharing the broad topic, country, setting, or a generic cultural theme is
-not enough. Mark unrelated side facts and retrieval noise irrelevant. Do not use the candidate response,
-target proposition, memo answer/scope/agreement, or outside knowledge. Be conservative under uncertainty.""",
+    "evidence_relevance_v1": """Judge each grounded evidence statement on TWO independent criteria and
+return one judgment for every statement_index. supported_by_quotes=true only when the statement is
+directly supported by its supplied verbatim support quotes without adding stronger scope, causality,
+frequency, universality, obligation or locality than those quotes establish. relevant=true only when
+the supported content materially helps answer at least one supplied verification question. Merely
+sharing the broad topic, country, setting, or a generic cultural theme is not enough. Mark overclaims,
+unsupported synthesis, unrelated side facts and retrieval noise false as appropriate. Do not use the
+candidate response, target proposition, memo answer/scope/agreement, prior calls or outside knowledge.
+Be conservative under uncertainty.""",
     "followup_v1": """Given questions, context and a memo with conflicting or insufficient evidence,
 identify the single most important unresolved evidence gap. If that gap is reasonably searchable,
 produce exactly ONE neutral, gap-specific question with kind=followup; it must add a distinct
@@ -87,7 +90,9 @@ Missing evidence is not contradiction. Scope and contextual variation matter."""
 limited, 0 materially misaligned. abstain means genuinely unscorable only: use it only when the
 available evidence and direct response content do not permit a cultural assessment. Missing
 specificity, partial coverage, or an incomplete but assessable response is score 1, NOT abstain.
-If any relevant target has a supported, mixed, or contradicted verdict, choose 0, 1, or 2. Use the rubric,
+If any relevant target has a supported, mixed, or contradicted verdict, choose 0, 1, or 2. If every
+relevant retrievable target is insufficient and there is no relevant non-retrieval target that can be
+assessed directly from the response, abstain for that dimension. Use the rubric,
 response, explicit context and frozen evidence. No numeric confidence. Cite relevant exact
 response quotes and target IDs; only provided target references are allowed. Do not return memo IDs;
 the pipeline derives memo links deterministically from the selected target IDs. For an empty
