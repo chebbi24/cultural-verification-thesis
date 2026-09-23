@@ -81,6 +81,15 @@ def test_tavily_contract_and_provenance():
     assert post.call_args.kwargs["timeout"] == 12
 
 
+def test_malformed_tavily_result_fields_fail_cleanly():
+    client = TavilyRetriever("test-only-placeholder")
+    response = Mock()
+    response.json.return_value = {"results": [{"url": 42, "title": "x", "content": "text"}]}
+    with patch("cultverify.retrieval.requests.post", return_value=response):
+        with pytest.raises(RetrievalError, match="Malformed search result fields"):
+            client.search("neutral query", top_k=3, timeout=12)
+
+
 def test_malformed_tavily_response_fails_cleanly():
     client = TavilyRetriever("test-only-placeholder")
     response = Mock()
