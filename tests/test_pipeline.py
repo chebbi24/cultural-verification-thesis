@@ -570,14 +570,13 @@ def test_all_external_insufficient_requires_dimension_abstention(setup):
 
     def scorer(payload):
         attempts["n"] += 1
-        value = 2 if attempts["n"] == 1 else "abstain"
         return {
             "scores": [
                 {
                     "dimension_id": d["dimension_id"],
-                    "score": value,
-                    "rationale": "Evidence unavailable.",
-                    "response_quotes": [payload["response"]] if value != "abstain" else [],
+                    "score": 2,
+                    "rationale": "The model incorrectly tries to score unavailable evidence.",
+                    "response_quotes": [payload["response"]],
                     "target_ids": [
                         t["target_id"] for t in payload["targets"] if d["dimension_id"] in t["dimension_ids"]
                     ],
@@ -589,8 +588,12 @@ def test_all_external_insufficient_requires_dimension_abstention(setup):
     llm = FixtureLLM(config, overrides={"dimension_scorer_v1": scorer})
     result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
     assert result.status == "completed"
-    assert attempts["n"] == 2
+    assert attempts["n"] == 1
     assert all(score.score == "abstain" for score in result.dimension_scores)
+    assert all(not score.response_quotes for score in result.dimension_scores)
+    assert all("abstained deterministically" in score.rationale for score in result.dimension_scores)
+    assert all(score.target_ids for score in result.dimension_scores)
+    assert all(score.memo_ids for score in result.dimension_scores)
     assert result.overall_score is None
     assert result.candidate_abstained
 
