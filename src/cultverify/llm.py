@@ -135,6 +135,12 @@ class SemanticSession:
                     )
                     raise
                 except requests.RequestException as exc:
+                    status_code = (
+                        exc.response.status_code
+                        if isinstance(exc, requests.HTTPError) and exc.response is not None
+                        else None
+                    )
+                    error_name = type(exc).__name__ + (f":{status_code}" if status_code is not None else "")
                     self.calls.append(
                         CallRecord(
                             stage=stage,
@@ -142,16 +148,17 @@ class SemanticSession:
                             timestamp=timestamp(),
                             input_hash=digest(payload),
                             output_json=None,
-                            error=type(exc).__name__,
+                            error=error_name,
                         )
                     )
                     retryable = isinstance(exc, (requests.Timeout, requests.ConnectionError)) or (
                         isinstance(exc, requests.HTTPError)
-                        and exc.response is not None
-                        and (exc.response.status_code == 429 or exc.response.status_code >= 500)
+                        and status_code is not None
+                        and (status_code == 429 or status_code >= 500)
                     )
                     if not retryable or transport_attempt == self.config.transport_retry_count:
-                        raise StageError(f"{stage}: transport {type(exc).__name__}") from exc
+                        suffix = f" status={status_code}" if status_code is not None else ""
+                        raise StageError(f"{stage}: transport {type(exc).__name__}{suffix}") from exc
             try:
                 value = output_type.model_validate_json(raw)
                 if validator:
