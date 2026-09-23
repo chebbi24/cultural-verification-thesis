@@ -182,7 +182,9 @@ def test_unsupported_legal_label_is_downgraded(setup):
     config, _, retriever, _ = setup
 
     def legal_memo(payload):
-        refs = [d["source_ref"] for d in payload["documents"]]
+        supports = [
+            {"source_ref": d["source_ref"], "quote": d["text"][:300]} for d in payload["documents"]
+        ]
         return {
             "answer": "Documented cultural guidance.",
             "scope": "x",
@@ -194,7 +196,7 @@ def test_unsupported_legal_label_is_downgraded(setup):
                 {
                     "text": "Documented cultural guidance.",
                     "kind": "legal_institutional_rule",
-                    "source_refs": refs,
+                    "supports": supports,
                 }
             ],
         }
@@ -203,6 +205,83 @@ def test_unsupported_legal_label_is_downgraded(setup):
     result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
     assert result.status == "completed"
     assert all(statement.kind == "context_sensitive_practice" for statement in result.evidence[0].memos[-1].statements)
+
+
+def test_inferred_strong_provenance_is_downgraded(setup):
+    config, _, retriever, _ = setup
+
+    def inferred_academic(payload):
+        return {
+            "sources": [
+                {
+                    "document_id": d["document_id"],
+                    "source_type": "academic_peer_reviewed",
+                    "provenance_basis": "inferred",
+                    "reason": "The page looks academic, but peer review is not explicitly established.",
+                }
+                for d in payload["documents"]
+            ]
+        }
+
+    llm = FixtureLLM(config, overrides={"source_classifier_v1": inferred_academic})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert all(s.source_type == "unknown" for s in result.evidence[0].source_classifications)
+
+
+def test_support_quote_must_match_referenced_document(setup):
+    config, _, retriever, _ = setup
+
+    def bad_support(payload):
+        return {
+            "answer": "Unsupported",
+            "scope": "x",
+            "variation": "x",
+            "agreement": "x",
+            "sufficiency": "sufficient",
+            "confidence": "high",
+            "statements": [
+                {
+                    "text": "Unsupported",
+                    "kind": "context_sensitive_practice",
+                    "supports": [{"source_ref": 1, "quote": "not present in the retrieved document"}],
+                }
+            ],
+        }
+
+    llm = FixtureLLM(config, overrides={"evidence_memo_v1": bad_support})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "failed"
+    trace = RunTrace.model_validate_json(Path(result.trace_path).read_text())
+    assert sum(c.stage == "evidence_memo_v1" for c in trace.calls) == 2
+
+
+def test_directional_verdict_forces_numeric_score_retry(setup):
+    config, _, retriever, _ = setup
+    attempts = {"n": 0}
+
+    def scorer(payload):
+        attempts["n"] += 1
+        value = "abstain" if attempts["n"] == 1 else 1
+        return {
+            "scores": [
+                {
+                    "dimension_id": d["dimension_id"],
+                    "score": value,
+                    "rationale": "Assessable but incomplete evidence.",
+                    "response_quotes": [payload["response"]],
+                    "target_ids": [t["target_id"] for t in payload["targets"]],
+                    "memo_ids": [m["memo_id"] for m in payload["memos"]],
+                }
+                for d in payload["dimension_plan"]["dimensions"]
+            ]
+        }
+
+    llm = FixtureLLM(config, overrides={"dimension_scorer_v1": scorer})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert attempts["n"] == 2
+    assert all(score.score == 1 for score in result.dimension_scores)
 
 
 def test_duplicate_followup_is_skipped(setup):
@@ -241,8 +320,11 @@ def test_scope_and_query_prompts_prefer_general_then_authoritative():
     assert "named city or region" in question_prompt
     assert "academic or linguistic" in query_prompt
     assert "official or institutional" in query_prompt
-    assert "selected enum MUST agree" in PROMPTS["source_classifier_v1"]
+    assert "provenance_basis" in PROMPTS["source_classifier_v1"]
+    assert "REQUIRE provenance_basis=explicit" in PROMPTS["source_classifier_v1"]
+    assert "VERBATIM span" in PROMPTS["evidence_memo_v1"]
     assert "ONLY for an actual binding law" in PROMPTS["evidence_memo_v1"]
+    assert "genuinely unscorable only" in PROMPTS["dimension_scorer_v1"]
 
 
 def test_max_two_rounds_one_followup(setup):
@@ -270,8 +352,12 @@ def test_memo_source_refs_map_to_exact_document_ids(setup):
     assert all("document_id" not in d for d in refs.values())
 
     memo = result.evidence[0].memos[-1]
-    expected_ids = tuple(document.document_id for document in result.evidence[0].documents)
-    assert set(memo.citations) <= set(expected_ids)
+    documents = {document.document_id: document for document in result.evidence[0].documents}
+    assert set(memo.citations) <= set(documents)
+    for statement in memo.statements:
+        for support in statement.supports:
+            assert support.document_id in documents
+            assert support.quote in documents[support.document_id].text
 
 
 def test_memo_citations_are_derived_from_statement_union(setup):
@@ -288,7 +374,7 @@ def test_memo_draft_rejects_more_than_five_statements():
     statement = {
         "text": "x",
         "kind": "context_sensitive_practice",
-        "source_refs": [1],
+        "supports": [{"source_ref": 1, "quote": "x"}],
     }
     with pytest.raises(ValidationError):
         MemoDraft(
@@ -485,7 +571,7 @@ def test_invalid_source_ref_fails_before_target_comparison(setup):
                     {
                         "text": "Unsupported fact",
                         "kind": "context_sensitive_practice",
-                        "source_refs": [999],
+                        "supports": [{"source_ref": 999, "quote": "x"}],
                     }
                 ],
             }
@@ -513,7 +599,9 @@ def test_conflicting_final_memo_counts_as_evidence_coverage(setup):
     config, _, retriever, _ = setup
 
     def conflicting(payload):
-        refs = [d["source_ref"] for d in payload["documents"]]
+        supports = [
+            {"source_ref": d["source_ref"], "quote": d["text"][:300]} for d in payload["documents"]
+        ]
         return {
             "answer": "The retrieved sources do not resolve the question consistently.",
             "scope": "The documented context",
@@ -525,7 +613,7 @@ def test_conflicting_final_memo_counts_as_evidence_coverage(setup):
                 {
                     "text": "The retrieved sources do not resolve the question consistently.",
                     "kind": "context_sensitive_practice",
-                    "source_refs": refs,
+                    "supports": supports,
                 }
             ],
         }
