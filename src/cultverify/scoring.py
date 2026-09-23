@@ -126,7 +126,7 @@ def score_dimensions(session, prompt, response, context, plan, targets, verdicts
         )
         if score.dimension_id in forced_abstentions
         else score
-        for score in repaired_scores
+        for score in result.scores
     )
     memo_by_target = {verdict.target_id: verdict.memo_id for verdict in verdicts}
     scores = tuple(
@@ -138,7 +138,7 @@ def score_dimensions(session, prompt, response, context, plan, targets, verdicts
                 )
             ),
         )
-        for score in result.scores
+        for score in repaired_scores
     )
     final = ScoreBatch(scores=scores)
     validate_scores(final, response, plan, targets, verdicts, memos)
