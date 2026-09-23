@@ -39,6 +39,7 @@ class HTTPModel:
                 "model": self.config.verifier_model_id,
                 "messages": messages,
                 "format": schema,
+                "think": False,
                 "stream": False,
                 "options": {"temperature": self.config.temperature},
             }
