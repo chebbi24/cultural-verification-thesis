@@ -468,7 +468,10 @@ def test_downstream_decisions_receive_only_exact_or_structured_inputs(setup):
 
     target_call = next(call for call in llm.calls if call["stage"] == "target_extractor_v1")
     assert "reasoning" not in target_call["payload"]["dimension_plan"]
-    assert all(set(dimension) == {"dimension_id", "role"} for dimension in target_call["payload"]["dimension_plan"]["dimensions"])
+    assert all(
+        set(dimension) == {"dimension_id", "role"}
+        for dimension in target_call["payload"]["dimension_plan"]["dimensions"]
+    )
 
     question_call = next(call for call in llm.calls if call["stage"] == "verification_question_v1")
     assert set(question_call["payload"]["target"]) == {"response_quote", "epistemic_type", "dimension_ids"}
@@ -486,21 +489,18 @@ def test_downstream_decisions_receive_only_exact_or_structured_inputs(setup):
         "citations",
         "statements",
     }.intersection(comparator_call["payload"]["memo"])
-    assert all(
-        set(group) == {"supports"} for group in comparator_call["payload"]["memo"]["evidence_groups"]
-    )
+    assert all(set(group) == {"supports"} for group in comparator_call["payload"]["memo"]["evidence_groups"])
 
     scorer_call = next(call for call in llm.calls if call["stage"] == "dimension_scorer_v1")
-    assert all(set(dimension) == {"dimension_id"} for dimension in scorer_call["payload"]["dimension_plan"]["dimensions"])
     assert all(
-        set(target)
-        == {"target_id", "response_quote", "dimension_ids", "epistemic_type", "retrieval_appropriate"}
+        set(dimension) == {"dimension_id"} for dimension in scorer_call["payload"]["dimension_plan"]["dimensions"]
+    )
+    assert all(
+        set(target) == {"target_id", "response_quote", "dimension_ids", "epistemic_type", "retrieval_appropriate"}
         for target in scorer_call["payload"]["targets"]
     )
     assert all(set(verdict) == {"target_id", "memo_id", "verdict"} for verdict in scorer_call["payload"]["verdicts"])
-    assert all(
-        set(memo) == {"memo_id", "sufficiency", "evidence_groups"} for memo in scorer_call["payload"]["memos"]
-    )
+    assert all(set(memo) == {"memo_id", "sufficiency", "evidence_groups"} for memo in scorer_call["payload"]["memos"])
 
 
 def test_directional_verdict_forces_numeric_score_retry(setup):
