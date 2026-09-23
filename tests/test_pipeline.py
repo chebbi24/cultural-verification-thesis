@@ -15,14 +15,21 @@ from cultverify.schemas import (
     Followup,
     InitialQuestions,
     MaterialTarget,
+    MemoDraft,
     RunTrace,
+    SourceBatch,
     TargetBatch,
 )
 from cultverify.prompts import PROMPTS
 from cultverify.scoring import aggregate, rank_results
 from cultverify.trace import digest
-from cultverify.validation import validate_context, validate_document_citation, validate_trace_links
-from conftest import FixtureLLM, FixtureRetriever, PROMPT, RESPONSE
+from cultverify.validation import (
+    validate_context,
+    validate_document_citation,
+    validate_sources,
+    validate_trace_links,
+)
+from conftest import FixtureLLM, FixtureRetriever, PROMPT, RESPONSE, document
 
 
 def test_context_quote_validation():
@@ -142,6 +149,57 @@ def test_source_classifier_does_not_receive_placeholder_type(setup):
             assert "source_type" not in document
 
 
+
+
+def test_source_classification_reason_must_match_enum():
+    doc = document()
+    academic = SourceBatch(
+        sources=(
+            {
+                "document_id": doc.document_id,
+                "source_type": "academic_peer_reviewed",
+                "reason": "This tutoring page is not peer-reviewed.",
+            },
+        )
+    )
+    with pytest.raises(ValueError, match="academic_peer_reviewed"):
+        validate_sources(academic, (doc,))
+
+    official = SourceBatch(
+        sources=(
+            {
+                "document_id": doc.document_id,
+                "source_type": "official_legal",
+                "reason": "This is a language-learning blog, not an official legal source.",
+            },
+        )
+    )
+    with pytest.raises(ValueError, match="official_legal"):
+        validate_sources(official, (doc,))
+
+
+def test_legal_statement_requires_official_or_institutional_provenance():
+    doc = document().model_copy(update={"source_type": "general_explanatory"})
+    memo = MemoDraft(
+        answer="A documented practice.",
+        scope="x",
+        variation="x",
+        agreement="x",
+        sufficiency="sufficient",
+        confidence="medium",
+        statements=(
+            {
+                "text": "A documented practice.",
+                "kind": "legal_institutional_rule",
+                "citations": (doc.document_id,),
+            },
+        ),
+        citations=(doc.document_id,),
+    )
+    with pytest.raises(ValueError, match="official or institutional"):
+        validate_document_citation(memo, (doc,))
+
+
 def test_followup_reason_is_bounded_and_prompt_is_concise():
     Followup(question=None, reason="Short reason.")
     with pytest.raises(ValidationError):
@@ -156,6 +214,8 @@ def test_scope_and_query_prompts_prefer_general_then_authoritative():
     assert "named city or region" in question_prompt
     assert "academic or linguistic" in query_prompt
     assert "official or institutional" in query_prompt
+    assert "selected enum MUST agree" in PROMPTS["source_classifier_v1"]
+    assert "ONLY for an actual binding law" in PROMPTS["evidence_memo_v1"]
 
 
 def test_max_two_rounds_one_followup(setup):
