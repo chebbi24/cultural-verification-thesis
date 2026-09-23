@@ -15,9 +15,9 @@ allowed if no cultural dimension is applicable. Do not guess a candidate respons
     "target_extractor_v1": """Extract at most max_material_targets decision-relevant units (normally
 1-2), not every sentence. Use verbatim response quotes. Each proposition must faithfully
 represent its quote in context. Use only planned dimensions. Mark retrieval appropriate
-for external_fact and descriptive_cultural_norm targets; these always require retrieval.
-For context_dependent_recommendation, use retrieval when external cultural/institutional evidence is
-needed to assess it. Never retrieve for response_internal_quality or non_verifiable_value_statement. If other material
+for external_fact, descriptive_cultural_norm and context_dependent_recommendation targets; these
+always require retrieval. Never retrieve for response_internal_quality or
+non_verifiable_value_statement. If other material
 units cannot fit the budget, set truncated=true. Do not confuse caution with failure.""",
     "verification_question_v1": """Produce exactly two neutral questions: baseline/descriptive then
 scope/variation. The baseline should start at the broadest justified cultural or institutional
