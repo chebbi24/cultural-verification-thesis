@@ -533,6 +533,19 @@ def test_all_external_insufficient_requires_dimension_abstention(setup):
     assert result.candidate_abstained
 
 
+def test_followup_receives_only_grounded_statement_level_memo(setup):
+    config, _, _, _ = setup
+    retriever = FixtureRetriever(empty=True)
+    llm = FixtureLLM(config)
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    followup_call = next(call for call in llm.calls if call["stage"] == "followup_v1")
+    assert set(followup_call["payload"]["memo"]) == {"sufficiency", "confidence", "statements"}
+    assert not {"answer", "scope", "variation", "agreement", "citations", "memo_id"}.intersection(
+        followup_call["payload"]["memo"]
+    )
+
+
 def test_duplicate_followup_is_skipped(setup):
     config, _, _, _ = setup
     retriever = FixtureRetriever(empty=True)
@@ -572,7 +585,7 @@ def test_scope_and_query_prompts_prefer_general_then_authoritative():
     assert "provenance_basis" in PROMPTS["source_classifier_v1"]
     assert "REQUIRE provenance_basis=explicit" in PROMPTS["source_classifier_v1"]
     assert "VERBATIM span" in PROMPTS["evidence_memo_v1"]
-    assert "Do not return source_ref" in PROMPTS["evidence_memo_v1"]
+    assert "Do not return source references" in PROMPTS["evidence_memo_v1"]
     assert "ONLY for an actual binding law" in PROMPTS["evidence_memo_v1"]
     assert "supported_by_quotes" in PROMPTS["evidence_relevance_v1"]
     assert "materially" in PROMPTS["evidence_relevance_v1"]
