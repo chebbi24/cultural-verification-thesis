@@ -60,15 +60,19 @@ class TavilyRetriever:
         for rank, item in enumerate(results, 1):
             if not isinstance(item, dict):
                 raise RetrievalError("Malformed search result item")
+            url = item.get("url")
+            title = item.get("title") or ""
             content = item.get("content") or ""
-            if not item.get("url") or not isinstance(content, str) or not content.strip():
+            if not isinstance(url, str) or not isinstance(title, str) or not isinstance(content, str):
+                raise RetrievalError("Malformed search result fields")
+            if not url.strip() or not content.strip():
                 continue
             documents.append(
                 RetrievedDocument(
-                    document_id=stable_id("doc", [canonical_url(item["url"]), content]),
+                    document_id=stable_id("doc", [canonical_url(url), content]),
                     query=query,
-                    url=item["url"],
-                    title=item.get("title", ""),
+                    url=url,
+                    title=title,
                     text=content,
                     rank=rank,
                     provider_score=item.get("score"),
