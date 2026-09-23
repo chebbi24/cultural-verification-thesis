@@ -19,7 +19,7 @@ from cultverify.schemas import (
     TargetBatch,
 )
 from cultverify.prompts import PROMPTS
-from cultverify.scoring import aggregate, compare_target, rank_results
+from cultverify.scoring import aggregate, rank_results
 from cultverify.trace import digest
 from cultverify.validation import validate_context, validate_document_citation, validate_trace_links
 from conftest import FixtureLLM, FixtureRetriever, PROMPT, RESPONSE
