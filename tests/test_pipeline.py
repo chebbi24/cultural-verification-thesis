@@ -165,6 +165,8 @@ def test_llm_evidence_payload_truncates_text_but_keeps_full_snapshot(setup):
     for call in llm.calls:
         if call["stage"] in {"source_classifier_v1", "evidence_memo_v1"}:
             assert all(len(d["text"]) <= LLM_DOCUMENT_TEXT_LIMIT for d in call["payload"]["documents"])
+        if call["stage"] == "evidence_memo_v1":
+            assert all("source_ref" in d and "document_id" not in d for d in call["payload"]["documents"])
 
 
 def test_classifier_failure_falls_back_to_unknown(setup):
@@ -180,7 +182,7 @@ def test_unsupported_legal_label_is_downgraded(setup):
     config, _, retriever, _ = setup
 
     def legal_memo(payload):
-        ids = [d["document_id"] for d in payload["documents"]]
+        refs = [d["source_ref"] for d in payload["documents"]]
         return {
             "answer": "Documented cultural guidance.",
             "scope": "x",
@@ -192,7 +194,7 @@ def test_unsupported_legal_label_is_downgraded(setup):
                 {
                     "text": "Documented cultural guidance.",
                     "kind": "legal_institutional_rule",
-                    "citations": ids,
+                    "source_refs": refs,
                 }
             ],
         }
@@ -259,6 +261,19 @@ def test_max_two_rounds_one_followup(setup):
     assert not any(c["stage"] == "target_comparator_v1" for c in llm.calls)
 
 
+def test_memo_source_refs_map_to_exact_document_ids(setup):
+    _, llm, _, verifier = setup
+    result = verifier.verify(PROMPT, RESPONSE)
+    memo_call = next(c for c in llm.calls if c["stage"] == "evidence_memo_v1")
+    refs = {d["source_ref"]: d for d in memo_call["payload"]["documents"]}
+    assert set(refs) == set(range(1, len(refs) + 1))
+    assert all("document_id" not in d for d in refs.values())
+
+    memo = result.evidence[0].memos[-1]
+    expected_ids = tuple(document.document_id for document in result.evidence[0].documents)
+    assert set(memo.citations) <= set(expected_ids)
+
+
 def test_memo_citations_are_derived_from_statement_union(setup):
     _, _, _, verifier = setup
     result = verifier.verify(PROMPT, RESPONSE)
@@ -273,7 +288,7 @@ def test_memo_draft_rejects_more_than_five_statements():
     statement = {
         "text": "x",
         "kind": "context_sensitive_practice",
-        "citations": ["doc"],
+        "source_refs": [1],
     }
     with pytest.raises(ValidationError):
         MemoDraft(
@@ -454,7 +469,7 @@ def test_broken_score_memo_links_retry_then_abstain(setup):
     assert sum(c["stage"] == "dimension_scorer_v1" for c in llm.calls) == 2
 
 
-def test_invalid_statement_citation_fails_before_target_comparison(setup):
+def test_invalid_source_ref_fails_before_target_comparison(setup):
     config, _, retriever, _ = setup
     llm = FixtureLLM(
         config,
@@ -470,7 +485,7 @@ def test_invalid_statement_citation_fails_before_target_comparison(setup):
                     {
                         "text": "Unsupported fact",
                         "kind": "context_sensitive_practice",
-                        "citations": ["missing"],
+                        "source_refs": [999],
                     }
                 ],
             }
@@ -498,7 +513,7 @@ def test_conflicting_final_memo_counts_as_evidence_coverage(setup):
     config, _, retriever, _ = setup
 
     def conflicting(payload):
-        ids = [d["document_id"] for d in payload["documents"]]
+        refs = [d["source_ref"] for d in payload["documents"]]
         return {
             "answer": "The retrieved sources do not resolve the question consistently.",
             "scope": "The documented context",
@@ -510,7 +525,7 @@ def test_conflicting_final_memo_counts_as_evidence_coverage(setup):
                 {
                     "text": "The retrieved sources do not resolve the question consistently.",
                     "kind": "context_sensitive_practice",
-                    "citations": ids,
+                    "source_refs": refs,
                 }
             ],
         }
