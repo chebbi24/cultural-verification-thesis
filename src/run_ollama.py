@@ -15,9 +15,7 @@ OUTPUT_PATH = OUTPUT_DIR / "llama32_3b_redteam_v22_outputs.csv"
 
 OLLAMA_URL = "http://localhost:11434/api/chat"
 
-SYSTEM_PROMPT = (
-    "You are a helpful assistant. Answer naturally and concisely. "
-)
+SYSTEM_PROMPT = "You are a helpful assistant. Answer naturally and concisely. "
 
 
 def generate_response(prompt: str) -> str:
@@ -59,17 +57,19 @@ def main():
                 output = ""
                 error = str(e)
 
-            results.append({
-                "model": MODEL_NAME,
-                "prompt_id": prompt_id,
-                "run_id": run_id,
-                "category": row["category"],
-                "source": row["source"],
-                "prompt": prompt,
-                "expected_issue": row["expected_issue"],
-                "model_output": output,
-                "error": error,
-            })
+            results.append(
+                {
+                    "model": MODEL_NAME,
+                    "prompt_id": prompt_id,
+                    "run_id": run_id,
+                    "category": row["category"],
+                    "source": row["source"],
+                    "prompt": prompt,
+                    "expected_issue": row["expected_issue"],
+                    "model_output": output,
+                    "error": error,
+                }
+            )
 
             time.sleep(1)
 
