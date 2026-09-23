@@ -48,8 +48,10 @@ not peer-reviewed, do not select academic_peer_reviewed; if it says it is not of
 select official_legal. Do not invent category names outside the schema.""",
     "evidence_memo_v1": """Answer the provided questions using ONLY retrieved documents. Keep
 answer, scope, variation and agreement concise. Return at most five substantive evidence
-statements, each with exact document IDs. Do not return a top-level citations field; the pipeline
-derives the citation union deterministically from statement citations.
+statements. Each statement must cite sources ONLY through source_refs: copy the small integer
+source_ref values supplied with the documents (for example [1] or [1, 3]). Never put document IDs,
+URLs, titles, quotations or prose in source_refs. Do not return a top-level citations field; the
+pipeline maps source_refs to exact document IDs and derives the citation union deterministically.
 With no adequate source, state the limitation, use insufficient/low, and do not invent facts.
 Use tendency for broad recurring patterns, context_sensitive_practice for norms that vary by
 setting/group/region, legal_institutional_rule ONLY for an actual binding law, policy or formal
