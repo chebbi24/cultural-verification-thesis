@@ -1,7 +1,7 @@
 """Independent Skywork reward-model Best-of-4 baseline.
 
-This file is intentionally separate from verifier.py: the reward-model score is
-never used by the proposed cultural verifier.
+This file is intentionally separate from the cultverify package: reward-model scores
+never enter the proposed cultural verifier.
 """
 
 from __future__ import annotations
