@@ -147,8 +147,12 @@ does target comparison receive the target again. Trace events record this orderi
 Every cited factual statement links to retrieved document IDs. Python resolves citations
 only from source spans that match retrieved text after conservative formatting
 normalization. A separate candidate-blind semantic gate rejects statements that exceed
-their quoted supports or do not materially answer a verification question. These checks
-reduce unsupported synthesis but remain model judgments that require empirical audit.
+their quoted supports or do not materially answer a verification question. Invalid or
+irrelevant supports are removed individually; if usable grounded statements survive, the
+memo is retained and confidence is conservatively reduced rather than automatically
+discarding the entire evidence round. If none survive, the memo becomes
+`insufficient/low`. These checks reduce unsupported synthesis but remain model judgments
+that require empirical audit.
 
 Configure `excluded_domains`, `excluded_repos` (owner/repository) and
 `excluded_paths` (URL/path globs) for the exact external benchmark sources used.
@@ -162,8 +166,10 @@ are loaded by the package.
 prompt/response hashes, rubric/template hashes and versions, timestamped semantic
 calls and retry outcomes, context, plan, targets, questions, queries, documents,
 source classifications, memo revisions, final memo links, verdicts, scores, coverage,
-errors and partial evidence on failed runs. Ranking writes one complete trace per
-candidate and reuses the exact prompt-level plan across all four.
+errors and partial evidence on failed runs. Final trace validation recomputes scoring
+coverage, overall score, abstention state, evidence coverage and final memo links so these
+summary fields cannot silently disagree with their underlying records. Ranking writes one
+complete trace per candidate and reuses the exact prompt-level plan across all four.
 
 ## Scores and limitations
 
