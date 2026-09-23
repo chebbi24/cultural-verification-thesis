@@ -12,12 +12,14 @@ from cultverify.schemas import (
     DimensionApplicability,
     DimensionPlan,
     DimensionScore,
+    Followup,
     InitialQuestions,
     MaterialTarget,
     RunTrace,
     TargetBatch,
 )
-from cultverify.scoring import aggregate, rank_results
+from cultverify.prompts import PROMPTS
+from cultverify.scoring import aggregate, compare_target, rank_results
 from cultverify.trace import digest
 from cultverify.validation import validate_context, validate_document_citation, validate_trace_links
 from conftest import FixtureLLM, FixtureRetriever, PROMPT, RESPONSE
@@ -128,6 +130,34 @@ def test_blind_boundary_and_query_inputs(setup):
     assert order.index("evidence_memo_v1") < order.index("target_comparator_v1")
 
 
+def test_source_classifier_does_not_receive_placeholder_type(setup):
+    _, llm, _, verifier = setup
+    result = verifier.verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    calls = [c for c in llm.calls if c["stage"] == "source_classifier_v1"]
+    assert calls
+    for call in calls:
+        for document in call["payload"]["documents"]:
+            assert set(document) == {"document_id", "url", "title", "text"}
+            assert "source_type" not in document
+
+
+def test_followup_reason_is_bounded_and_prompt_is_concise():
+    Followup(question=None, reason="Short reason.")
+    with pytest.raises(ValidationError):
+        Followup(question=None, reason="x" * 401)
+    assert "1-2 concise sentences" in PROMPTS["followup_v1"]
+
+
+def test_scope_and_query_prompts_prefer_general_then_authoritative():
+    question_prompt = PROMPTS["verification_question_v1"]
+    query_prompt = PROMPTS["query_rewriter_v1"]
+    assert "broadest justified" in question_prompt
+    assert "named city or region" in question_prompt
+    assert "academic or linguistic" in query_prompt
+    assert "official or institutional" in query_prompt
+
+
 def test_max_two_rounds_one_followup(setup):
     config, _, _, _ = setup
     retriever = FixtureRetriever(empty=True)
@@ -140,6 +170,8 @@ def test_max_two_rounds_one_followup(setup):
     assert len(bundle.memos) == 2 and bundle.memos[-1].sufficiency == "insufficient"
     assert sum(c["stage"] == "followup_v1" for c in llm.calls) == 1
     assert result.evidence_coverage == 0
+    assert result.verdicts[0].verdict == "insufficient"
+    assert not any(c["stage"] == "target_comparator_v1" for c in llm.calls)
 
 
 def test_citations_require_retrieved_document(setup):
@@ -371,3 +403,17 @@ def test_conflicting_final_memo_counts_as_evidence_coverage(setup):
     assert result.status == "completed"
     assert result.evidence[0].memos[-1].sufficiency == "conflicting"
     assert result.evidence_coverage == 1
+
+
+
+def test_insufficient_memo_cannot_produce_directional_verdict(setup):
+    config, _, _, _ = setup
+    retriever = FixtureRetriever(empty=True)
+    llm = FixtureLLM(
+        config,
+        overrides={"target_comparator_v1": AssertionError("Comparator must not run on insufficient evidence")},
+    )
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert result.verdicts[0].verdict == "insufficient"
+    assert result.evidence[0].memos[-1].sufficiency == "insufficient"
