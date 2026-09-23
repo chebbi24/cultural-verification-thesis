@@ -89,8 +89,9 @@ class FixtureLLM:
                 "judgments": [
                     {
                         "statement_index": statement["statement_index"],
+                        "supported_by_quotes": True,
                         "relevant": True,
-                        "reason": "The grounded statement answers the verification questions.",
+                        "reason": "The statement is supported by its quotes and answers the verification questions.",
                     }
                     for statement in payload["statements"]
                 ]
@@ -108,18 +109,34 @@ class FixtureLLM:
                 "reasoning": "The source establishes that arrangements are published",
             }
         elif stage == "dimension_scorer_v1":
-            out = {
-                "scores": [
+            verdicts = {v["target_id"]: v for v in payload["verdicts"]}
+            scores = []
+            for d in payload["dimension_plan"]["dimensions"]:
+                relevant_targets = [t for t in payload["targets"] if d["dimension_id"] in t["dimension_ids"]]
+                external = [t for t in relevant_targets if t["retrieval_appropriate"]]
+                direct = [t for t in relevant_targets if not t["retrieval_appropriate"]]
+                directional = any(
+                    verdicts.get(t["target_id"], {}).get("verdict") in {"supported", "mixed", "contradicted"}
+                    for t in external
+                )
+                all_external_insufficient = bool(external) and all(
+                    verdicts.get(t["target_id"], {}).get("verdict") == "insufficient" for t in external
+                )
+                abstain = all_external_insufficient and not direct and not directional
+                scores.append(
                     {
                         "dimension_id": d["dimension_id"],
-                        "score": 2,
-                        "rationale": "Uses the documented event arrangements",
-                        "response_quotes": [payload["response"]] if payload["response"] else [],
-                        "target_ids": [t["target_id"] for t in payload["targets"]],
+                        "score": "abstain" if abstain else 2,
+                        "rationale": (
+                            "Insufficient external evidence."
+                            if abstain
+                            else "Uses the documented event arrangements"
+                        ),
+                        "response_quotes": [] if abstain or not payload["response"] else [payload["response"]],
+                        "target_ids": [t["target_id"] for t in relevant_targets],
                     }
-                    for d in payload["dimension_plan"]["dimensions"]
-                ]
-            }
+                )
+            out = {"scores": scores}
         else:
             raise AssertionError(stage)
         return json.dumps(out)
