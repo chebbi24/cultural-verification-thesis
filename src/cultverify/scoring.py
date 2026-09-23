@@ -7,9 +7,37 @@ def _memo_evidence_view(memo):
     return {
         "memo_id": memo.memo_id,
         "sufficiency": memo.sufficiency,
-        "confidence": memo.confidence,
-        "statements": [statement.model_dump(mode="json") for statement in memo.statements],
+        "evidence_groups": [
+            {"supports": [support.model_dump(mode="json") for support in statement.supports]}
+            for statement in memo.statements
+        ],
     }
+
+
+def _target_comparison_view(target):
+    return {"target_id": target.target_id, "response_quote": target.response_quote}
+
+
+def _target_scoring_view(target):
+    return {
+        "target_id": target.target_id,
+        "response_quote": target.response_quote,
+        "dimension_ids": target.dimension_ids,
+        "epistemic_type": target.epistemic_type,
+        "retrieval_appropriate": target.retrieval_appropriate,
+    }
+
+
+def _verdict_scoring_view(verdict):
+    return {
+        "target_id": verdict.target_id,
+        "memo_id": verdict.memo_id,
+        "verdict": verdict.verdict,
+    }
+
+
+def _plan_scoring_view(plan):
+    return {"dimensions": [{"dimension_id": dimension.dimension_id} for dimension in plan.dimensions]}
 
 
 def compare_target(session, target, memo):
@@ -23,7 +51,7 @@ def compare_target(session, target, memo):
         )
     return session.call(
         "target_comparator_v1",
-        {"target": target.model_dump(mode="json"), "memo": _memo_evidence_view(memo)},
+        {"target": _target_comparison_view(target), "memo": _memo_evidence_view(memo)},
         TargetVerdict,
         lambda v: validate_verdict(v, target, memo),
     )
@@ -36,9 +64,9 @@ def score_dimensions(session, prompt, response, context, plan, targets, verdicts
             "prompt": prompt,
             "response": response,
             "context": context.model_dump(mode="json"),
-            "dimension_plan": plan.model_dump(mode="json"),
-            "targets": [t.model_dump(mode="json") for t in targets],
-            "verdicts": [v.model_dump(mode="json") for v in verdicts],
+            "dimension_plan": _plan_scoring_view(plan),
+            "targets": [_target_scoring_view(t) for t in targets],
+            "verdicts": [_verdict_scoring_view(v) for v in verdicts],
             "memos": [_memo_evidence_view(m) for m in memos],
             "rubric": rubric,
         },
