@@ -114,9 +114,18 @@ class BlindEvidenceEngine:
                 known_ids = {d.document_id for d in docs}
                 new = tuple(d for d in snapshot.documents if d.document_id not in known_ids)
                 if new:
+                    classifier_documents = [
+                        {
+                            "document_id": d.document_id,
+                            "url": d.url,
+                            "title": d.title,
+                            "text": d.text,
+                        }
+                        for d in new
+                    ]
                     classified = session.call(
                         "source_classifier_v1",
-                        {"documents": [d.model_dump(mode="json") for d in new]},
+                        {"documents": classifier_documents},
                         SourceBatch,
                         lambda b: validate_sources(b, new),
                     )
