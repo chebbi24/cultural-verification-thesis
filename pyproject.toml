@@ -25,7 +25,7 @@ cultverify = ["resources/*.csv"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "."]
 markers = ["live: explicitly opted-in live provider smoke test"]
 
 [tool.ruff]
