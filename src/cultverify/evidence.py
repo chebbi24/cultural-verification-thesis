@@ -9,6 +9,7 @@ from .schemas import (
     EvidenceBundle,
     EvidenceMemo,
     EvidenceSchedule,
+    EvidenceStatement,
     Followup,
     MemoDraft,
     QueryDraft,
@@ -24,8 +25,10 @@ from .validation import require, validate_memo_draft, validate_sources
 LLM_DOCUMENT_TEXT_LIMIT = 2000
 
 
-def _llm_document(document):
+def _llm_document(document, source_ref):
     data = document.model_dump(mode="json")
+    data.pop("document_id")
+    data["source_ref"] = source_ref
     data["text"] = document.text[:LLM_DOCUMENT_TEXT_LIMIT]
     return data
 
@@ -186,28 +189,40 @@ class BlindEvidenceEngine:
                     {
                         "questions": [q.model_dump(mode="json") for q in all_questions],
                         "context": context.model_dump(mode="json"),
-                        "documents": [_llm_document(d) for d in docs],
+                        "documents": [_llm_document(d, i) for i, d in enumerate(docs, start=1)],
                     },
                     MemoDraft,
                     lambda m: validate_memo_draft(m, docs),
                 )
-                # A cultural norm is not a legal/institutional rule unless cited evidence
-                # includes an official/legal source. Downgrade the label rather than failing.
-                documents_by_id = {d.document_id: d for d in docs}
-                normalized_statements = tuple(
-                    statement.model_copy(update={"kind": "context_sensitive_practice"})
-                    if statement.kind == "legal_institutional_rule"
-                    and not any(
-                        documents_by_id[c].source_type == SourceType.OFFICIAL
-                        for c in statement.citations
-                        if c in documents_by_id
+                # Map simple local source refs back to exact frozen document IDs.
+                mapped_statements = []
+                for statement in memo.statements:
+                    cited_docs = tuple(docs[ref - 1] for ref in dict.fromkeys(statement.source_refs))
+                    kind = statement.kind
+                    if kind == "legal_institutional_rule" and not any(
+                        document.source_type == SourceType.OFFICIAL for document in cited_docs
+                    ):
+                        kind = "context_sensitive_practice"
+                    mapped_statements.append(
+                        EvidenceStatement(
+                            text=statement.text,
+                            kind=kind,
+                            citations=tuple(document.document_id for document in cited_docs),
+                        )
                     )
-                    else statement
-                    for statement in memo.statements
+                citations = tuple(
+                    dict.fromkeys(c for statement in mapped_statements for c in statement.citations)
                 )
-                memo = memo.model_copy(update={"statements": normalized_statements})
-                citations = tuple(dict.fromkeys(c for statement in memo.statements for c in statement.citations))
-                frozen_payload = {**memo.model_dump(), "citations": citations}
+                frozen_payload = {
+                    "answer": memo.answer,
+                    "scope": memo.scope,
+                    "variation": memo.variation,
+                    "agreement": memo.agreement,
+                    "sufficiency": memo.sufficiency,
+                    "confidence": memo.confidence,
+                    "statements": tuple(mapped_statements),
+                    "citations": citations,
+                }
                 frozen = EvidenceMemo(
                     **frozen_payload,
                     memo_id=stable_id("memo", [key, len(memos), frozen_payload]),
