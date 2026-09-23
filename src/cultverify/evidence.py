@@ -19,7 +19,7 @@ from .schemas import (
     VerificationQuestion,
 )
 from .trace import digest, stable_id, write_json
-from .validation import require, validate_document_citation, validate_sources
+from .validation import require, validate_memo_draft, validate_sources
 
 LLM_DOCUMENT_TEXT_LIMIT = 2000
 
@@ -189,7 +189,7 @@ class BlindEvidenceEngine:
                         "documents": [_llm_document(d) for d in docs],
                     },
                     MemoDraft,
-                    lambda m: validate_document_citation(m, docs),
+                    lambda m: validate_memo_draft(m, docs),
                 )
                 # A cultural norm is not a legal/institutional rule unless cited evidence
                 # includes an official/legal source. Downgrade the label rather than failing.
@@ -206,9 +206,11 @@ class BlindEvidenceEngine:
                     for statement in memo.statements
                 )
                 memo = memo.model_copy(update={"statements": normalized_statements})
+                citations = tuple(dict.fromkeys(c for statement in memo.statements for c in statement.citations))
+                frozen_payload = {**memo.model_dump(), "citations": citations}
                 frozen = EvidenceMemo(
-                    **memo.model_dump(),
-                    memo_id=stable_id("memo", [key, len(memos), memo.model_dump(mode="json")]),
+                    **frozen_payload,
+                    memo_id=stable_id("memo", [key, len(memos), frozen_payload]),
                     question_ids=tuple(q.question_id for q in all_questions),
                 )
                 memos.append(frozen)
