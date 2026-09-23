@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Protocol
 from urllib.parse import unquote, urlsplit, urlunsplit
 import requests
+from pydantic import ValidationError
 from .config import PIPELINE_VERSION, Config
 from .schemas import FilteredResult, RetrievedDocument, RetrievalSnapshot, SearchQuery
 from .trace import digest, stable_id, timestamp, write_json
@@ -186,5 +187,9 @@ class SnapshotStore:
         path = self.config.cache_directory / f"{snapshot_id}.json"
         if not path.exists():
             raise RetrievalError("Missing frozen snapshot")
-        raw = json.loads(path.read_text())
-        return self._read(path, SearchQuery.model_validate(raw["query"]), snapshot_id)
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            query = SearchQuery.model_validate(raw["query"])
+        except (ValueError, KeyError, TypeError, ValidationError) as exc:
+            raise RetrievalError("Malformed frozen snapshot") from exc
+        return self._read(path, query, snapshot_id)
