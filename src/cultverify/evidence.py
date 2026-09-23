@@ -346,7 +346,13 @@ class BlindEvidenceEngine:
                     {
                         "questions": [q.model_dump(mode="json") for q in all_questions],
                         "context": context.model_dump(mode="json"),
-                        "memo": memos[-1].model_dump(mode="json"),
+                        "memo": {
+                            "sufficiency": memos[-1].sufficiency,
+                            "confidence": memos[-1].confidence,
+                            "statements": [
+                                statement.model_dump(mode="json") for statement in memos[-1].statements
+                            ],
+                        },
                     },
                     Followup,
                 )
