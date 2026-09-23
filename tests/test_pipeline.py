@@ -27,7 +27,7 @@ from cultverify.validation import (
     validate_document_citation,
     validate_trace_links,
 )
-from conftest import FixtureLLM, FixtureRetriever, PROMPT, RESPONSE, document
+from conftest import FixtureLLM, FixtureRetriever, PROMPT, RESPONSE, document as make_document
 
 
 def test_context_quote_validation():
@@ -229,7 +229,7 @@ def test_inferred_strong_provenance_is_downgraded(setup):
 
 
 def test_support_matching_normalizes_whitespace_and_typographic_quotes():
-    doc = document(
+    doc = make_document(
         text='Du is used:\n\n By equal peers, family, friends and lovers. It is someone’s choice.'
     )
     matches = matching_support_documents(
