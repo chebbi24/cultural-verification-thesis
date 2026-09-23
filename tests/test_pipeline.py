@@ -461,23 +461,45 @@ def test_irrelevant_grounded_statement_is_filtered_before_freeze(setup):
     assert not any(call["stage"] == "target_comparator_v1" for call in llm.calls)
 
 
-def test_comparator_and_scorer_receive_statement_level_evidence_only(setup):
+def test_downstream_decisions_receive_only_exact_or_structured_inputs(setup):
     _, llm, _, verifier = setup
     result = verifier.verify(PROMPT, RESPONSE)
     assert result.status == "completed"
+
+    target_call = next(call for call in llm.calls if call["stage"] == "target_extractor_v1")
+    assert "reasoning" not in target_call["payload"]["dimension_plan"]
+    assert all(set(dimension) == {"dimension_id", "role"} for dimension in target_call["payload"]["dimension_plan"]["dimensions"])
+
+    question_call = next(call for call in llm.calls if call["stage"] == "verification_question_v1")
+    assert set(question_call["payload"]["target"]) == {"response_quote", "epistemic_type", "dimension_ids"}
+    assert not {"target_id", "proposition", "materiality"}.intersection(question_call["payload"]["target"])
+
     comparator_call = next(call for call in llm.calls if call["stage"] == "target_comparator_v1")
-    assert set(comparator_call["payload"]["memo"]) == {
-        "memo_id",
-        "sufficiency",
+    assert set(comparator_call["payload"]["target"]) == {"target_id", "response_quote"}
+    assert set(comparator_call["payload"]["memo"]) == {"memo_id", "sufficiency", "evidence_groups"}
+    assert not {
+        "answer",
+        "scope",
+        "variation",
+        "agreement",
         "confidence",
+        "citations",
         "statements",
-    }
-    assert not {"answer", "scope", "variation", "agreement", "citations"}.intersection(
-        comparator_call["payload"]["memo"]
-    )
-    scorer_call = next(call for call in llm.calls if call["stage"] == "dimension_scorer_v1")
+    }.intersection(comparator_call["payload"]["memo"])
     assert all(
-        set(memo) == {"memo_id", "sufficiency", "confidence", "statements"} for memo in scorer_call["payload"]["memos"]
+        set(group) == {"supports"} for group in comparator_call["payload"]["memo"]["evidence_groups"]
+    )
+
+    scorer_call = next(call for call in llm.calls if call["stage"] == "dimension_scorer_v1")
+    assert all(set(dimension) == {"dimension_id"} for dimension in scorer_call["payload"]["dimension_plan"]["dimensions"])
+    assert all(
+        set(target)
+        == {"target_id", "response_quote", "dimension_ids", "epistemic_type", "retrieval_appropriate"}
+        for target in scorer_call["payload"]["targets"]
+    )
+    assert all(set(verdict) == {"target_id", "memo_id", "verdict"} for verdict in scorer_call["payload"]["verdicts"])
+    assert all(
+        set(memo) == {"memo_id", "sufficiency", "evidence_groups"} for memo in scorer_call["payload"]["memos"]
     )
 
 
@@ -588,10 +610,18 @@ def test_followup_receives_only_grounded_statement_level_memo(setup):
     result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
     assert result.status == "completed"
     followup_call = next(call for call in llm.calls if call["stage"] == "followup_v1")
-    assert set(followup_call["payload"]["memo"]) == {"sufficiency", "confidence", "statements"}
-    assert not {"answer", "scope", "variation", "agreement", "citations", "memo_id"}.intersection(
-        followup_call["payload"]["memo"]
-    )
+    assert set(followup_call["payload"]["memo"]) == {"sufficiency", "evidence_groups"}
+    assert not {
+        "answer",
+        "scope",
+        "variation",
+        "agreement",
+        "confidence",
+        "citations",
+        "memo_id",
+        "statements",
+    }.intersection(followup_call["payload"]["memo"])
+    assert all(set(group) == {"supports"} for group in followup_call["payload"]["memo"]["evidence_groups"])
 
 
 def test_duplicate_followup_is_skipped(setup):
@@ -637,7 +667,8 @@ def test_scope_and_query_prompts_prefer_general_then_authoritative():
     assert "ONLY for an actual binding law" in PROMPTS["evidence_memo_v1"]
     assert "supported_by_quotes" in PROMPTS["evidence_relevance_v1"]
     assert "materially" in PROMPTS["evidence_relevance_v1"]
-    assert "supplied frozen statement-level" in PROMPTS["target_comparator_v1"]
+    assert "supplied frozen" in PROMPTS["target_comparator_v1"]
+    assert "support quotes" in PROMPTS["target_comparator_v1"]
     assert "genuinely unscorable only" in PROMPTS["dimension_scorer_v1"]
     assert "relevant retrievable target is insufficient" in PROMPTS["dimension_scorer_v1"]
     assert "Do not return memo IDs" in PROMPTS["dimension_scorer_v1"]
