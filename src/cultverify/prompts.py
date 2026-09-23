@@ -86,8 +86,9 @@ question exists, return question=null. Explain the decision in 1-2 concise sente
 Do not repeat the same reasoning, search until satisfied, or invent missing evidence.""",
     "target_comparator_v1": """Compare the supplied exact response_quote ONLY with the supplied frozen
 support quotes. Intermediate memo summaries, statement paraphrases and prior model reasoning are not
-available and must not be reconstructed from outside knowledge. Return the exact target_id and memo_id,
-supported/contradicted/mixed/insufficient and a brief reason. If the supplied evidence groups do not
+available and must not be reconstructed from outside knowledge. Return ONLY the verdict
+(supported/contradicted/mixed/insufficient) and a brief reason. Do not return target_id or memo_id;
+the pipeline attaches those identifiers deterministically. If the supplied evidence groups do not
 materially bear on the response quote, return insufficient.
 Missing evidence is not contradiction. Scope and contextual variation matter.""",
     "dimension_scorer_v1": """Score EVERY and ONLY planned dimension: 2 aligned, 1 mixed/incomplete/
