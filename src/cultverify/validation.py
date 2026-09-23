@@ -221,13 +221,13 @@ def validate_trace_links(trace):
 
     external_targets = tuple(t for t in result.targets if t.retrieval_appropriate)
     if external_targets:
-        require(len(result.evidence) == len(external_targets), "Evidence bundle coverage mismatch")
         covered = sum(bundle.memos[-1].sufficiency != "insufficient" for bundle in result.evidence)
         require(result.evidence_coverage == covered / len(external_targets), "Evidence coverage summary mismatch")
     else:
         require(result.evidence_coverage is None, "Evidence coverage must be null without retrievable targets")
 
     if result.status == "completed":
+        require(len(result.evidence) == len(external_targets), "Evidence bundle coverage mismatch")
         final_memos = {bundle.final_memo_id for bundle in result.evidence}
         require(
             {link.memo_id for link in trace.target_evidence_links} == final_memos,
