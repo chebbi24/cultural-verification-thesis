@@ -220,12 +220,19 @@ class TargetVerdict(Record):
     reasoning: Text
 
 
-class DimensionScore(Record):
+class DimensionScoreDraft(Record):
     dimension_id: DimensionID
     score: Annotated[int, Field(strict=True, ge=0, le=2)] | Literal["abstain"]
     rationale: Text
     response_quotes: tuple[Text, ...]
     target_ids: tuple[Text, ...]
+
+
+class ScoreDraftBatch(Record):
+    scores: tuple[DimensionScoreDraft, ...]
+
+
+class DimensionScore(DimensionScoreDraft):
     memo_ids: tuple[Text, ...]
 
 
