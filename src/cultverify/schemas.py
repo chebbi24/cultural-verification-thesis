@@ -169,6 +169,16 @@ class EvidenceStatement(Record):
     supports: tuple[EvidenceSupport, ...] = ()
 
 
+class StatementRelevance(Record):
+    statement_index: Annotated[int, Field(strict=True, ge=0, le=4)]
+    relevant: Annotated[bool, Field(strict=True)]
+    reason: Text
+
+
+class StatementRelevanceBatch(Record):
+    judgments: tuple[StatementRelevance, ...] = Field(max_length=5)
+
+
 class MemoDraft(Record):
     answer: Text
     scope: Text
