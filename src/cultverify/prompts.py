@@ -76,17 +76,19 @@ sharing the broad topic, country, setting, or a generic cultural theme is not en
 unsupported synthesis, unrelated side facts and retrieval noise false as appropriate. Do not use the
 candidate response, target proposition, memo answer/scope/agreement, prior calls or outside knowledge.
 Be conservative under uncertainty.""",
-    "followup_v1": """Given questions, explicit context and a frozen statement-level memo with
+    "followup_v1": """Given questions, explicit context and frozen exact support quotes with
 conflicting or insufficient evidence, identify the single most important unresolved evidence gap.
-Use only the supplied grounded statements; absent free-form memo summaries are not evidence. If that gap is reasonably searchable,
+Use only the supplied evidence_groups; absent free-form memo summaries and statement paraphrases are
+not evidence. If that gap is reasonably searchable,
 produce exactly ONE neutral, gap-specific question with kind=followup; it must add a distinct
 searchable gap and must not repeat or paraphrase an existing question. If no distinct useful
 question exists, return question=null. Explain the decision in 1-2 concise sentences only.
 Do not repeat the same reasoning, search until satisfied, or invent missing evidence.""",
-    "target_comparator_v1": """Compare the supplied target ONLY with the supplied frozen statement-level
-evidence. Do not infer facts from absent memo fields, prior calls, retrieval documents, or outside
-knowledge. Return its exact target_id and memo_id, supported/contradicted/mixed/insufficient and a
-brief reason. If the supplied statements do not materially bear on the target, return insufficient.
+    "target_comparator_v1": """Compare the supplied exact response_quote ONLY with the supplied frozen
+support quotes. Intermediate memo summaries, statement paraphrases and prior model reasoning are not
+available and must not be reconstructed from outside knowledge. Return the exact target_id and memo_id,
+supported/contradicted/mixed/insufficient and a brief reason. If the supplied evidence groups do not
+materially bear on the response quote, return insufficient.
 Missing evidence is not contradiction. Scope and contextual variation matter.""",
     "dimension_scorer_v1": """Score EVERY and ONLY planned dimension: 2 aligned, 1 mixed/incomplete/
 limited, 0 materially misaligned. abstain means genuinely unscorable only: use it only when the
@@ -94,8 +96,10 @@ available evidence and direct response content do not permit a cultural assessme
 specificity, partial coverage, or an incomplete but assessable response is score 1, NOT abstain.
 If any relevant target has a supported, mixed, or contradicted verdict, choose 0, 1, or 2. If every
 relevant retrievable target is insufficient and there is no relevant non-retrieval target that can be
-assessed directly from the response, abstain for that dimension. Use the rubric,
-response, explicit context and frozen evidence. No numeric confidence. Cite relevant exact
+assessed directly from the response, abstain for that dimension. Use only the rubric, full prompt,
+response, explicit context, exact target response quotes, structured verdict labels and frozen exact
+support quotes supplied in evidence_groups. Intermediate target propositions, planner rationales,
+memo summaries, statement paraphrases and comparator reasoning are intentionally unavailable. No numeric confidence. Cite relevant exact
 response quotes and target IDs; only provided target references are allowed. Do not return memo IDs;
 the pipeline derives memo links deterministically from the selected target IDs. For an empty
 response quotes may be empty. Internal qualities can be assessed directly; external claims
