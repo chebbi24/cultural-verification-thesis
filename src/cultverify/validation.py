@@ -49,7 +49,7 @@ _SUPPORT_TRANSLATION = str.maketrans(
 
 def normalize_support_text(text):
     normalized = unicodedata.normalize("NFKC", text).translate(_SUPPORT_TRANSLATION)
-    return re.sub(r"\\s+", " ", normalized).strip()
+    return re.sub(r"\s+", " ", normalized).strip()
 
 
 def matching_support_documents(quote, documents):
