@@ -32,6 +32,7 @@ def test_ollama_stateless_structured_contract():
         )
     body = post.call_args.kwargs["json"]
     assert body["format"] == QueryDraft.model_json_schema()
+    assert body["think"] is False
     assert body["options"]["temperature"] == 0 and body["stream"] is False
     assert len(body["messages"]) == 2 and "first" not in json.dumps(body)
     assert post.call_args.kwargs["timeout"] == config.llm_timeout
