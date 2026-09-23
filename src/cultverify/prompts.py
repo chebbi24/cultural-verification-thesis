@@ -41,17 +41,22 @@ community_insider = community/forum/first-person lived-practice evidence;
 general_explanatory = educational or explanatory material without stronger provenance;
 commercial_lifestyle = commercial/lifestyle guidance;
 unknown = provenance is genuinely unclear.
-Use URL, title and content as provenance evidence. A blog, language-learning site, tutoring site,
-company page or hosting platform is not official_legal or academic_peer_reviewed merely because it
-sounds authoritative. The selected enum MUST agree with the reason. If the reason says a source is
-not peer-reviewed, do not select academic_peer_reviewed; if it says it is not official/legal, do not
-select official_legal. Do not invent category names outside the schema.""",
+Use URL, title and content as provenance evidence and return provenance_basis for every source:
+explicit = the supplied document itself clearly establishes the claimed provenance;
+inferred = provenance is only inferred from names, domain, style or context;
+unclear = provenance cannot be established.
+official_legal and academic_peer_reviewed REQUIRE provenance_basis=explicit. A blog,
+language-learning site, tutoring site, company page or hosting platform is not official_legal or
+academic_peer_reviewed merely because it sounds authoritative. The selected enum MUST agree with
+the reason and provenance_basis. Do not invent category names outside the schema.""",
     "evidence_memo_v1": """Answer the provided questions using ONLY retrieved documents. Keep
 answer, scope, variation and agreement concise. Return at most five substantive evidence
-statements. Each statement must cite sources ONLY through source_refs: copy the small integer
-source_ref values supplied with the documents (for example [1] or [1, 3]). Never put document IDs,
-URLs, titles, quotations or prose in source_refs. Do not return a top-level citations field; the
-pipeline maps source_refs to exact document IDs and derives the citation union deterministically.
+statements. Each statement must contain supports. Every support has exactly:
+source_ref = the small integer source_ref supplied with a document; and
+quote = a short VERBATIM span copied from that same document (maximum 300 characters).
+Never paraphrase a support quote and never attach a quote to a different source_ref. Do not return
+document IDs or a top-level citations field; the pipeline verifies each quote against its referenced
+document, maps source_refs to exact document IDs and derives the citation union deterministically.
 With no adequate source, state the limitation, use insufficient/low, and do not invent facts.
 Use tendency for broad recurring patterns, context_sensitive_practice for norms that vary by
 setting/group/region, legal_institutional_rule ONLY for an actual binding law, policy or formal
@@ -71,7 +76,10 @@ Do not repeat the same reasoning, search until satisfied, or invent missing evid
 Return its exact target_id and memo_id, supported/contradicted/mixed/insufficient and a brief
 reason. Missing evidence is not contradiction. Scope and contextual variation matter.""",
     "dimension_scorer_v1": """Score EVERY and ONLY planned dimension: 2 aligned, 1 mixed/incomplete/
-limited, 0 materially misaligned, abstain when there is insufficient basis. Use the rubric,
+limited, 0 materially misaligned. abstain means genuinely unscorable only: use it only when the
+available evidence and direct response content do not permit a cultural assessment. Missing
+specificity, partial coverage, or an incomplete but assessable response is score 1, NOT abstain.
+If any relevant target has a supported, mixed, or contradicted verdict, choose 0, 1, or 2. Use the rubric,
 response, explicit context and frozen evidence. No numeric confidence. Cite relevant exact
 response quotes, target IDs and memo IDs; only provided references are allowed. For an empty
 response quotes may be empty. Internal qualities can be assessed directly; external claims
