@@ -15,9 +15,7 @@ from cultverify.schemas import (
     Followup,
     InitialQuestions,
     MaterialTarget,
-    MemoDraft,
     RunTrace,
-    SourceBatch,
     TargetBatch,
 )
 from cultverify.prompts import PROMPTS
@@ -26,10 +24,9 @@ from cultverify.trace import digest
 from cultverify.validation import (
     validate_context,
     validate_document_citation,
-    validate_sources,
     validate_trace_links,
 )
-from conftest import FixtureLLM, FixtureRetriever, PROMPT, RESPONSE, document
+from conftest import FixtureLLM, FixtureRetriever, PROMPT, RESPONSE
 
 
 def test_context_quote_validation():
@@ -151,53 +148,65 @@ def test_source_classifier_does_not_receive_placeholder_type(setup):
 
 
 
-def test_source_classification_reason_must_match_enum():
-    doc = document()
-    academic = SourceBatch(
-        sources=(
-            {
-                "document_id": doc.document_id,
-                "source_type": "academic_peer_reviewed",
-                "reason": "This tutoring page is not peer-reviewed.",
-            },
-        )
-    )
-    with pytest.raises(ValueError, match="academic_peer_reviewed"):
-        validate_sources(academic, (doc,))
-
-    official = SourceBatch(
-        sources=(
-            {
-                "document_id": doc.document_id,
-                "source_type": "official_legal",
-                "reason": "This is a language-learning blog, not an official legal source.",
-            },
-        )
-    )
-    with pytest.raises(ValueError, match="official_legal"):
-        validate_sources(official, (doc,))
+def test_classifier_failure_falls_back_to_unknown(setup):
+    config, _, retriever, _ = setup
+    llm = FixtureLLM(config, overrides={"source_classifier_v1": {"sources": []}})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert result.evidence[0].source_classifications
+    assert all(s.source_type == "unknown" for s in result.evidence[0].source_classifications)
 
 
-def test_legal_statement_requires_official_or_institutional_provenance():
-    doc = document().model_copy(update={"source_type": "general_explanatory"})
-    memo = MemoDraft(
-        answer="A documented practice.",
-        scope="x",
-        variation="x",
-        agreement="x",
-        sufficiency="sufficient",
-        confidence="medium",
-        statements=(
-            {
-                "text": "A documented practice.",
-                "kind": "legal_institutional_rule",
-                "citations": (doc.document_id,),
-            },
-        ),
-        citations=(doc.document_id,),
+def test_unsupported_legal_label_is_downgraded(setup):
+    config, _, retriever, _ = setup
+
+    def legal_memo(payload):
+        ids = [d["document_id"] for d in payload["documents"]]
+        return {
+            "answer": "Documented cultural guidance.",
+            "scope": "x",
+            "variation": "x",
+            "agreement": "x",
+            "sufficiency": "sufficient",
+            "confidence": "medium",
+            "statements": [
+                {
+                    "text": "Documented cultural guidance.",
+                    "kind": "legal_institutional_rule",
+                    "citations": ids,
+                }
+            ],
+            "citations": ids,
+        }
+
+    llm = FixtureLLM(config, overrides={"evidence_memo_v1": legal_memo})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert all(
+        statement.kind == "context_sensitive_practice"
+        for statement in result.evidence[0].memos[-1].statements
     )
-    with pytest.raises(ValueError, match="official or institutional"):
-        validate_document_citation(memo, (doc,))
+
+
+def test_duplicate_followup_is_skipped(setup):
+    config, _, _, _ = setup
+    retriever = FixtureRetriever(empty=True)
+
+    def duplicate(payload):
+        return {
+            "question": {
+                "kind": "followup",
+                "text": payload["questions"][0]["text"],
+            },
+            "reason": "No distinct searchable gap beyond the existing baseline question.",
+        }
+
+    llm = FixtureLLM(config, overrides={"followup_v1": duplicate})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert len(result.evidence[0].questions) == 2
+    assert len(retriever.calls) == 2
+    assert len(result.evidence[0].memos) == 1
 
 
 def test_followup_reason_is_bounded_and_prompt_is_concise():
@@ -205,6 +214,7 @@ def test_followup_reason_is_bounded_and_prompt_is_concise():
     with pytest.raises(ValidationError):
         Followup(question=None, reason="x" * 401)
     assert "1-2 concise sentences" in PROMPTS["followup_v1"]
+    assert "must not repeat or paraphrase" in PROMPTS["followup_v1"]
 
 
 def test_scope_and_query_prompts_prefer_general_then_authoritative():
