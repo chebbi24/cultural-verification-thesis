@@ -229,9 +229,7 @@ def test_inferred_strong_provenance_is_downgraded(setup):
 
 
 def test_support_matching_normalizes_whitespace_and_typographic_quotes():
-    doc = make_document(
-        text='Du is used:\n\n By equal peers, family, friends and lovers. It is someone’s choice.'
-    )
+    doc = make_document(text="Du is used:\n\n By equal peers, family, friends and lovers. It is someone’s choice.")
     matches = matching_support_documents(
         "Du is used: By equal peers, family, friends and lovers. It is someone's choice.",
         (doc,),
