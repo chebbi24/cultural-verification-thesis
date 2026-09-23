@@ -50,7 +50,9 @@ def score_dimensions(session, prompt, response, context, plan, targets, verdicts
         DimensionScore(
             **score.model_dump(mode="json"),
             memo_ids=tuple(
-                dict.fromkeys(memo_by_target[target_id] for target_id in score.target_ids if target_id in memo_by_target)
+                dict.fromkeys(
+                    memo_by_target[target_id] for target_id in score.target_ids if target_id in memo_by_target
+                )
             ),
         )
         for score in result.scores
