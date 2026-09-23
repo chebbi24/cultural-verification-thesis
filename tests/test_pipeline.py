@@ -173,7 +173,9 @@ def test_llm_evidence_payload_truncates_text_but_keeps_full_snapshot(setup):
         if call["stage"] in {"source_classifier_v1", "evidence_memo_v1"}:
             assert all(len(d["text"]) <= LLM_DOCUMENT_TEXT_LIMIT for d in call["payload"]["documents"])
         if call["stage"] == "evidence_memo_v1":
-            assert all("source_ref" in d and "document_id" not in d for d in call["payload"]["documents"])
+            assert all(
+                "source_ref" not in d and "document_id" not in d for d in call["payload"]["documents"]
+            )
 
 
 def test_classifier_failure_falls_back_to_unknown(setup):
@@ -257,6 +259,32 @@ def test_contradictory_strong_source_reason_is_downgraded(setup):
     assert all(s.provenance_basis == "unclear" for s in result.evidence[0].source_classifications)
 
 
+def test_self_contradictory_institutional_label_is_downgraded(setup):
+    config, _, retriever, _ = setup
+
+    def contradictory_institutional(payload):
+        return {
+            "sources": [
+                {
+                    "document_id": d["document_id"],
+                    "source_type": "institutional_professional",
+                    "provenance_basis": "explicit",
+                    "reason": (
+                        "This is a commercial tutoring platform, not a recognized institution or professional body. "
+                        "The source type should be commercial_lifestyle."
+                    ),
+                }
+                for d in payload["documents"]
+            ]
+        }
+
+    llm = FixtureLLM(config, overrides={"source_classifier_v1": contradictory_institutional})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert all(s.source_type == "unknown" for s in result.evidence[0].source_classifications)
+    assert all(s.provenance_basis == "unclear" for s in result.evidence[0].source_classifications)
+
+
 def test_support_matching_normalizes_whitespace_case_and_typographic_quotes():
     doc = make_document(text="Du is used:\n\n By equal peers, family, friends and lovers. It is someone’s choice.")
     matches = matching_support_documents(
@@ -295,6 +323,89 @@ def test_ungrounded_support_is_dropped_and_memo_downgraded(setup):
     assert result.verdicts[0].verdict == "insufficient"
 
 
+def test_partial_grounding_loss_preserves_sufficient_evidence_with_lower_confidence(setup):
+    config, _, retriever, _ = setup
+
+    def partial_memo(payload):
+        valid_quote = payload["documents"][0]["text"][:300]
+        return {
+            "answer": "One grounded statement survives.",
+            "scope": "x",
+            "variation": "x",
+            "agreement": "x",
+            "sufficiency": "sufficient",
+            "confidence": "high",
+            "statements": [
+                {
+                    "text": "The organiser publishes arrangements.",
+                    "kind": "context_sensitive_practice",
+                    "supports": [{"quote": valid_quote}],
+                },
+                {
+                    "text": "Unsupported extra claim.",
+                    "kind": "context_sensitive_practice",
+                    "supports": [{"quote": "not present in any supplied document"}],
+                },
+            ],
+        }
+
+    llm = FixtureLLM(config, overrides={"evidence_memo_v1": partial_memo})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    memo = result.evidence[0].memos[-1]
+    assert result.status == "completed"
+    assert memo.sufficiency == "sufficient"
+    assert memo.confidence == "medium"
+    assert len(memo.statements) == 1
+    assert result.evidence_coverage == 1
+    assert result.verdicts[0].verdict == "supported"
+
+
+def test_grounded_but_unsupported_synthesis_is_filtered(setup):
+    config, _, retriever, _ = setup
+
+    def overclaim_memo(payload):
+        return {
+            "answer": "Overclaim",
+            "scope": "x",
+            "variation": "x",
+            "agreement": "x",
+            "sufficiency": "sufficient",
+            "confidence": "high",
+            "statements": [
+                {
+                    "text": "The organiser requires every visitor to do something universal.",
+                    "kind": "universal_claim",
+                    "supports": [{"quote": payload["documents"][0]["text"][:300]}],
+                }
+            ],
+        }
+
+    def support_gate(payload):
+        return {
+            "judgments": [
+                {
+                    "statement_index": statement["statement_index"],
+                    "supported_by_quotes": False,
+                    "relevant": True,
+                    "reason": "The claim materially exceeds the quoted evidence.",
+                }
+                for statement in payload["statements"]
+            ]
+        }
+
+    llm = FixtureLLM(
+        config,
+        overrides={"evidence_memo_v1": overclaim_memo, "evidence_relevance_v1": support_gate},
+    )
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    memo = result.evidence[0].memos[-1]
+    assert result.status == "completed"
+    assert memo.statements == ()
+    assert memo.sufficiency == "insufficient"
+    assert memo.confidence == "low"
+    assert result.verdicts[0].verdict == "insufficient"
+
+
 def test_irrelevant_grounded_statement_is_filtered_before_freeze(setup):
     config, _, retriever, _ = setup
 
@@ -320,8 +431,9 @@ def test_irrelevant_grounded_statement_is_filtered_before_freeze(setup):
             "judgments": [
                 {
                     "statement_index": statement["statement_index"],
+                    "supported_by_quotes": True,
                     "relevant": False,
-                    "reason": "The statement does not answer either verification question.",
+                    "reason": "The statement is grounded but does not answer either verification question.",
                 }
                 for statement in payload["statements"]
             ]
@@ -391,6 +503,38 @@ def test_directional_verdict_forces_numeric_score_retry(setup):
     assert all(score.score == 1 for score in result.dimension_scores)
 
 
+def test_all_external_insufficient_requires_dimension_abstention(setup):
+    config, _, _, _ = setup
+    retriever = FixtureRetriever(empty=True)
+    attempts = {"n": 0}
+
+    def scorer(payload):
+        attempts["n"] += 1
+        value = 2 if attempts["n"] == 1 else "abstain"
+        return {
+            "scores": [
+                {
+                    "dimension_id": d["dimension_id"],
+                    "score": value,
+                    "rationale": "Evidence unavailable.",
+                    "response_quotes": [payload["response"]] if value != "abstain" else [],
+                    "target_ids": [
+                        t["target_id"] for t in payload["targets"] if d["dimension_id"] in t["dimension_ids"]
+                    ],
+                }
+                for d in payload["dimension_plan"]["dimensions"]
+            ]
+        }
+
+    llm = FixtureLLM(config, overrides={"dimension_scorer_v1": scorer})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert attempts["n"] == 2
+    assert all(score.score == "abstain" for score in result.dimension_scores)
+    assert result.overall_score is None
+    assert result.candidate_abstained
+
+
 def test_duplicate_followup_is_skipped(setup):
     config, _, _, _ = setup
     retriever = FixtureRetriever(empty=True)
@@ -432,9 +576,11 @@ def test_scope_and_query_prompts_prefer_general_then_authoritative():
     assert "VERBATIM span" in PROMPTS["evidence_memo_v1"]
     assert "Do not return source_ref" in PROMPTS["evidence_memo_v1"]
     assert "ONLY for an actual binding law" in PROMPTS["evidence_memo_v1"]
+    assert "supported_by_quotes" in PROMPTS["evidence_relevance_v1"]
     assert "materially" in PROMPTS["evidence_relevance_v1"]
     assert "supplied frozen statement-level" in PROMPTS["target_comparator_v1"]
     assert "genuinely unscorable only" in PROMPTS["dimension_scorer_v1"]
+    assert "every relevant retrievable target is insufficient" in PROMPTS["dimension_scorer_v1"]
     assert "Do not return memo IDs" in PROMPTS["dimension_scorer_v1"]
 
 
