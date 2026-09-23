@@ -87,13 +87,15 @@ def validate_sources(batch, documents):
     require(set(found) == {d.document_id for d in documents}, "Classify each document once")
 
 
-def validate_score_drafts(batch, response, plan, targets, verdicts):
+def validate_score_drafts(batch, response, plan, targets, verdicts, ignored_dimensions=()):
     ids = [s.dimension_id for s in batch.scores]
     require(len(ids) == len(set(ids)), "Duplicate dimension score")
     require(set(ids) == {d.dimension_id for d in plan.dimensions}, "Score every planned dimension only")
     targets_by_id = {t.target_id: t for t in targets}
     verdicts_by_target = {v.target_id: v for v in verdicts}
     for score in batch.scores:
+        if score.dimension_id in ignored_dimensions:
+            continue
         for quote in score.response_quotes:
             validate_response_quote(quote, response)
         require(set(score.target_ids) <= targets_by_id.keys(), "Unknown target ID")
