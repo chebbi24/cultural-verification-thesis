@@ -831,9 +831,7 @@ def test_result_summary_invariants_are_trace_validated(setup):
     trace = RunTrace.model_validate_json(Path(result.trace_path).read_text())
 
     with pytest.raises(ValueError, match="Overall score mismatch"):
-        validate_trace_links(
-            trace.model_copy(update={"result": result.model_copy(update={"overall_score": 0.123})})
-        )
+        validate_trace_links(trace.model_copy(update={"result": result.model_copy(update={"overall_score": 0.123})}))
     with pytest.raises(ValueError, match="Evidence coverage summary mismatch"):
         validate_trace_links(
             trace.model_copy(update={"result": result.model_copy(update={"evidence_coverage": 0.123})})
