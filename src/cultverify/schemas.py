@@ -171,6 +171,7 @@ class EvidenceStatement(Record):
 
 class StatementRelevance(Record):
     statement_index: Annotated[int, Field(strict=True, ge=0, le=4)]
+    supported_by_quotes: Annotated[bool, Field(strict=True)]
     relevant: Annotated[bool, Field(strict=True)]
     reason: Text
 
