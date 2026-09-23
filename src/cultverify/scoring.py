@@ -1,6 +1,6 @@
 from fractions import Fraction
-from .schemas import DimensionScore, RankingResult, ScoreBatch, TargetVerdict
-from .validation import validate_scores, validate_verdict
+from .schemas import DimensionScore, RankingResult, ScoreBatch, ScoreDraftBatch, TargetVerdict
+from .validation import validate_score_drafts, validate_scores, validate_verdict
 
 
 def _memo_evidence_view(memo):
@@ -42,10 +42,22 @@ def score_dimensions(session, prompt, response, context, plan, targets, verdicts
             "memos": [_memo_evidence_view(m) for m in memos],
             "rubric": rubric,
         },
-        ScoreBatch,
-        lambda b: validate_scores(b, response, plan, targets, verdicts, memos),
+        ScoreDraftBatch,
+        lambda b: validate_score_drafts(b, response, plan, targets, verdicts),
     )
-    return result.scores
+    memo_by_target = {verdict.target_id: verdict.memo_id for verdict in verdicts}
+    scores = tuple(
+        DimensionScore(
+            **score.model_dump(mode="json"),
+            memo_ids=tuple(
+                dict.fromkeys(memo_by_target[target_id] for target_id in score.target_ids if target_id in memo_by_target)
+            ),
+        )
+        for score in result.scores
+    )
+    final = ScoreBatch(scores=scores)
+    validate_scores(final, response, plan, targets, verdicts, memos)
+    return final.scores
 
 
 def abstain_scores(plan, reason):
