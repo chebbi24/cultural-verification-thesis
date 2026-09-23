@@ -10,7 +10,12 @@ def extract_targets(session, prompt, response, context, plan):
             "prompt": prompt,
             "response": response,
             "context": context.model_dump(mode="json"),
-            "dimension_plan": plan.model_dump(mode="json"),
+            "dimension_plan": {
+                "dimensions": [
+                    {"dimension_id": dimension.dimension_id, "role": dimension.role}
+                    for dimension in plan.dimensions
+                ]
+            },
             "max_material_targets": session.config.max_material_targets,
         },
         TargetBatch,
@@ -26,7 +31,14 @@ def extract_targets(session, prompt, response, context, plan):
 def neutral_questions(session, target, context):
     pair = session.call(
         "verification_question_v1",
-        {"target": target.model_dump(mode="json"), "context": context.model_dump(mode="json")},
+        {
+            "target": {
+                "response_quote": target.response_quote,
+                "epistemic_type": target.epistemic_type,
+                "dimension_ids": target.dimension_ids,
+            },
+            "context": context.model_dump(mode="json"),
+        },
         InitialQuestions,
     )
     # No target ID, response, verdict, candidate position, or enclosing result is exported.
