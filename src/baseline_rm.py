@@ -80,7 +80,8 @@ def main() -> None:
     fields = ["set_id", "prompt_id", "human_chosen", "rm_winner", "rm_correct"] + [f"rm_score_{x}" for x in "abcd"]
     with args.output_csv.open("w", encoding="utf-8-sig", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fields)
-        writer.writeheader(); writer.writerows(output)
+        writer.writeheader()
+        writer.writerows(output)
 
     labelled = [row for row in output if row["human_chosen"]]
     if labelled:
