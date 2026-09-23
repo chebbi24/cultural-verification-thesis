@@ -139,6 +139,7 @@ class RetrievedDocument(Record):
 class SourceClassification(Record):
     document_id: Text
     source_type: SourceType
+    provenance_basis: Literal["explicit", "inferred", "unclear"]
     reason: Text
 
 
@@ -146,16 +147,27 @@ class SourceBatch(Record):
     sources: tuple[SourceClassification, ...]
 
 
+class EvidenceSupportDraft(Record):
+    source_ref: Annotated[int, Field(strict=True, ge=1)]
+    quote: Annotated[str, Field(min_length=1, max_length=300)]
+
+
+class EvidenceSupport(Record):
+    document_id: Text
+    quote: Annotated[str, Field(min_length=1, max_length=300)]
+
+
 class EvidenceStatementDraft(Record):
     text: Text
     kind: Literal["tendency", "context_sensitive_practice", "legal_institutional_rule", "universal_claim"]
-    source_refs: tuple[Annotated[int, Field(strict=True, ge=1)], ...] = Field(min_length=1)
+    supports: tuple[EvidenceSupportDraft, ...] = Field(min_length=1)
 
 
 class EvidenceStatement(Record):
     text: Text
     kind: Literal["tendency", "context_sensitive_practice", "legal_institutional_rule", "universal_claim"]
     citations: tuple[Text, ...] = Field(min_length=1)
+    supports: tuple[EvidenceSupport, ...] = ()
 
 
 class MemoDraft(Record):
