@@ -153,7 +153,8 @@ def test_llm_evidence_payload_truncates_text_but_keeps_full_snapshot(setup):
         def search(self, query, *, top_k, timeout):
             self.calls.append(query)
             doc = super().search(query, top_k=top_k, timeout=timeout)[0]
-            return (doc.model_copy(update={"text": "x" * (LLM_DOCUMENT_TEXT_LIMIT + 500)}),)
+            text = "x" * (LLM_DOCUMENT_TEXT_LIMIT + 500)
+            return (doc.model_copy(update={"text": text, "content_hash": digest(text)}),)
 
     retriever = LongRetriever()
     llm = FixtureLLM(config)
