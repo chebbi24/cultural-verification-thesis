@@ -654,9 +654,7 @@ def test_followup_memo_timeout_keeps_round_one_frozen_memo(setup):
 
     trace = RunTrace.model_validate_json(Path(result.trace_path).read_text())
     timeout_calls = [
-        call
-        for call in trace.calls
-        if call.stage == "evidence_memo_v1" and call.error and "ReadTimeout" in call.error
+        call for call in trace.calls if call.stage == "evidence_memo_v1" and call.error and "ReadTimeout" in call.error
     ]
     assert timeout_calls
 
