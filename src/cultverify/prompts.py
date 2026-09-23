@@ -89,7 +89,8 @@ available evidence and direct response content do not permit a cultural assessme
 specificity, partial coverage, or an incomplete but assessable response is score 1, NOT abstain.
 If any relevant target has a supported, mixed, or contradicted verdict, choose 0, 1, or 2. Use the rubric,
 response, explicit context and frozen evidence. No numeric confidence. Cite relevant exact
-response quotes, target IDs and memo IDs; only provided references are allowed. For an empty
+response quotes and target IDs; only provided target references are allowed. Do not return memo IDs;
+the pipeline derives memo links deterministically from the selected target IDs. For an empty
 response quotes may be empty. Internal qualities can be assessed directly; external claims
 without sufficient evidence require appropriate uncertainty. Distinguish common practice
 from obligations and personal preferences. Supported/contradicted is not automatically a
