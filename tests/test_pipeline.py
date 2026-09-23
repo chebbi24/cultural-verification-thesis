@@ -724,6 +724,7 @@ def test_scope_and_query_prompts_prefer_general_then_authoritative():
     assert "materially" in PROMPTS["evidence_relevance_v1"]
     assert "supplied frozen" in PROMPTS["target_comparator_v1"]
     assert "support quotes" in PROMPTS["target_comparator_v1"]
+    assert "Do not return target_id or memo_id" in PROMPTS["target_comparator_v1"]
     assert "genuinely unscorable only" in PROMPTS["dimension_scorer_v1"]
     assert "relevant retrievable target is insufficient" in PROMPTS["dimension_scorer_v1"]
     assert "Do not return memo IDs" in PROMPTS["dimension_scorer_v1"]
@@ -946,8 +947,6 @@ def test_no_python_score_override_on_contradiction(setup):
 
     def contradicted(payload):
         return {
-            "target_id": payload["target"]["target_id"],
-            "memo_id": payload["memo"]["memo_id"],
             "verdict": "contradicted",
             "reasoning": "Contradicted fixture",
         }
@@ -956,6 +955,27 @@ def test_no_python_score_override_on_contradiction(setup):
     result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
     # Deliberately inconsistent semantics: structural code must not invent a score cap.
     assert result.status == "completed" and result.overall_score == 1
+
+
+def test_target_comparator_ids_are_python_derived(setup):
+    config, _, retriever, _ = setup
+
+    def comparator(_payload):
+        return {
+            "verdict": "supported",
+            "reasoning": "The frozen evidence supports the target.",
+        }
+
+    llm = FixtureLLM(config, overrides={"target_comparator_v1": comparator})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    verdict = result.verdicts[0]
+    assert verdict.target_id == result.targets[0].target_id
+    assert verdict.memo_id == result.evidence[0].memos[-1].memo_id
+
+    comparator_call = next(call for call in llm.calls if call["stage"] == "target_comparator_v1")
+    assert "target_id" not in comparator_call["schema"]["properties"]
+    assert "memo_id" not in comparator_call["schema"]["properties"]
 
 
 def test_score_memo_links_are_derived_from_target_ids(setup):
