@@ -22,11 +22,12 @@ from cultverify.prompts import PROMPTS
 from cultverify.scoring import aggregate, rank_results
 from cultverify.trace import digest
 from cultverify.validation import (
+    matching_support_documents,
     validate_context,
     validate_document_citation,
     validate_trace_links,
 )
-from conftest import FixtureLLM, FixtureRetriever, PROMPT, RESPONSE
+from conftest import FixtureLLM, FixtureRetriever, PROMPT, RESPONSE, document
 
 
 def test_context_quote_validation():
@@ -225,6 +226,17 @@ def test_inferred_strong_provenance_is_downgraded(setup):
     result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
     assert result.status == "completed"
     assert all(s.source_type == "unknown" for s in result.evidence[0].source_classifications)
+
+
+def test_support_matching_normalizes_whitespace_and_typographic_quotes():
+    doc = document(
+        text='Du is used:\n\n By equal peers, family, friends and lovers. It is someone’s choice.'
+    )
+    matches = matching_support_documents(
+        "Du is used: By equal peers, family, friends and lovers. It is someone's choice.",
+        (doc,),
+    )
+    assert matches == (doc,)
 
 
 def test_support_quote_must_match_one_supplied_document(setup):
