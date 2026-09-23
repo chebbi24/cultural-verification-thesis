@@ -32,21 +32,32 @@ only supplied explicit context. Preserve neutrality and relevant scope; do not a
 When appropriate, phrase the query to favor authoritative evidence such as academic or linguistic
 research, official or institutional sources, and surveys. Do not force a source category when
 credible community or professional evidence is more suitable for lived cultural practice.""",
-    "source_classifier_v1": """Classify every provided document once by source type, using its URL,
-title and content as provenance evidence. Determine the type independently from those fields.
-Do not infer peer review merely from formal language or from a hosting platform alone; use unknown
-when the source's provenance genuinely cannot establish a type. Classification is not a numerical
-quality score.""",
-    "evidence_memo_v1": """Answer the provided questions using ONLY retrieved documents. Include
-scope, variation and agreement/disagreement. Every factual statement in any memo field must
-be represented in statements with supporting document citations. Citations must be exact
-provided IDs; overall citations equal the union of statement citations. With no adequate
-source, state the limitation, use insufficient/low, and do not invent substantive facts.
-Distinguish tendency, context-sensitive practice, legal/institutional rule and universal claim.
-Do not turn often into always. Assess source suitability for the question: official primary
-sources for binding rules; empirical/linguistic work for language; empirical and credible
-community evidence for lived practice. A lone weak commercial source cannot establish a
-high-confidence cultural norm. Report unresolved disagreements, not artificial consensus.""",
+    "source_classifier_v1": """Classify every provided document once using ONLY these source types:
+official_legal = primary government/legal/public-authority material;
+academic_peer_reviewed = provenance explicitly supports a peer-reviewed scholarly publication;
+statistical_survey = survey/statistical evidence;
+institutional_professional = guidance or evidence from a recognized institution/professional body;
+community_insider = community/forum/first-person lived-practice evidence;
+general_explanatory = educational or explanatory material without stronger provenance;
+commercial_lifestyle = commercial/lifestyle guidance;
+unknown = provenance is genuinely unclear.
+Use URL, title and content as provenance evidence. A blog, language-learning site, tutoring site,
+company page or hosting platform is not official_legal or academic_peer_reviewed merely because it
+sounds authoritative. The selected enum MUST agree with the reason. If the reason says a source is
+not peer-reviewed, do not select academic_peer_reviewed; if it says it is not official/legal, do not
+select official_legal. Do not invent category names outside the schema.""",
+    "evidence_memo_v1": """Answer the provided questions using ONLY retrieved documents. Keep
+answer, scope, variation and agreement concise. Put substantive evidence claims in statements
+with exact document IDs; overall citations must equal the union of statement citations.
+With no adequate source, state the limitation, use insufficient/low, and do not invent facts.
+Use tendency for broad recurring patterns, context_sensitive_practice for norms that vary by
+setting/group/region, legal_institutional_rule ONLY for an actual binding law, policy or formal
+institutional rule, and universal_claim only when the evidence truly supports universality.
+Etiquette, language habits and common cultural practices are NOT legal/institutional rules merely
+because a source presents them as rules. Do not turn often into always. Assess source suitability:
+official primary sources for binding rules; empirical/linguistic work for language; empirical and
+credible community evidence for lived practice. Weak explanatory/commercial sources alone should
+not produce high-confidence claims. Report unresolved disagreement rather than artificial consensus.""",
     "followup_v1": """Given questions, context and a memo with conflicting or insufficient evidence,
 identify the single most important unresolved evidence gap. If that gap is reasonably searchable,
 produce exactly ONE neutral, gap-specific question with kind=followup; if further search is not
