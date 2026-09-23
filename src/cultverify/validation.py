@@ -121,6 +121,17 @@ def validate_score_drafts(batch, response, plan, targets, verdicts):
                 score.score == "abstain",
                 "All relevant retrievable targets are insufficient; this dimension must abstain",
             )
+        assessable_target_ids = {
+            t.target_id
+            for t in direct_targets
+        } | {
+            v.target_id for v in relevant_verdicts if v.verdict in {"supported", "mixed", "contradicted"}
+        }
+        if score.score != "abstain" and assessable_target_ids:
+            require(
+                bool(set(score.target_ids) & assessable_target_ids),
+                "A numeric score must reference at least one assessable target for the dimension",
+            )
         if score.score != "abstain" and response:
             require(bool(score.response_quotes), "A scored response requires a supporting quote")
 
