@@ -67,8 +67,8 @@ class TargetDraft(Record):
 
     @model_validator(mode="after")
     def retrieval_type(self):
-        if self.epistemic_type in (EpistemicType.EXTERNAL, EpistemicType.NORM) and not self.retrieval_appropriate:
-            raise ValueError("External facts and descriptive cultural norms require retrieval")
+        if self.epistemic_type in (EpistemicType.EXTERNAL, EpistemicType.NORM, EpistemicType.RECOMMENDATION) and not self.retrieval_appropriate:
+            raise ValueError("External facts, descriptive norms and context-dependent recommendations require retrieval")
         if self.retrieval_appropriate and self.epistemic_type in (EpistemicType.INTERNAL, EpistemicType.VALUE):
             raise ValueError("Internal quality/value targets must not trigger retrieval")
         if len(set(self.dimension_ids)) != len(self.dimension_ids):
