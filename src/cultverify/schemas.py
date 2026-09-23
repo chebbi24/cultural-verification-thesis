@@ -221,11 +221,14 @@ class Followup(Record):
         return self
 
 
-class TargetVerdict(Record):
-    target_id: Text
-    memo_id: Text
+class TargetVerdictDraft(Record):
     verdict: Literal["supported", "contradicted", "mixed", "insufficient"]
     reasoning: Text
+
+
+class TargetVerdict(TargetVerdictDraft):
+    target_id: Text
+    memo_id: Text
 
 
 class DimensionScoreDraft(Record):
