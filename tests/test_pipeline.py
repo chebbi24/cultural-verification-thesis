@@ -719,6 +719,16 @@ def test_rank_shared_planning_and_exact_tie(setup):
     assert all(c.dimension_plan is result.candidates[0].dimension_plan for c in result.candidates)
 
 
+def test_ranking_with_failed_candidate_returns_no_clear_winner(setup):
+    _, _, _, verifier = setup
+    candidate = verifier.verify(PROMPT, RESPONSE)
+    failed = candidate.model_copy(update={"status": "failed", "errors": ("fixture",)})
+    ranking = rank_results([candidate, candidate, failed, candidate])
+    assert ranking.winner == "no_clear_winner"
+    assert ranking.tied_indices == ()
+    assert ranking.coverage_comparable is False
+
+
 def test_ranking_all_abstain_and_unique_winner(setup):
     _, _, _, verifier = setup
     candidate = verifier.verify(PROMPT, RESPONSE)
