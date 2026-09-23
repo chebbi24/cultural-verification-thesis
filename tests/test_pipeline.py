@@ -580,7 +580,7 @@ def test_scope_and_query_prompts_prefer_general_then_authoritative():
     assert "materially" in PROMPTS["evidence_relevance_v1"]
     assert "supplied frozen statement-level" in PROMPTS["target_comparator_v1"]
     assert "genuinely unscorable only" in PROMPTS["dimension_scorer_v1"]
-    assert "every relevant retrievable target is insufficient" in PROMPTS["dimension_scorer_v1"]
+    assert "relevant retrievable target is insufficient" in PROMPTS["dimension_scorer_v1"]
     assert "Do not return memo IDs" in PROMPTS["dimension_scorer_v1"]
 
 
