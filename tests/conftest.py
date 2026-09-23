@@ -65,22 +65,22 @@ class FixtureLLM:
                 ]
             }
         elif stage == "evidence_memo_v1":
-            ids = [d["document_id"] for d in payload["documents"]]
+            refs = [d["source_ref"] for d in payload["documents"]]
             out = {
-                "answer": "The organiser publishes arrangements." if ids else "No retrieved evidence.",
+                "answer": "The organiser publishes arrangements." if refs else "No retrieved evidence.",
                 "scope": "The documented event",
                 "variation": "Other events may differ.",
                 "agreement": "Limited evidence",
-                "sufficiency": "sufficient" if ids else "insufficient",
-                "confidence": "medium" if ids else "low",
+                "sufficiency": "sufficient" if refs else "insufficient",
+                "confidence": "medium" if refs else "low",
                 "statements": [
                     {
                         "text": "The organiser publishes arrangements.",
                         "kind": "context_sensitive_practice",
-                        "citations": ids,
+                        "source_refs": refs,
                     }
                 ]
-                if ids
+                if refs
                 else [],
             }
         elif stage == "followup_v1":
