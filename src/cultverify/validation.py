@@ -35,10 +35,18 @@ def validate_targets(batch, response, plan, limit):
 
 def validate_memo_draft(memo, documents):
     valid_refs = set(range(1, len(documents) + 1))
-    statement_refs = {ref for statement in memo.statements for ref in statement.source_refs}
-    require(statement_refs <= valid_refs, "source_refs must reference supplied documents")
+    statement_refs = {support.source_ref for statement in memo.statements for support in statement.supports}
+    require(statement_refs <= valid_refs, "support source_refs must reference supplied documents")
+    for statement in memo.statements:
+        refs = [support.source_ref for support in statement.supports]
+        require(len(refs) == len(set(refs)), "A statement may cite each source_ref only once")
+        for support in statement.supports:
+            require(
+                support.quote in documents[support.source_ref - 1].text,
+                "Support quote must occur verbatim in the referenced document",
+            )
     if memo.sufficiency != "insufficient":
-        require(bool(statement_refs), "Sufficient/conflicting evidence needs source refs")
+        require(bool(statement_refs), "Sufficient/conflicting evidence needs grounded supports")
     if not documents:
         require(
             memo.sufficiency == "insufficient" and memo.confidence == "low",
@@ -66,11 +74,12 @@ def validate_sources(batch, documents):
     require(set(found) == {d.document_id for d in documents}, "Classify each document once")
 
 
-def validate_scores(batch, response, plan, targets, memos):
+def validate_scores(batch, response, plan, targets, verdicts, memos):
     ids = [s.dimension_id for s in batch.scores]
     require(len(ids) == len(set(ids)), "Duplicate dimension score")
     require(set(ids) == {d.dimension_id for d in plan.dimensions}, "Score every planned dimension only")
     targets_by_id = {t.target_id: t for t in targets}
+    verdicts_by_target = {v.target_id: v for v in verdicts}
     memo_ids = {m.memo_id for m in memos}
     memo_target = {m.memo_id: t for m, t in zip(memos, (t for t in targets if t.retrieval_appropriate))}
     for score in batch.scores:
@@ -82,6 +91,16 @@ def validate_scores(batch, response, plan, targets, memos):
             require(score.dimension_id in memo_target[memo_id].dimension_ids, "Memo/dimension mismatch")
         for tid in score.target_ids:
             require(score.dimension_id in targets_by_id[tid].dimension_ids, "Target/dimension mismatch")
+        relevant_verdicts = [
+            verdicts_by_target[t.target_id]
+            for t in targets
+            if score.dimension_id in t.dimension_ids and t.target_id in verdicts_by_target
+        ]
+        if any(v.verdict in {"supported", "mixed", "contradicted"} for v in relevant_verdicts):
+            require(
+                score.score != "abstain",
+                "Directional evidence exists for this dimension; score 0, 1 or 2 instead of abstain",
+            )
         if score.score != "abstain" and response:
             require(bool(score.response_quotes), "A scored response requires a supporting quote")
 
