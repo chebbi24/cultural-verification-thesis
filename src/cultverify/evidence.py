@@ -210,9 +210,7 @@ class BlindEvidenceEngine:
                             citations=tuple(document.document_id for document in cited_docs),
                         )
                     )
-                citations = tuple(
-                    dict.fromkeys(c for statement in mapped_statements for c in statement.citations)
-                )
+                citations = tuple(dict.fromkeys(c for statement in mapped_statements for c in statement.citations))
                 frozen_payload = {
                     "answer": memo.answer,
                     "scope": memo.scope,
