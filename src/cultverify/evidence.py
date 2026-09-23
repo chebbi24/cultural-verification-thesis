@@ -350,11 +350,7 @@ class BlindEvidenceEngine:
                             "memo": {
                                 "sufficiency": memos[-1].sufficiency,
                                 "evidence_groups": [
-                                    {
-                                        "supports": [
-                                            support.model_dump(mode="json") for support in statement.supports
-                                        ]
-                                    }
+                                    {"supports": [support.model_dump(mode="json") for support in statement.supports]}
                                     for statement in memos[-1].statements
                                 ],
                             },
