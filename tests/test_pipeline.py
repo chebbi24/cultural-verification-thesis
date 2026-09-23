@@ -533,6 +533,18 @@ def test_all_external_insufficient_requires_dimension_abstention(setup):
     assert result.candidate_abstained
 
 
+def test_invalid_followup_output_keeps_current_memo(setup):
+    config, _, _, _ = setup
+    retriever = FixtureRetriever(empty=True)
+    llm = FixtureLLM(config, overrides={"followup_v1": {"question": {"kind": "baseline", "text": "bad"}, "reason": "x"}})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert len(result.evidence[0].memos) == 1
+    assert result.evidence[0].memos[-1].sufficiency == "insufficient"
+    assert "Follow-up planning unavailable" in result.evidence[0].followup_reason
+    assert result.verdicts[0].verdict == "insufficient"
+
+
 def test_followup_receives_only_grounded_statement_level_memo(setup):
     config, _, _, _ = setup
     retriever = FixtureRetriever(empty=True)
