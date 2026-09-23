@@ -159,11 +159,11 @@ class MemoDraft(Record):
     agreement: Text
     sufficiency: Literal["sufficient", "conflicting", "insufficient"]
     confidence: Literal["low", "medium", "high"]
-    statements: tuple[EvidenceStatement, ...]
-    citations: tuple[Text, ...]
+    statements: tuple[EvidenceStatement, ...] = Field(max_length=5)
 
 
 class EvidenceMemo(MemoDraft):
+    citations: tuple[Text, ...]
     memo_id: Text
     question_ids: tuple[Text, ...]
 
