@@ -77,6 +77,8 @@ def validate_scores(batch, response, plan, targets, memos):
 def validate_verdict(verdict, target, memo):
     require(verdict.target_id == target.target_id, "Wrong target link")
     require(verdict.memo_id == memo.memo_id, "Wrong memo link")
+    if memo.sufficiency == "insufficient":
+        require(verdict.verdict == "insufficient", "Insufficient evidence requires an insufficient verdict")
 
 
 def validate_trace_links(trace):
