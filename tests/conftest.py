@@ -116,7 +116,6 @@ class FixtureLLM:
                         "rationale": "Uses the documented event arrangements",
                         "response_quotes": [payload["response"]] if payload["response"] else [],
                         "target_ids": [t["target_id"] for t in payload["targets"]],
-                        "memo_ids": [m["memo_id"] for m in payload["memos"]],
                     }
                     for d in payload["dimension_plan"]["dimensions"]
                 ]
