@@ -66,9 +66,7 @@ class FixtureLLM:
                 ]
             }
         elif stage == "evidence_memo_v1":
-            supports = [
-                {"source_ref": d["source_ref"], "quote": d["text"][:300]} for d in payload["documents"]
-            ]
+            supports = [{"source_ref": d["source_ref"], "quote": d["text"][:300]} for d in payload["documents"]]
             out = {
                 "answer": "The organiser publishes arrangements." if supports else "No retrieved evidence.",
                 "scope": "The documented event",
