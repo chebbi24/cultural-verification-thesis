@@ -3,6 +3,15 @@ from .schemas import DimensionScore, RankingResult, ScoreBatch, TargetVerdict
 from .validation import validate_scores, validate_verdict
 
 
+def _memo_evidence_view(memo):
+    return {
+        "memo_id": memo.memo_id,
+        "sufficiency": memo.sufficiency,
+        "confidence": memo.confidence,
+        "statements": [statement.model_dump(mode="json") for statement in memo.statements],
+    }
+
+
 def compare_target(session, target, memo):
     # Epistemic consistency: insufficient evidence cannot support a directional verdict.
     if memo.sufficiency == "insufficient":
@@ -14,7 +23,7 @@ def compare_target(session, target, memo):
         )
     return session.call(
         "target_comparator_v1",
-        {"target": target.model_dump(mode="json"), "memo": memo.model_dump(mode="json")},
+        {"target": target.model_dump(mode="json"), "memo": _memo_evidence_view(memo)},
         TargetVerdict,
         lambda v: validate_verdict(v, target, memo),
     )
@@ -30,7 +39,7 @@ def score_dimensions(session, prompt, response, context, plan, targets, verdicts
             "dimension_plan": plan.model_dump(mode="json"),
             "targets": [t.model_dump(mode="json") for t in targets],
             "verdicts": [v.model_dump(mode="json") for v in verdicts],
-            "memos": [m.model_dump(mode="json") for m in memos],
+            "memos": [_memo_evidence_view(m) for m in memos],
             "rubric": rubric,
         },
         ScoreBatch,
