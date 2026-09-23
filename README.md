@@ -76,7 +76,8 @@ configuration file → supported environment variables → explicit CLI flags.
 
 Both commands print structured JSON. Exit code 0 indicates completed execution
 (including genuine abstention); 2 indicates invalid configuration or pipeline failure.
-Winner indices are **zero-based**; ties and all-abstained sets return `no_clear_winner`.
+Winner indices are **zero-based**; ties, all-abstained sets and any ranking containing
+a failed candidate return `no_clear_winner`.
 
 ## Python API
 
