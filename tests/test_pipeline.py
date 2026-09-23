@@ -228,16 +228,16 @@ def test_inferred_strong_provenance_is_downgraded(setup):
     assert all(s.source_type == "unknown" for s in result.evidence[0].source_classifications)
 
 
-def test_support_matching_normalizes_whitespace_and_typographic_quotes():
+def test_support_matching_normalizes_whitespace_case_and_typographic_quotes():
     doc = make_document(text="Du is used:\n\n By equal peers, family, friends and lovers. It is someone’s choice.")
     matches = matching_support_documents(
-        "Du is used: By equal peers, family, friends and lovers. It is someone's choice.",
+        "du is used: by equal peers, family, friends and lovers. it is someone's choice.",
         (doc,),
     )
     assert matches == (doc,)
 
 
-def test_support_quote_must_match_one_supplied_document(setup):
+def test_ungrounded_support_is_dropped_and_memo_downgraded(setup):
     config, _, retriever, _ = setup
 
     def bad_support(payload):
@@ -259,9 +259,11 @@ def test_support_quote_must_match_one_supplied_document(setup):
 
     llm = FixtureLLM(config, overrides={"evidence_memo_v1": bad_support})
     result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
-    assert result.status == "failed"
-    trace = RunTrace.model_validate_json(Path(result.trace_path).read_text())
-    assert sum(c.stage == "evidence_memo_v1" for c in trace.calls) == 2
+    assert result.status == "completed"
+    assert result.evidence[0].memos[-1].sufficiency == "insufficient"
+    assert result.evidence[0].memos[-1].confidence == "low"
+    assert result.evidence[0].memos[-1].statements == ()
+    assert result.verdicts[0].verdict == "insufficient"
 
 
 def test_directional_verdict_forces_numeric_score_retry(setup):
@@ -562,7 +564,7 @@ def test_broken_score_memo_links_retry_then_abstain(setup):
     assert sum(c["stage"] == "dimension_scorer_v1" for c in llm.calls) == 2
 
 
-def test_ungrounded_support_fails_before_target_comparison(setup):
+def test_ungrounded_support_cannot_reach_target_comparison(setup):
     config, _, retriever, _ = setup
     llm = FixtureLLM(
         config,
@@ -585,10 +587,9 @@ def test_ungrounded_support_fails_before_target_comparison(setup):
         },
     )
     result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
-    assert result.status == "failed" and not result.verdicts
-    trace = RunTrace.model_validate_json(Path(result.trace_path).read_text())
-    assert trace.partial_evidence_json and "snapshots" in trace.partial_evidence_json
-    assert sum(c.stage == "evidence_memo_v1" for c in trace.calls) == 2
+    assert result.status == "completed"
+    assert result.verdicts[0].verdict == "insufficient"
+    assert not any(c["stage"] == "target_comparator_v1" for c in llm.calls)
 
 
 def test_citation_trace_score_reference_validation(setup):
