@@ -63,7 +63,28 @@ def compare_target(session, target, memo):
     return verdict
 
 
+def _forced_abstain_dimensions(plan, targets, verdicts):
+    verdicts_by_target = {verdict.target_id: verdict for verdict in verdicts}
+    forced = set()
+    for dimension in plan.dimensions:
+        relevant_targets = [target for target in targets if dimension.dimension_id in target.dimension_ids]
+        external_targets = [target for target in relevant_targets if target.retrieval_appropriate]
+        direct_targets = [target for target in relevant_targets if not target.retrieval_appropriate]
+        if (
+            external_targets
+            and not direct_targets
+            and all(
+                verdicts_by_target.get(target.target_id) is not None
+                and verdicts_by_target[target.target_id].verdict == "insufficient"
+                for target in external_targets
+            )
+        ):
+            forced.add(dimension.dimension_id)
+    return forced
+
+
 def score_dimensions(session, prompt, response, context, plan, targets, verdicts, memos, rubric):
+    forced_abstentions = _forced_abstain_dimensions(plan, targets, verdicts)
     result = session.call(
         "dimension_scorer_v1",
         {
@@ -77,7 +98,35 @@ def score_dimensions(session, prompt, response, context, plan, targets, verdicts
             "rubric": rubric,
         },
         ScoreDraftBatch,
-        lambda b: validate_score_drafts(b, response, plan, targets, verdicts),
+        lambda b: validate_score_drafts(
+            b,
+            response,
+            plan,
+            targets,
+            verdicts,
+            ignored_dimensions=forced_abstentions,
+        ),
+    )
+    targets_by_dimension = {
+        dimension.dimension_id: tuple(
+            target.target_id
+            for target in targets
+            if dimension.dimension_id in target.dimension_ids and target.retrieval_appropriate
+        )
+        for dimension in plan.dimensions
+    }
+    repaired_scores = tuple(
+        score.model_copy(
+            update={
+                "score": "abstain",
+                "rationale": "All relevant retrievable targets are insufficient; dimension abstained deterministically.",
+                "response_quotes": (),
+                "target_ids": targets_by_dimension[score.dimension_id],
+            }
+        )
+        if score.dimension_id in forced_abstentions
+        else score
+        for score in repaired_scores
     )
     memo_by_target = {verdict.target_id: verdict.memo_id for verdict in verdicts}
     scores = tuple(
