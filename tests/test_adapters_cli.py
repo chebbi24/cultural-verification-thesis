@@ -105,9 +105,10 @@ def test_bad_credentials_not_retried(setup):
     response = Mock(status_code=401)
     llm = FixtureLLM(config, overrides={"query_rewriter_v1": requests.HTTPError(response=response)})
     session = SemanticSession(llm, config)
-    with pytest.raises(StageError):
+    with pytest.raises(StageError, match=r"HTTPError status=401"):
         session.call("query_rewriter_v1", {}, QueryDraft)
     assert len(session.calls) == 1
+    assert session.calls[0].error == "HTTPError:401"
 
 
 def test_wrong_model_configuration_rejected(setup):
