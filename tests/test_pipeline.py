@@ -182,9 +182,7 @@ def test_unsupported_legal_label_is_downgraded(setup):
     config, _, retriever, _ = setup
 
     def legal_memo(payload):
-        supports = [
-            {"source_ref": d["source_ref"], "quote": d["text"][:300]} for d in payload["documents"]
-        ]
+        supports = [{"source_ref": d["source_ref"], "quote": d["text"][:300]} for d in payload["documents"]]
         return {
             "answer": "Documented cultural guidance.",
             "scope": "x",
@@ -599,9 +597,7 @@ def test_conflicting_final_memo_counts_as_evidence_coverage(setup):
     config, _, retriever, _ = setup
 
     def conflicting(payload):
-        supports = [
-            {"source_ref": d["source_ref"], "quote": d["text"][:300]} for d in payload["documents"]
-        ]
+        supports = [{"source_ref": d["source_ref"], "quote": d["text"][:300]} for d in payload["documents"]]
         return {
             "answer": "The retrieved sources do not resolve the question consistently.",
             "scope": "The documented context",
