@@ -36,7 +36,7 @@ credible community or professional evidence is more suitable for lived cultural 
 official_legal = primary government/legal/public-authority material;
 academic_peer_reviewed = provenance explicitly supports a peer-reviewed scholarly publication;
 statistical_survey = survey/statistical evidence;
-institutional_professional = guidance or evidence from a recognized institution/professional body;
+institutional_professional = guidance or evidence from a recognized institution/professional body, not merely a commercial platform, tutoring site, generic blog or language-learning site;
 community_insider = community/forum/first-person lived-practice evidence;
 general_explanatory = educational or explanatory material without stronger provenance;
 commercial_lifestyle = commercial/lifestyle guidance;
@@ -60,9 +60,10 @@ credible community evidence for lived practice. Weak explanatory/commercial sour
 not produce high-confidence claims. Report unresolved disagreement rather than artificial consensus.""",
     "followup_v1": """Given questions, context and a memo with conflicting or insufficient evidence,
 identify the single most important unresolved evidence gap. If that gap is reasonably searchable,
-produce exactly ONE neutral, gap-specific question with kind=followup; if further search is not
-useful, return question=null. Explain the decision in 1-2 concise sentences only. Do not repeat
-the same reasoning, search until satisfied, or invent missing evidence.""",
+produce exactly ONE neutral, gap-specific question with kind=followup; it must add a distinct
+searchable gap and must not repeat or paraphrase an existing question. If no distinct useful
+question exists, return question=null. Explain the decision in 1-2 concise sentences only.
+Do not repeat the same reasoning, search until satisfied, or invent missing evidence.""",
     "target_comparator_v1": """Compare only the supplied target with the frozen evidence memo.
 Return its exact target_id and memo_id, supported/contradicted/mixed/insufficient and a brief
 reason. Missing evidence is not contradiction. Scope and contextual variation matter.""",
