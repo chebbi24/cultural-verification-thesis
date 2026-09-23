@@ -341,30 +341,35 @@ class BlindEvidenceEngine:
                     followup = frozen_questions[2]
                     followup_reason = schedule["followup_reason"]
             elif memos[-1].sufficiency != "sufficient" and self._config.max_retrieval_rounds == 2:
-                decision = session.call(
-                    "followup_v1",
-                    {
-                        "questions": [q.model_dump(mode="json") for q in all_questions],
-                        "context": context.model_dump(mode="json"),
-                        "memo": {
-                            "sufficiency": memos[-1].sufficiency,
-                            "confidence": memos[-1].confidence,
-                            "statements": [
-                                statement.model_dump(mode="json") for statement in memos[-1].statements
-                            ],
+                try:
+                    decision = session.call(
+                        "followup_v1",
+                        {
+                            "questions": [q.model_dump(mode="json") for q in all_questions],
+                            "context": context.model_dump(mode="json"),
+                            "memo": {
+                                "sufficiency": memos[-1].sufficiency,
+                                "confidence": memos[-1].confidence,
+                                "statements": [
+                                    statement.model_dump(mode="json") for statement in memos[-1].statements
+                                ],
+                            },
                         },
-                    },
-                    Followup,
-                )
-                followup_reason = decision.reason
-                if decision.question:
-                    candidate_text = " ".join(decision.question.text.lower().split())
-                    existing_texts = {" ".join(q.text.lower().split()) for q in all_questions}
-                    if candidate_text not in existing_texts:
-                        followup = VerificationQuestion(
-                            **decision.question.model_dump(),
-                            question_id=stable_id("question", decision.question.model_dump(mode="json")),
-                        )
+                        Followup,
+                    )
+                except StageError:
+                    decision = None
+                    followup_reason = "Follow-up planning unavailable; retained the current frozen memo."
+                if decision is not None:
+                    followup_reason = decision.reason
+                    if decision.question:
+                        candidate_text = " ".join(decision.question.text.lower().split())
+                        existing_texts = {" ".join(q.text.lower().split()) for q in all_questions}
+                        if candidate_text not in existing_texts:
+                            followup = VerificationQuestion(
+                                **decision.question.model_dump(),
+                                question_id=stable_id("question", decision.question.model_dump(mode="json")),
+                            )
             if followup:
                 all_questions.append(followup)
                 retrieve(followup, 2)
