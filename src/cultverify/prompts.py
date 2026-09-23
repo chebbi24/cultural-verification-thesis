@@ -66,15 +66,23 @@ because a source presents them as rules. Do not turn often into always. Assess s
 official primary sources for binding rules; empirical/linguistic work for language; empirical and
 credible community evidence for lived practice. Weak explanatory/commercial sources alone should
 not produce high-confidence claims. Report unresolved disagreement rather than artificial consensus.""",
+    "evidence_relevance_v1": """Judge each grounded evidence statement ONLY for whether it materially
+helps answer at least one supplied verification question. Return one judgment for every statement_index.
+Relevant means the statement itself, together with its quoted supports, bears on the substance of a
+verification question. Merely sharing the broad topic, country, setting, or a generic cultural theme is
+not enough. Mark unrelated side facts and retrieval noise irrelevant. Do not use the candidate response,
+target proposition, memo answer/scope/agreement, or outside knowledge. Be conservative under uncertainty.""",
     "followup_v1": """Given questions, context and a memo with conflicting or insufficient evidence,
 identify the single most important unresolved evidence gap. If that gap is reasonably searchable,
 produce exactly ONE neutral, gap-specific question with kind=followup; it must add a distinct
 searchable gap and must not repeat or paraphrase an existing question. If no distinct useful
 question exists, return question=null. Explain the decision in 1-2 concise sentences only.
 Do not repeat the same reasoning, search until satisfied, or invent missing evidence.""",
-    "target_comparator_v1": """Compare only the supplied target with the frozen evidence memo.
-Return its exact target_id and memo_id, supported/contradicted/mixed/insufficient and a brief
-reason. Missing evidence is not contradiction. Scope and contextual variation matter.""",
+    "target_comparator_v1": """Compare the supplied target ONLY with the supplied frozen statement-level
+evidence. Do not infer facts from absent memo fields, prior calls, retrieval documents, or outside
+knowledge. Return its exact target_id and memo_id, supported/contradicted/mixed/insufficient and a
+brief reason. If the supplied statements do not materially bear on the target, return insufficient.
+Missing evidence is not contradiction. Scope and contextual variation matter.""",
     "dimension_scorer_v1": """Score EVERY and ONLY planned dimension: 2 aligned, 1 mixed/incomplete/
 limited, 0 materially misaligned. abstain means genuinely unscorable only: use it only when the
 available evidence and direct response content do not permit a cultural assessment. Missing
