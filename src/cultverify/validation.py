@@ -1,5 +1,8 @@
 """Structural validation only. Scores and cultural conclusions belong to the LLM."""
 
+import re
+import unicodedata
+
 from .schemas import ContextFact
 from .trace import digest
 
@@ -33,14 +36,39 @@ def validate_targets(batch, response, plan, limit):
         require(set(target.dimension_ids) <= allowed, "Target dimensions must be planned")
 
 
+_SUPPORT_TRANSLATION = str.maketrans(
+    {
+        "\u2018": "'",
+        "\u2019": "'",
+        "\u201c": '"',
+        "\u201d": '"',
+        "\u00a0": " ",
+    }
+)
+
+
+def normalize_support_text(text):
+    normalized = unicodedata.normalize("NFKC", text).translate(_SUPPORT_TRANSLATION)
+    return re.sub(r"\\s+", " ", normalized).strip()
+
+
+def matching_support_documents(quote, documents):
+    normalized_quote = normalize_support_text(quote)
+    return tuple(
+        document
+        for document in documents
+        if normalized_quote and normalized_quote in normalize_support_text(document.text)
+    )
+
+
 def validate_memo_draft(memo, documents):
     support_count = 0
     for statement in memo.statements:
         quotes = [support.quote for support in statement.supports]
         require(len(quotes) == len(set(quotes)), "A statement may use each support quote only once")
         for support in statement.supports:
-            matches = [document for document in documents if support.quote in document.text]
-            require(bool(matches), "Support quote must occur verbatim in a supplied document")
+            matches = matching_support_documents(support.quote, documents)
+            require(bool(matches), "Support quote must match a supplied document after safe normalization")
             require(len(matches) == 1, "Support quote must identify exactly one supplied document")
             support_count += 1
     if memo.sufficiency != "insufficient":
