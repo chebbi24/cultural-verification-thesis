@@ -51,12 +51,11 @@ academic_peer_reviewed merely because it sounds authoritative. The selected enum
 the reason and provenance_basis. Do not invent category names outside the schema.""",
     "evidence_memo_v1": """Answer the provided questions using ONLY retrieved documents. Keep
 answer, scope, variation and agreement concise. Return at most five substantive evidence
-statements. Each statement must contain supports. Every support has exactly:
-source_ref = the small integer source_ref supplied with a document; and
-quote = a short VERBATIM span copied from that same document (maximum 300 characters).
-Never paraphrase a support quote and never attach a quote to a different source_ref. Do not return
-document IDs or a top-level citations field; the pipeline verifies each quote against its referenced
-document, maps source_refs to exact document IDs and derives the citation union deterministically.
+statements. Each statement must contain supports. Every support contains ONLY quote: a short
+VERBATIM span copied from one supplied document (maximum 300 characters). Choose a distinctive span
+that occurs in exactly one supplied document. Never paraphrase it. Do not return source_ref,
+document IDs, URLs or a top-level citations field; Python locates the exact document containing each
+quote, maps it to the frozen document ID and derives the citation union deterministically.
 With no adequate source, state the limitation, use insufficient/low, and do not invent facts.
 Use tendency for broad recurring patterns, context_sensitive_practice for norms that vary by
 setting/group/region, legal_institutional_rule ONLY for an actual binding law, policy or formal
