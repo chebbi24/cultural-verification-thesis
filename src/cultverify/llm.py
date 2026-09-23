@@ -186,7 +186,10 @@ class SemanticSession:
                         error=type(exc).__name__,
                     )
                 )
-                repair = "\nPrevious output was structurally invalid. Return valid JSON and exact spans/IDs. "
+                repair = (
+                    "\nPrevious output was structurally invalid. Return JSON matching the supplied schema exactly. "
+                    "Preserve exact spans or references only where that schema requires them. "
+                )
                 repair += str(exc)[:1500]
                 if semantic_attempt == self.config.retry_count:
                     raise StageError(f"{stage}: invalid output after bounded retry") from exc
