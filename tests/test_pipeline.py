@@ -195,7 +195,6 @@ def test_unsupported_legal_label_is_downgraded(setup):
                     "citations": ids,
                 }
             ],
-            "citations": ids,
         }
 
     llm = FixtureLLM(config, overrides={"evidence_memo_v1": legal_memo})
@@ -258,6 +257,34 @@ def test_max_two_rounds_one_followup(setup):
     assert result.evidence_coverage == 0
     assert result.verdicts[0].verdict == "insufficient"
     assert not any(c["stage"] == "target_comparator_v1" for c in llm.calls)
+
+
+def test_memo_citations_are_derived_from_statement_union(setup):
+    _, _, _, verifier = setup
+    result = verifier.verify(PROMPT, RESPONSE)
+    memo = result.evidence[0].memos[-1]
+    expected = tuple(dict.fromkeys(c for statement in memo.statements for c in statement.citations))
+    assert memo.citations == expected
+
+
+def test_memo_draft_rejects_more_than_five_statements():
+    from cultverify.schemas import MemoDraft
+
+    statement = {
+        "text": "x",
+        "kind": "context_sensitive_practice",
+        "citations": ["doc"],
+    }
+    with pytest.raises(ValidationError):
+        MemoDraft(
+            answer="x",
+            scope="x",
+            variation="x",
+            agreement="x",
+            sufficiency="sufficient",
+            confidence="medium",
+            statements=[statement] * 6,
+        )
 
 
 def test_citations_require_retrieved_document(setup):
@@ -427,7 +454,7 @@ def test_broken_score_memo_links_retry_then_abstain(setup):
     assert sum(c["stage"] == "dimension_scorer_v1" for c in llm.calls) == 2
 
 
-def test_missing_citations_fail_before_target_comparison(setup):
+def test_invalid_statement_citation_fails_before_target_comparison(setup):
     config, _, retriever, _ = setup
     llm = FixtureLLM(
         config,
@@ -439,8 +466,13 @@ def test_missing_citations_fail_before_target_comparison(setup):
                 "agreement": "x",
                 "sufficiency": "sufficient",
                 "confidence": "high",
-                "statements": [],
-                "citations": [],
+                "statements": [
+                    {
+                        "text": "Unsupported fact",
+                        "kind": "context_sensitive_practice",
+                        "citations": ["missing"],
+                    }
+                ],
             }
         },
     )
@@ -474,7 +506,6 @@ def test_conflicting_final_memo_counts_as_evidence_coverage(setup):
             "agreement": "Conflicting evidence",
             "sufficiency": "conflicting",
             "confidence": "medium",
-            "citations": ids,
             "statements": [
                 {
                     "text": "The retrieved sources do not resolve the question consistently.",
