@@ -47,10 +47,20 @@ class TavilyRetriever:
             timeout=timeout,
         )
         response.raise_for_status()
+        try:
+            data = response.json()
+            results = data["results"]
+            if not isinstance(results, list):
+                raise TypeError("results must be a list")
+        except (ValueError, KeyError, TypeError) as exc:
+            raise RetrievalError("Malformed search provider response") from exc
+
         documents = []
-        for rank, item in enumerate(response.json()["results"], 1):
+        for rank, item in enumerate(results, 1):
+            if not isinstance(item, dict):
+                raise RetrievalError("Malformed search result item")
             content = item.get("content") or ""
-            if not item.get("url") or not content.strip():
+            if not item.get("url") or not isinstance(content, str) or not content.strip():
                 continue
             documents.append(
                 RetrievedDocument(
