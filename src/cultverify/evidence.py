@@ -21,7 +21,7 @@ from .schemas import (
     VerificationQuestion,
 )
 from .trace import digest, stable_id, write_json
-from .validation import matching_support_documents, require, validate_memo_draft, validate_sources
+from .validation import matching_support_documents, require, validate_sources
 
 LLM_DOCUMENT_TEXT_LIMIT = 2000
 
@@ -177,17 +177,31 @@ class BlindEvidenceEngine:
                         "documents": [_llm_document(d, i) for i, d in enumerate(docs, start=1)],
                     },
                     MemoDraft,
-                    lambda m: validate_memo_draft(m, docs),
                 )
-                # Map simple local source refs back to exact frozen document IDs.
+                # Ground supports deterministically. A malformed/paraphrased support is discarded
+                # instead of crashing the whole memo; any grounding loss conservatively downgrades
+                # the memo to insufficient/low so unsupported material cannot yield a directional verdict.
                 mapped_statements = []
+                grounding_loss = False
                 for statement in memo.statements:
                     resolved_supports = []
+                    seen_supports = set()
                     for support in statement.supports:
-                        matching_document = matching_support_documents(support.quote, docs)[0]
+                        matches = matching_support_documents(support.quote, docs)
+                        if len(matches) != 1:
+                            grounding_loss = True
+                            continue
+                        matching_document = matches[0]
+                        support_key = (matching_document.document_id, support.quote)
+                        if support_key in seen_supports:
+                            continue
+                        seen_supports.add(support_key)
                         resolved_supports.append(
                             EvidenceSupport(document_id=matching_document.document_id, quote=support.quote)
                         )
+                    if not resolved_supports:
+                        grounding_loss = True
+                        continue
                     cited_docs = tuple(
                         next(document for document in docs if document.document_id == support.document_id)
                         for support in resolved_supports
@@ -206,13 +220,15 @@ class BlindEvidenceEngine:
                         )
                     )
                 citations = tuple(dict.fromkeys(c for statement in mapped_statements for c in statement.citations))
+                sufficiency = "insufficient" if grounding_loss or not mapped_statements else memo.sufficiency
+                confidence = "low" if grounding_loss or not mapped_statements else memo.confidence
                 frozen_payload = {
                     "answer": memo.answer,
                     "scope": memo.scope,
                     "variation": memo.variation,
                     "agreement": memo.agreement,
-                    "sufficiency": memo.sufficiency,
-                    "confidence": memo.confidence,
+                    "sufficiency": sufficiency,
+                    "confidence": confidence,
                     "statements": tuple(statement.model_dump(mode="json") for statement in mapped_statements),
                     "citations": citations,
                 }
