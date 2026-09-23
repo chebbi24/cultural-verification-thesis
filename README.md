@@ -11,7 +11,8 @@ are hard-coded in Python.
 Prompt → supported context → shared dimension plan → up to three material targets
 → two neutral questions per retrievable target → **candidate-blind evidence**
 → query rewriting → retrieval and provenance filtering → source classification
-→ evidence memo → optional single gap-specific follow-up → **frozen memo**
+→ evidence memo → exact-span grounding → blind support/relevance gate
+→ optional single gap-specific follow-up → **frozen memo**
 → target comparison → D01–D10 scoring → equal aggregation → JSON trace.
 
 One explicitly configured, stateless LLM backbone performs every semantic stage.
@@ -137,11 +138,15 @@ The two neutral questions necessarily convey the issue under investigation; this
 is a structural candidate-blind boundary, **not proof that question wording is unbiased**.
 Source text is untrusted data in all semantic prompts.
 
-The memo and its nested records/collections are immutable. Only after it is frozen
+The memo and its nested records/collections are immutable. Free-form memo summaries are
+not passed to the follow-up planner, target comparator or dimension scorer; those stages
+receive only grounded frozen statement-level evidence. Only after the memo is frozen
 does target comparison receive the target again. Trace events record this ordering.
-Every cited factual statement links to retrieved document IDs; Python validates the
-references, while whether a source actually supports a statement remains a semantic
-judgment requiring empirical audit.
+Every cited factual statement links to retrieved document IDs. Python resolves citations
+only from source spans that match retrieved text after conservative formatting
+normalization. A separate candidate-blind semantic gate rejects statements that exceed
+their quoted supports or do not materially answer a verification question. These checks
+reduce unsupported synthesis but remain model judgments that require empirical audit.
 
 Configure `excluded_domains`, `excluded_repos` (owner/repository) and
 `excluded_paths` (URL/path globs) for the exact external benchmark sources used.
@@ -160,7 +165,9 @@ candidate and reuses the exact prompt-level plan across all four.
 
 ## Scores and limitations
 
-Dimensions receive 0, 1, 2 or `abstain`. The overall score is the mean of scored
+Dimensions receive 0, 1, 2 or `abstain`. If every retrievable target relevant to a
+dimension ends `insufficient` and there is no relevant non-retrieval target that can be
+assessed directly, that dimension must abstain. The overall score is the mean of scored
 dimensions divided by two; if none can be scored it is `null`. There are no caps or
 primary/secondary weighting differences. Ranking uses exact rational comparison,
 so floating-point rounding cannot break a mathematical tie. No tie margin is added.
