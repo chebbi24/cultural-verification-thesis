@@ -4,6 +4,14 @@ from .validation import validate_scores, validate_verdict
 
 
 def compare_target(session, target, memo):
+    # Epistemic consistency: insufficient evidence cannot support a directional verdict.
+    if memo.sufficiency == "insufficient":
+        return TargetVerdict(
+            target_id=target.target_id,
+            memo_id=memo.memo_id,
+            verdict="insufficient",
+            reasoning="Frozen evidence memo is insufficient; no directional verdict is permitted.",
+        )
     return session.call(
         "target_comparator_v1",
         {"target": target.model_dump(mode="json"), "memo": memo.model_dump(mode="json")},
