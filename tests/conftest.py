@@ -103,8 +103,6 @@ class FixtureLLM:
             }
         elif stage == "target_comparator_v1":
             out = {
-                "target_id": payload["target"]["target_id"],
-                "memo_id": payload["memo"]["memo_id"],
                 "verdict": "supported",
                 "reasoning": "The source establishes that arrangements are published",
             }
