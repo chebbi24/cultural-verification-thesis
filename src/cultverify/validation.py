@@ -80,6 +80,12 @@ def validate_memo_draft(memo, documents):
         )
 
 
+def validate_statement_relevance(batch, statement_count):
+    indices = [judgment.statement_index for judgment in batch.judgments]
+    require(len(indices) == len(set(indices)), "Duplicate statement relevance judgments")
+    require(set(indices) == set(range(statement_count)), "Judge every grounded statement exactly once")
+
+
 def validate_document_citation(memo, documents):
     ids = {d.document_id for d in documents}
     statement_citations = {c for s in memo.statements for c in s.citations}
