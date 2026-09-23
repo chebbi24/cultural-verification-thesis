@@ -54,8 +54,7 @@ the reason and provenance_basis. Do not invent category names outside the schema
 answer, scope, variation and agreement concise. Return at most five substantive evidence
 statements. Each statement must contain supports. Every support contains ONLY quote: a short
 VERBATIM span copied from one supplied document (maximum 300 characters). Choose a distinctive span
-that occurs in exactly one supplied document. Never paraphrase it. Do not return source_ref,
-document IDs, URLs, source references or a top-level citations field; Python locates the exact
+that occurs in exactly one supplied document. Never paraphrase it. Do not return source references, document IDs, URLs or a top-level citations field; Python locates the exact
 document containing each quote, maps it to the frozen document ID and derives the citation union deterministically.
 If you are not sure of the exact source wording, omit that support/statement rather than paraphrasing it.
 With no adequate source, state the limitation, use insufficient/low, and do not invent facts.
@@ -76,8 +75,9 @@ sharing the broad topic, country, setting, or a generic cultural theme is not en
 unsupported synthesis, unrelated side facts and retrieval noise false as appropriate. Do not use the
 candidate response, target proposition, memo answer/scope/agreement, prior calls or outside knowledge.
 Be conservative under uncertainty.""",
-    "followup_v1": """Given questions, context and a memo with conflicting or insufficient evidence,
-identify the single most important unresolved evidence gap. If that gap is reasonably searchable,
+    "followup_v1": """Given questions, explicit context and a frozen statement-level memo with
+conflicting or insufficient evidence, identify the single most important unresolved evidence gap.
+Use only the supplied grounded statements; absent free-form memo summaries are not evidence. If that gap is reasonably searchable,
 produce exactly ONE neutral, gap-specific question with kind=followup; it must add a distinct
 searchable gap and must not repeat or paraphrase an existing question. If no distinct useful
 question exists, return question=null. Explain the decision in 1-2 concise sentences only.
