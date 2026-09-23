@@ -21,6 +21,14 @@ from .schemas import (
 from .trace import digest, stable_id, write_json
 from .validation import require, validate_document_citation, validate_sources
 
+LLM_DOCUMENT_TEXT_LIMIT = 2000
+
+
+def _llm_document(document):
+    data = document.model_dump(mode="json")
+    data["text"] = document.text[:LLM_DOCUMENT_TEXT_LIMIT]
+    return data
+
 
 class BlindEvidenceEngine:
     def __init__(self, llm, config, store):
@@ -121,7 +129,7 @@ class BlindEvidenceEngine:
                             "document_id": d.document_id,
                             "url": d.url,
                             "title": d.title,
-                            "text": d.text,
+                            "text": d.text[:LLM_DOCUMENT_TEXT_LIMIT],
                         }
                         for d in new
                     ]
@@ -178,7 +186,7 @@ class BlindEvidenceEngine:
                     {
                         "questions": [q.model_dump(mode="json") for q in all_questions],
                         "context": context.model_dump(mode="json"),
-                        "documents": [d.model_dump(mode="json") for d in docs],
+                        "documents": [_llm_document(d) for d in docs],
                     },
                     MemoDraft,
                     lambda m: validate_document_citation(m, docs),
