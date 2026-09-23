@@ -25,6 +25,6 @@ jobs:
       - name: Unit tests
         run: python -m pytest -q
       - name: Ruff lint
-        run: ruff check src/cultverify scripts tests
+        run: ruff check src scripts tests
       - name: Ruff format
-        run: ruff format --check src/cultverify scripts tests
+        run: ruff format --check src scripts tests
