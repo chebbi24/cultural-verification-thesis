@@ -128,9 +128,7 @@ class FixtureLLM:
                         "dimension_id": d["dimension_id"],
                         "score": "abstain" if abstain else 2,
                         "rationale": (
-                            "Insufficient external evidence."
-                            if abstain
-                            else "Uses the documented event arrangements"
+                            "Insufficient external evidence." if abstain else "Uses the documented event arrangements"
                         ),
                         "response_quotes": [] if abstain or not payload["response"] else [payload["response"]],
                         "target_ids": [t["target_id"] for t in relevant_targets],
