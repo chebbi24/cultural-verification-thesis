@@ -379,7 +379,6 @@ def test_directional_verdict_forces_numeric_score_retry(setup):
                     "rationale": "Assessable but incomplete evidence.",
                     "response_quotes": [payload["response"]],
                     "target_ids": [t["target_id"] for t in payload["targets"]],
-                    "memo_ids": [m["memo_id"] for m in payload["memos"]],
                 }
                 for d in payload["dimension_plan"]["dimensions"]
             ]
@@ -436,6 +435,7 @@ def test_scope_and_query_prompts_prefer_general_then_authoritative():
     assert "materially" in PROMPTS["evidence_relevance_v1"]
     assert "supplied frozen statement-level" in PROMPTS["target_comparator_v1"]
     assert "genuinely unscorable only" in PROMPTS["dimension_scorer_v1"]
+    assert "Do not return memo IDs" in PROMPTS["dimension_scorer_v1"]
 
 
 def test_max_two_rounds_one_followup(setup):
@@ -640,28 +640,31 @@ def test_no_python_score_override_on_contradiction(setup):
     assert result.status == "completed" and result.overall_score == 1
 
 
-def test_broken_score_memo_links_retry_then_abstain(setup):
+def test_score_memo_links_are_derived_from_target_ids(setup):
     config, _, retriever, _ = setup
-    llm = FixtureLLM(
-        config,
-        overrides={
-            "dimension_scorer_v1": {
-                "scores": [
-                    {
-                        "dimension_id": "D03",
-                        "score": 2,
-                        "rationale": "x",
-                        "response_quotes": [RESPONSE],
-                        "target_ids": [],
-                        "memo_ids": ["invented"],
-                    }
-                ]
-            }
-        },
-    )
+
+    def scorer(payload):
+        target_id = payload["targets"][0]["target_id"]
+        return {
+            "scores": [
+                {
+                    "dimension_id": "D03",
+                    "score": 2,
+                    "rationale": "x",
+                    "response_quotes": [RESPONSE],
+                    "target_ids": [target_id],
+                }
+            ]
+        }
+
+    llm = FixtureLLM(config, overrides={"dimension_scorer_v1": scorer})
     result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
-    assert result.status == "failed" and result.candidate_abstained
-    assert sum(c["stage"] == "dimension_scorer_v1" for c in llm.calls) == 2
+    assert result.status == "completed"
+    score_result = result.dimension_scores[0]
+    verdict_by_target = {verdict.target_id: verdict for verdict in result.verdicts}
+    assert score_result.memo_ids == tuple(verdict_by_target[target_id].memo_id for target_id in score_result.target_ids)
+    scorer_call = next(call for call in llm.calls if call["stage"] == "dimension_scorer_v1")
+    assert "memo_ids" not in scorer_call["schema"]
 
 
 def test_ungrounded_support_cannot_reach_target_comparison(setup):
