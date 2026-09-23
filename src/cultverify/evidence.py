@@ -21,7 +21,7 @@ from .schemas import (
     VerificationQuestion,
 )
 from .trace import digest, stable_id, write_json
-from .validation import require, validate_memo_draft, validate_sources
+from .validation import matching_support_documents, require, validate_memo_draft, validate_sources
 
 LLM_DOCUMENT_TEXT_LIMIT = 2000
 
@@ -184,7 +184,7 @@ class BlindEvidenceEngine:
                 for statement in memo.statements:
                     resolved_supports = []
                     for support in statement.supports:
-                        matching_document = next(document for document in docs if support.quote in document.text)
+                        matching_document = matching_support_documents(support.quote, docs)[0]
                         resolved_supports.append(
                             EvidenceSupport(document_id=matching_document.document_id, quote=support.quote)
                         )
