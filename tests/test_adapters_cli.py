@@ -7,7 +7,7 @@ import requests
 from cultverify import Config, CulturalVerifier
 from cultverify.cli import main
 from cultverify.llm import HTTPModel, SemanticSession, StageError, strict_schema
-from cultverify.retrieval import TavilyRetriever
+from cultverify.retrieval import RetrievalError, TavilyRetriever
 from cultverify.schemas import InitialQuestions, QueryDraft, RunTrace
 from conftest import FixtureLLM, PROMPT, RESPONSE
 
@@ -79,6 +79,15 @@ def test_tavily_contract_and_provenance():
     assert docs[0].rank == 1 and docs[0].provider_score == 0.7
     assert docs[0].query == "neutral query" and docs[0].retrieved_at
     assert post.call_args.kwargs["timeout"] == 12
+
+
+def test_malformed_tavily_response_fails_cleanly():
+    client = TavilyRetriever("test-only-placeholder")
+    response = Mock()
+    response.json.return_value = {"unexpected": []}
+    with patch("cultverify.retrieval.requests.post", return_value=response):
+        with pytest.raises(RetrievalError, match="Malformed search provider response"):
+            client.search("neutral query", top_k=3, timeout=12)
 
 
 def test_transport_retry_is_traced(setup):
