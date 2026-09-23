@@ -84,6 +84,17 @@ class FixtureLLM:
                 if supports
                 else [],
             }
+        elif stage == "evidence_relevance_v1":
+            out = {
+                "judgments": [
+                    {
+                        "statement_index": statement["statement_index"],
+                        "relevant": True,
+                        "reason": "The grounded statement answers the verification questions.",
+                    }
+                    for statement in payload["statements"]
+                ]
+            }
         elif stage == "followup_v1":
             out = {
                 "question": {"kind": "followup", "text": "Where are the event’s official arrangements published?"},
