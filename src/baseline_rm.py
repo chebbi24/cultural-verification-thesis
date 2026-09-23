@@ -67,14 +67,16 @@ def main() -> None:
         scores = {label: rm.score(row["prompt"], row[f"response_{label}"]) for label in "abcd"}
         winner = max(scores, key=scores.get)
         human = (row.get("human_chosen") or "").strip().lower()
-        output.append({
-            "set_id": row.get("set_id", f"row_{index}"),
-            "prompt_id": row.get("prompt_id", ""),
-            "human_chosen": human,
-            "rm_winner": winner,
-            "rm_correct": int(bool(human) and winner == human),
-            **{f"rm_score_{label}": scores[label] for label in "abcd"},
-        })
+        output.append(
+            {
+                "set_id": row.get("set_id", f"row_{index}"),
+                "prompt_id": row.get("prompt_id", ""),
+                "human_chosen": human,
+                "rm_winner": winner,
+                "rm_correct": int(bool(human) and winner == human),
+                **{f"rm_score_{label}": scores[label] for label in "abcd"},
+            }
+        )
 
     args.output_csv.parent.mkdir(parents=True, exist_ok=True)
     fields = ["set_id", "prompt_id", "human_chosen", "rm_winner", "rm_correct"] + [f"rm_score_{x}" for x in "abcd"]
