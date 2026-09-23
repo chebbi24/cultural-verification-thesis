@@ -16,6 +16,9 @@ FORBIDDEN_LEGACY_IDENTIFIERS = (
     "material_accommodation_gaps",
     "verifier_v7",
     "verifier_v8",
+    "v7_legacy",
+    "v8_core",
+    "benchmark.csv",
 )
 
 
@@ -41,3 +44,10 @@ def test_smoke_cases_are_unlabelled_and_outside_gold_set():
         assert set(case) == {"case_id", "prompt", "response"}
         assert case["case_id"].startswith("SMK") and not case["case_id"].startswith("PLT")
         assert case["prompt"].strip() and case["response"].strip()
+
+
+def test_active_verifier_does_not_reference_project_data_files():
+    source = "\n".join(path.read_text(encoding="utf-8").lower() for path in sorted(PACKAGE.rglob("*.py")))
+    assert "data/" not in source
+    assert "data\\" not in source
+    assert "plt001" not in source
