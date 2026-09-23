@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 from cultverify import CulturalVerifier
-from cultverify.evidence import BlindEvidenceEngine
+from cultverify.evidence import BlindEvidenceEngine, LLM_DOCUMENT_TEXT_LIMIT
 from cultverify.schemas import (
     ContextFact,
     ContextFrame,
@@ -144,6 +144,26 @@ def test_source_classifier_does_not_receive_placeholder_type(setup):
         for document in call["payload"]["documents"]:
             assert set(document) == {"document_id", "url", "title", "text"}
             assert "source_type" not in document
+
+
+def test_llm_evidence_payload_truncates_text_but_keeps_full_snapshot(setup):
+    config, _, _, _ = setup
+
+    class LongRetriever(FixtureRetriever):
+        def search(self, query, *, top_k, timeout):
+            self.calls.append(query)
+            doc = super().search(query, top_k=top_k, timeout=timeout)[0]
+            return (doc.model_copy(update={"text": "x" * (LLM_DOCUMENT_TEXT_LIMIT + 500)}),)
+
+    retriever = LongRetriever()
+    llm = FixtureLLM(config)
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert len(result.evidence[0].documents[0].text) == LLM_DOCUMENT_TEXT_LIMIT + 500
+
+    for call in llm.calls:
+        if call["stage"] in {"source_classifier_v1", "evidence_memo_v1"}:
+            assert all(len(d["text"]) <= LLM_DOCUMENT_TEXT_LIMIT for d in call["payload"]["documents"])
 
 
 def test_classifier_failure_falls_back_to_unknown(setup):
