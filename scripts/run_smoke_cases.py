@@ -100,7 +100,8 @@ def build_config(args: argparse.Namespace) -> Config:
 
 
 def build_verifier(config: Config) -> CulturalVerifier:
-    llm = HTTPModel(config, os.getenv("OPENROUTER_API_KEY"))
+    api_key = os.getenv("OPENROUTER_API_KEY") if config.verifier_model_provider == "openrouter" else None
+    llm = HTTPModel(config, api_key)
     retriever = TavilyRetriever(os.getenv("TAVILY_API_KEY"), config.search_depth) if config.mode == "LIVE" else None
     return CulturalVerifier(llm=llm, retriever=retriever, config=config)
 
