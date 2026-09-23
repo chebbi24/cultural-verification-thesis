@@ -220,7 +220,7 @@ class BlindEvidenceEngine:
                     "agreement": memo.agreement,
                     "sufficiency": memo.sufficiency,
                     "confidence": memo.confidence,
-                    "statements": tuple(mapped_statements),
+                    "statements": tuple(statement.model_dump(mode="json") for statement in mapped_statements),
                     "citations": citations,
                 }
                 frozen = EvidenceMemo(
