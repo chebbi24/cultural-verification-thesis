@@ -20,9 +20,9 @@ git pull
 python -m pip install -e '.[test]'
 pytest -q
 
-export CULTVERIFY_PROVIDER=openrouter
-export CULTVERIFY_MODEL='provider/model-version-to-freeze'
-export OPENROUTER_API_KEY='...'
+export CULTVERIFY_PROVIDER=ollama
+export CULTVERIFY_MODEL='qwen3:4b'
+export OLLAMA_URL='http://localhost:11434/api/chat'
 export TAVILY_API_KEY='...'
 export CULTVERIFY_MODE=LIVE
 
@@ -33,7 +33,7 @@ python scripts/run_smoke_cases.py \
   --trace-directory artifacts/traces/verifier_v1_smoke
 ```
 
-For Ollama, set `CULTVERIFY_PROVIDER=ollama`, a local model ID, and `OLLAMA_URL` instead of the OpenRouter key. Tavily is still required for LIVE retrieval.
+Verifier v1 smoke testing is standardized on local Ollama with `qwen3:4b` at temperature 0. Tavily remains the LIVE retrieval provider. The Tavily Search API is used with `include_answer=false`, so Tavily does not supply the verifier's evidence synthesis or final judgment; the local Ollama backbone performs those semantic stages.
 
 ## Outputs
 
