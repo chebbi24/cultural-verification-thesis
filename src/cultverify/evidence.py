@@ -64,18 +64,13 @@ def _normalized_source_classification(source):
     )
     strong_type_contradicted = (
         source_type == SourceType.OFFICIAL and any(phrase in reason for phrase in official_contradictions)
-    ) or (
-        source_type == SourceType.ACADEMIC and any(phrase in reason for phrase in academic_contradictions)
-    )
+    ) or (source_type == SourceType.ACADEMIC and any(phrase in reason for phrase in academic_contradictions))
     if (
-        source_type in {SourceType.ACADEMIC, SourceType.OFFICIAL}
-        and provenance_basis != "explicit"
+        source_type in {SourceType.ACADEMIC, SourceType.OFFICIAL} and provenance_basis != "explicit"
     ) or strong_type_contradicted:
         source_type = SourceType.UNKNOWN
         provenance_basis = "unclear"
-    return source.model_copy(
-        update={"source_type": source_type, "provenance_basis": provenance_basis}
-    )
+    return source.model_copy(update={"source_type": source_type, "provenance_basis": provenance_basis})
 
 
 class BlindEvidenceEngine:
@@ -282,9 +277,7 @@ class BlindEvidenceEngine:
                             judgment.statement_index for judgment in relevance.judgments if judgment.relevant
                         }
                         mapped_statements = [
-                            statement
-                            for index, statement in enumerate(mapped_statements)
-                            if index in relevant_indices
+                            statement for index, statement in enumerate(mapped_statements) if index in relevant_indices
                         ]
                     except StageError:
                         mapped_statements = []
