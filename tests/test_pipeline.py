@@ -77,7 +77,7 @@ def test_invalid_target_quote_abstains(setup):
     assert Path(result.trace_path).exists()
 
 
-def test_target_limit_and_internal_type():
+def test_target_limit_and_epistemic_retrieval_routing():
     target = dict(
         response_quote="x",
         proposition="x",
@@ -90,6 +90,13 @@ def test_target_limit_and_internal_type():
         TargetBatch(targets=(target,) * 4)
     with pytest.raises(ValidationError):
         MaterialTarget(**{**target, "epistemic_type": "response_internal_quality"}, target_id="t")
+    with pytest.raises(ValidationError):
+        MaterialTarget(**{**target, "retrieval_appropriate": False}, target_id="t")
+    with pytest.raises(ValidationError):
+        MaterialTarget(
+            **{**target, "epistemic_type": "descriptive_cultural_norm", "retrieval_appropriate": False},
+            target_id="t",
+        )
 
 
 def test_configured_target_limit(setup):
@@ -499,6 +506,33 @@ def test_directional_verdict_forces_numeric_score_retry(setup):
     assert result.status == "completed"
     assert attempts["n"] == 2
     assert all(score.score == 1 for score in result.dimension_scores)
+
+
+def test_numeric_score_requires_assessable_target_link(setup):
+    config, _, retriever, _ = setup
+    attempts = {"n": 0}
+
+    def scorer(payload):
+        attempts["n"] += 1
+        target_ids = [] if attempts["n"] == 1 else [payload["targets"][0]["target_id"]]
+        return {
+            "scores": [
+                {
+                    "dimension_id": d["dimension_id"],
+                    "score": 2,
+                    "rationale": "Assessable evidence.",
+                    "response_quotes": [payload["response"]],
+                    "target_ids": target_ids,
+                }
+                for d in payload["dimension_plan"]["dimensions"]
+            ]
+        }
+
+    llm = FixtureLLM(config, overrides={"dimension_scorer_v1": scorer})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert attempts["n"] == 2
+    assert all(score.target_ids for score in result.dimension_scores)
 
 
 def test_all_external_insufficient_requires_dimension_abstention(setup):
