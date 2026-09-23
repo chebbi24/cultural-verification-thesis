@@ -371,9 +371,39 @@ class BlindEvidenceEngine:
                                 question_id=stable_id("question", decision.question.model_dump(mode="json")),
                             )
             if followup:
+                # Round 2 is an optional refinement. If its retrieval or synthesis fails,
+                # retain the already-frozen round-1 memo rather than failing the candidate.
+                # Roll back round-2 state so the returned bundle/schedule remains internally
+                # consistent with the memo that actually survived.
+                checkpoint = (
+                    len(all_questions),
+                    len(queries),
+                    len(snapshots),
+                    len(docs),
+                    len(classes),
+                    len(memos),
+                )
                 all_questions.append(followup)
-                retrieve(followup, 2)
-                synthesize()  # terminal round, never recursively search
+                try:
+                    retrieve(followup, 2)
+                    synthesize()  # terminal round, never recursively search
+                except (StageError, RetrievalError):
+                    (
+                        question_count,
+                        query_count,
+                        snapshot_count,
+                        document_count,
+                        class_count,
+                        memo_count,
+                    ) = checkpoint
+                    del all_questions[question_count:]
+                    del queries[query_count:]
+                    del snapshots[snapshot_count:]
+                    del docs[document_count:]
+                    del classes[class_count:]
+                    del memos[memo_count:]
+                    fallback = "Follow-up evidence refinement unavailable; retained the current frozen memo."
+                    followup_reason = f"{followup_reason} {fallback}".strip() if followup_reason else fallback
             if schedule is None:
                 write_json(
                     path,
