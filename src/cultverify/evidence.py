@@ -334,13 +334,42 @@ class BlindEvidenceEngine:
 
             for question in questions:
                 retrieve(question, 1)
-            synthesize()
+            initial_synthesis_failed = False
+            try:
+                synthesize()
+            except StageError:
+                initial_synthesis_failed = True
+                fallback_payload = {
+                    "answer": "Evidence synthesis unavailable after bounded retry.",
+                    "scope": "No reliable synthesized scope available.",
+                    "variation": "No reliable synthesized variation available.",
+                    "agreement": "Unavailable because evidence synthesis failed.",
+                    "sufficiency": "insufficient",
+                    "confidence": "low",
+                    "statements": (),
+                    "citations": (),
+                }
+                memos.append(
+                    EvidenceMemo(
+                        **fallback_payload,
+                        memo_id=stable_id("memo", [key, len(memos), fallback_payload]),
+                        question_ids=tuple(q.question_id for q in all_questions),
+                    )
+                )
+                followup_reason = (
+                    "Initial evidence synthesis unavailable after bounded retry; "
+                    "retained an explicit insufficient memo."
+                )
             followup = None
             if schedule is not None:
                 if len(frozen_questions) == 3:
                     followup = frozen_questions[2]
                     followup_reason = schedule["followup_reason"]
-            elif memos[-1].sufficiency != "sufficient" and self._config.max_retrieval_rounds == 2:
+            elif (
+                not initial_synthesis_failed
+                and memos[-1].sufficiency != "sufficient"
+                and self._config.max_retrieval_rounds == 2
+            ):
                 try:
                     decision = session.call(
                         "followup_v1",
