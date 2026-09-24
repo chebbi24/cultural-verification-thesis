@@ -622,6 +622,37 @@ def test_invalid_followup_output_keeps_current_memo(setup):
     assert result.verdicts[0].verdict == "insufficient"
 
 
+def test_initial_memo_timeout_becomes_explicit_insufficient_memo(setup):
+    config, _, retriever, _ = setup
+
+    def timeout(_payload):
+        raise requests.ReadTimeout("fixture timeout")
+
+    llm = FixtureLLM(config, overrides={"evidence_memo_v1": timeout})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+
+    assert result.status == "completed"
+    assert len(result.evidence) == 1
+    bundle = result.evidence[0]
+    assert len(bundle.memos) == 1
+    assert bundle.memos[-1].sufficiency == "insufficient"
+    assert bundle.memos[-1].confidence == "low"
+    assert not bundle.memos[-1].statements
+    assert len(bundle.questions) == 2
+    assert len(bundle.queries) == 2
+    assert len(bundle.snapshots) == 2
+    assert "Initial evidence synthesis unavailable" in bundle.followup_reason
+    assert result.verdicts[0].verdict == "insufficient"
+    assert result.candidate_abstained
+    assert not any(call["stage"] == "followup_v1" for call in llm.calls)
+
+    trace = RunTrace.model_validate_json(Path(result.trace_path).read_text())
+    timeout_calls = [
+        call for call in trace.calls if call.stage == "evidence_memo_v1" and call.error and "ReadTimeout" in call.error
+    ]
+    assert len(timeout_calls) == 2
+
+
 def test_followup_memo_timeout_keeps_round_one_frozen_memo(setup):
     config, _, retriever, _ = setup
     memo_calls = {"n": 0}
@@ -739,6 +770,8 @@ def test_scope_and_query_prompts_prefer_general_then_authoritative():
     assert "genuinely unscorable only" in PROMPTS["dimension_scorer_v1"]
     assert "relevant retrievable target is insufficient" in PROMPTS["dimension_scorer_v1"]
     assert "Do not return target IDs or memo IDs" in PROMPTS["dimension_scorer_v1"]
+    assert "explicitly named places belong in location" in PROMPTS["context_planner_v1"]
+    assert "Prefer the smallest sufficient set of dimensions" in PROMPTS["dimension_planner_v1"]
 
 
 def test_max_two_rounds_one_followup(setup):
