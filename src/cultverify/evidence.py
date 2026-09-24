@@ -1,7 +1,9 @@
 """Blind evidence engine: its public input contains no candidate or target object."""
 
+from urllib.parse import urlparse
+
 from .config import PIPELINE_VERSION
-from .llm import SemanticSession
+from .llm import SemanticSession, StageError
 from .prompts import COMMON, PROMPTS
 from .retrieval import RetrievalError
 from .schemas import (
@@ -9,15 +11,137 @@ from .schemas import (
     EvidenceBundle,
     EvidenceMemo,
     EvidenceSchedule,
+    EvidenceStatement,
+    EvidenceSupport,
     Followup,
     MemoDraft,
     QueryDraft,
     SearchQuery,
     SourceBatch,
+    SourceClassification,
+    SourceType,
+    StatementRelevanceBatch,
     VerificationQuestion,
 )
 from .trace import digest, stable_id, write_json
-from .validation import require, validate_document_citation, validate_sources
+from .validation import (
+    matching_support_documents,
+    require,
+    validate_sources,
+    validate_statement_relevance,
+)
+
+LLM_DOCUMENT_TEXT_LIMIT = 2000
+
+
+def _llm_document(document):
+    data = document.model_dump(mode="json")
+    data.pop("document_id")
+    data["text"] = document.text[:LLM_DOCUMENT_TEXT_LIMIT]
+    return data
+
+
+_SECONDARY_PROVENANCE_HOSTS = {
+    "wikipedia.org",
+    "researchgate.net",
+    "academia.edu",
+    "ebsco.com",
+    "pmc.ncbi.nlm.nih.gov",
+}
+
+
+def _normalized_text(text):
+    return " ".join(text.casefold().split())
+
+
+def _is_secondary_provenance_host(url):
+    host = (urlparse(url).hostname or "").casefold()
+    return any(host == domain or host.endswith(f".{domain}") for domain in _SECONDARY_PROVENANCE_HOSTS)
+
+
+def _context_texts(context):
+    facts = (
+        *((context.setting,) if context.setting else ()),
+        *context.participants,
+        *context.relationships,
+        *((context.location,) if context.location else ()),
+        *((context.temporal_context,) if context.temporal_context else ()),
+        *context.explicit_constraints,
+        *((context.user_goal,) if context.user_goal else ()),
+    )
+    return {
+        _normalized_text(text) for fact in facts for text in (fact.value, fact.prompt_span) if text and text.strip()
+    }
+
+
+def _safe_query_text(query_text, question, context):
+    candidate = _normalized_text(query_text)
+    question_text = _normalized_text(question.text)
+    if candidate and candidate != question_text and candidate in _context_texts(context):
+        return question.text
+    return query_text
+
+
+def _normalized_source_classification(source, document=None):
+    reason = " ".join(source.reason.casefold().split())
+    source_type = source.source_type
+    provenance_basis = source.provenance_basis
+    strong_types = {
+        SourceType.OFFICIAL,
+        SourceType.ACADEMIC,
+        SourceType.SURVEY,
+        SourceType.INSTITUTIONAL,
+    }
+    explicit_contradictions = {
+        SourceType.OFFICIAL: (
+            "not official",
+            "not an official",
+            "not government",
+            "not a government",
+            "not legal",
+            "not a legal",
+            "not public-authority",
+            "not a public authority",
+        ),
+        SourceType.ACADEMIC: (
+            "not peer-reviewed",
+            "not peer reviewed",
+            "not academic",
+            "not an academic",
+            "not scholarly",
+        ),
+        SourceType.INSTITUTIONAL: (
+            "not a recognized institution",
+            "not a recognised institution",
+            "not a professional body",
+        ),
+    }
+    contradicts_selected = any(phrase in reason for phrase in explicit_contradictions.get(source_type, ()))
+    contradicts_enum = any(
+        other is not source_type
+        and (
+            f"should be {other.value}" in reason
+            or f"should be classified as {other.value}" in reason
+            or f"source type should be {other.value}" in reason
+        )
+        for other in SourceType
+    )
+    secondary_host_claims_primary_official = (
+        source_type == SourceType.OFFICIAL and document is not None and _is_secondary_provenance_host(document.url)
+    )
+    if (
+        (source_type in strong_types and provenance_basis != "explicit")
+        or contradicts_selected
+        or contradicts_enum
+        or secondary_host_claims_primary_official
+    ):
+        source_type = SourceType.UNKNOWN
+        provenance_basis = "unclear"
+    return source.model_copy(update={"source_type": source_type, "provenance_basis": provenance_basis})
+
+
+def _downgrade_confidence(confidence):
+    return {"high": "medium", "medium": "low", "low": "low"}[confidence]
 
 
 class BlindEvidenceEngine:
@@ -90,11 +214,12 @@ class BlindEvidenceEngine:
                         {"question": question.model_dump(mode="json"), "context": context.model_dump(mode="json")},
                         QueryDraft,
                     )
+                    effective_query_text = _safe_query_text(query_text.text, question, context)
                     query = SearchQuery(
-                        text=query_text.text,
+                        text=effective_query_text,
                         question_id=question.question_id,
                         round=round_number,
-                        query_id=stable_id("query", [question.question_id, query_text.text, round_number]),
+                        query_id=stable_id("query", [question.question_id, effective_query_text, round_number]),
                     )
                     snapshot = self._store.get(query)
                 else:
@@ -114,14 +239,39 @@ class BlindEvidenceEngine:
                 known_ids = {d.document_id for d in docs}
                 new = tuple(d for d in snapshot.documents if d.document_id not in known_ids)
                 if new:
-                    classified = session.call(
-                        "source_classifier_v1",
-                        {"documents": [d.model_dump(mode="json") for d in new]},
-                        SourceBatch,
-                        lambda b: validate_sources(b, new),
-                    )
-                    types = {s.document_id: s.source_type for s in classified.sources}
-                    classes.extend(classified.sources)
+                    classifier_documents = [
+                        {
+                            "document_id": d.document_id,
+                            "url": d.url,
+                            "title": d.title,
+                            "text": d.text[:LLM_DOCUMENT_TEXT_LIMIT],
+                        }
+                        for d in new
+                    ]
+                    try:
+                        classified = session.call(
+                            "source_classifier_v1",
+                            {"documents": classifier_documents},
+                            SourceBatch,
+                            lambda b: validate_sources(b, new),
+                        )
+                        document_by_id = {document.document_id: document for document in new}
+                        classified_sources = tuple(
+                            _normalized_source_classification(source, document_by_id[source.document_id])
+                            for source in classified.sources
+                        )
+                    except StageError:
+                        classified_sources = tuple(
+                            SourceClassification(
+                                document_id=d.document_id,
+                                source_type=SourceType.UNKNOWN,
+                                provenance_basis="unclear",
+                                reason="Source classification was unavailable; conservatively marked unknown.",
+                            )
+                            for d in new
+                        )
+                    types = {s.document_id: s.source_type for s in classified_sources}
+                    classes.extend(classified_sources)
                     docs.extend(d.model_copy(update={"source_type": types[d.document_id]}) for d in new)
 
             def synthesize():
@@ -130,46 +280,213 @@ class BlindEvidenceEngine:
                     {
                         "questions": [q.model_dump(mode="json") for q in all_questions],
                         "context": context.model_dump(mode="json"),
-                        "documents": [d.model_dump(mode="json") for d in docs],
+                        "documents": [_llm_document(d) for d in docs],
                     },
                     MemoDraft,
-                    lambda m: validate_document_citation(m, docs),
                 )
+                # Ground supports deterministically. Malformed/paraphrased supports are discarded
+                # rather than allowed to influence downstream judgments.
+                mapped_statements = []
+                grounding_loss = False
+                for statement in memo.statements:
+                    resolved_supports = []
+                    seen_supports = set()
+                    for support in statement.supports:
+                        matches = matching_support_documents(support.quote, docs)
+                        if len(matches) != 1:
+                            grounding_loss = True
+                            continue
+                        matching_document = matches[0]
+                        support_key = (matching_document.document_id, support.quote)
+                        if support_key in seen_supports:
+                            continue
+                        seen_supports.add(support_key)
+                        resolved_supports.append(
+                            EvidenceSupport(document_id=matching_document.document_id, quote=support.quote)
+                        )
+                    if not resolved_supports:
+                        grounding_loss = True
+                        continue
+                    cited_docs = tuple(
+                        next(document for document in docs if document.document_id == support.document_id)
+                        for support in resolved_supports
+                    )
+                    kind = statement.kind
+                    if kind == "legal_institutional_rule" and not any(
+                        document.source_type == SourceType.OFFICIAL for document in cited_docs
+                    ):
+                        kind = "context_sensitive_practice"
+                    mapped_statements.append(
+                        EvidenceStatement(
+                            text=statement.text,
+                            kind=kind,
+                            citations=tuple(dict.fromkeys(document.document_id for document in cited_docs)),
+                            supports=tuple(resolved_supports),
+                        )
+                    )
+
+                # Independent blind semantic gate: a grounded claim must both be supported
+                # by its quoted spans and materially answer at least one verification question.
+                semantic_filter_loss = False
+                if mapped_statements:
+                    try:
+                        relevance = session.call(
+                            "evidence_relevance_v1",
+                            {
+                                "questions": [q.model_dump(mode="json") for q in all_questions],
+                                "statements": [
+                                    {
+                                        "statement_index": index,
+                                        "text": statement.text,
+                                        "kind": statement.kind,
+                                        "support_quotes": [support.quote for support in statement.supports],
+                                    }
+                                    for index, statement in enumerate(mapped_statements)
+                                ],
+                            },
+                            StatementRelevanceBatch,
+                            lambda batch: validate_statement_relevance(batch, len(mapped_statements)),
+                        )
+                        accepted_indices = {
+                            judgment.statement_index
+                            for judgment in relevance.judgments
+                            if judgment.supported_by_quotes and judgment.relevant
+                        }
+                        semantic_filter_loss = len(accepted_indices) != len(mapped_statements)
+                        mapped_statements = [
+                            statement for index, statement in enumerate(mapped_statements) if index in accepted_indices
+                        ]
+                    except StageError:
+                        semantic_filter_loss = True
+                        mapped_statements = []
+
+                citations = tuple(dict.fromkeys(c for statement in mapped_statements for c in statement.citations))
+                if not mapped_statements:
+                    sufficiency = "insufficient"
+                    confidence = "low"
+                else:
+                    sufficiency = memo.sufficiency
+                    confidence = "low" if sufficiency == "insufficient" else memo.confidence
+                    if sufficiency != "insufficient" and (grounding_loss or semantic_filter_loss):
+                        confidence = _downgrade_confidence(confidence)
+                frozen_payload = {
+                    "answer": memo.answer,
+                    "scope": memo.scope,
+                    "variation": memo.variation,
+                    "agreement": memo.agreement,
+                    "sufficiency": sufficiency,
+                    "confidence": confidence,
+                    "statements": tuple(statement.model_dump(mode="json") for statement in mapped_statements),
+                    "citations": citations,
+                }
                 frozen = EvidenceMemo(
-                    **memo.model_dump(),
-                    memo_id=stable_id("memo", [key, len(memos), memo.model_dump(mode="json")]),
+                    **frozen_payload,
+                    memo_id=stable_id("memo", [key, len(memos), frozen_payload]),
                     question_ids=tuple(q.question_id for q in all_questions),
                 )
                 memos.append(frozen)
 
             for question in questions:
                 retrieve(question, 1)
-            synthesize()
+            initial_synthesis_failed = False
+            try:
+                synthesize()
+            except StageError:
+                initial_synthesis_failed = True
+                fallback_payload = {
+                    "answer": "Evidence synthesis unavailable after bounded retry.",
+                    "scope": "No reliable synthesized scope available.",
+                    "variation": "No reliable synthesized variation available.",
+                    "agreement": "Unavailable because evidence synthesis failed.",
+                    "sufficiency": "insufficient",
+                    "confidence": "low",
+                    "statements": (),
+                    "citations": (),
+                }
+                memos.append(
+                    EvidenceMemo(
+                        **fallback_payload,
+                        memo_id=stable_id("memo", [key, len(memos), fallback_payload]),
+                        question_ids=tuple(q.question_id for q in all_questions),
+                    )
+                )
+                followup_reason = (
+                    "Initial evidence synthesis unavailable after bounded retry; "
+                    "retained an explicit insufficient memo."
+                )
             followup = None
             if schedule is not None:
                 if len(frozen_questions) == 3:
                     followup = frozen_questions[2]
                     followup_reason = schedule["followup_reason"]
-            elif memos[-1].sufficiency != "sufficient" and self._config.max_retrieval_rounds == 2:
-                decision = session.call(
-                    "followup_v1",
-                    {
-                        "questions": [q.model_dump(mode="json") for q in all_questions],
-                        "context": context.model_dump(mode="json"),
-                        "memo": memos[-1].model_dump(mode="json"),
-                    },
-                    Followup,
-                )
-                followup_reason = decision.reason
-                if decision.question:
-                    followup = VerificationQuestion(
-                        **decision.question.model_dump(),
-                        question_id=stable_id("question", decision.question.model_dump(mode="json")),
+            elif (
+                not initial_synthesis_failed
+                and memos[-1].sufficiency != "sufficient"
+                and self._config.max_retrieval_rounds == 2
+            ):
+                try:
+                    decision = session.call(
+                        "followup_v1",
+                        {
+                            "questions": [q.model_dump(mode="json") for q in all_questions],
+                            "context": context.model_dump(mode="json"),
+                            "memo": {
+                                "sufficiency": memos[-1].sufficiency,
+                                "evidence_groups": [
+                                    {"supports": [support.model_dump(mode="json") for support in statement.supports]}
+                                    for statement in memos[-1].statements
+                                ],
+                            },
+                        },
+                        Followup,
                     )
+                except StageError:
+                    decision = None
+                    followup_reason = "Follow-up planning unavailable; retained the current frozen memo."
+                if decision is not None:
+                    followup_reason = decision.reason
+                    if decision.question:
+                        candidate_text = " ".join(decision.question.text.lower().split())
+                        existing_texts = {" ".join(q.text.lower().split()) for q in all_questions}
+                        if candidate_text not in existing_texts:
+                            followup = VerificationQuestion(
+                                **decision.question.model_dump(),
+                                question_id=stable_id("question", decision.question.model_dump(mode="json")),
+                            )
             if followup:
+                # Round 2 is an optional refinement. If its retrieval or synthesis fails,
+                # retain the already-frozen round-1 memo rather than failing the candidate.
+                # Roll back round-2 state so the returned bundle/schedule remains internally
+                # consistent with the memo that actually survived.
+                checkpoint = (
+                    len(all_questions),
+                    len(queries),
+                    len(snapshots),
+                    len(docs),
+                    len(classes),
+                    len(memos),
+                )
                 all_questions.append(followup)
-                retrieve(followup, 2)
-                synthesize()  # terminal round, never recursively search
+                try:
+                    retrieve(followup, 2)
+                    synthesize()  # terminal round, never recursively search
+                except (StageError, RetrievalError):
+                    (
+                        question_count,
+                        query_count,
+                        snapshot_count,
+                        document_count,
+                        class_count,
+                        memo_count,
+                    ) = checkpoint
+                    del all_questions[question_count:]
+                    del queries[query_count:]
+                    del snapshots[snapshot_count:]
+                    del docs[document_count:]
+                    del classes[class_count:]
+                    del memos[memo_count:]
+                    fallback = "Follow-up evidence refinement unavailable; retained the current frozen memo."
+                    followup_reason = f"{followup_reason} {fallback}".strip() if followup_reason else fallback
             if schedule is None:
                 write_json(
                     path,

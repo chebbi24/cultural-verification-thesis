@@ -7,7 +7,7 @@ import requests
 from cultverify import Config, CulturalVerifier
 from cultverify.cli import main
 from cultverify.llm import HTTPModel, SemanticSession, StageError, strict_schema
-from cultverify.retrieval import TavilyRetriever
+from cultverify.retrieval import RetrievalError, TavilyRetriever
 from cultverify.schemas import InitialQuestions, QueryDraft, RunTrace
 from conftest import FixtureLLM, PROMPT, RESPONSE
 
@@ -32,6 +32,7 @@ def test_ollama_stateless_structured_contract():
         )
     body = post.call_args.kwargs["json"]
     assert body["format"] == QueryDraft.model_json_schema()
+    assert body["think"] is False
     assert body["options"]["temperature"] == 0 and body["stream"] is False
     assert len(body["messages"]) == 2 and "first" not in json.dumps(body)
     assert post.call_args.kwargs["timeout"] == config.llm_timeout
@@ -80,6 +81,24 @@ def test_tavily_contract_and_provenance():
     assert post.call_args.kwargs["timeout"] == 12
 
 
+def test_malformed_tavily_result_fields_fail_cleanly():
+    client = TavilyRetriever("test-only-placeholder")
+    response = Mock()
+    response.json.return_value = {"results": [{"url": 42, "title": "x", "content": "text"}]}
+    with patch("cultverify.retrieval.requests.post", return_value=response):
+        with pytest.raises(RetrievalError, match="Malformed search result fields"):
+            client.search("neutral query", top_k=3, timeout=12)
+
+
+def test_malformed_tavily_response_fails_cleanly():
+    client = TavilyRetriever("test-only-placeholder")
+    response = Mock()
+    response.json.return_value = {"unexpected": []}
+    with patch("cultverify.retrieval.requests.post", return_value=response):
+        with pytest.raises(RetrievalError, match="Malformed search provider response"):
+            client.search("neutral query", top_k=3, timeout=12)
+
+
 def test_transport_retry_is_traced(setup):
     config, _, _, _ = setup
     llm = FixtureLLM(config)
@@ -105,9 +124,10 @@ def test_bad_credentials_not_retried(setup):
     response = Mock(status_code=401)
     llm = FixtureLLM(config, overrides={"query_rewriter_v1": requests.HTTPError(response=response)})
     session = SemanticSession(llm, config)
-    with pytest.raises(StageError):
+    with pytest.raises(StageError, match=r"HTTPError status=401"):
         session.call("query_rewriter_v1", {}, QueryDraft)
     assert len(session.calls) == 1
+    assert session.calls[0].error == "HTTPError:401"
 
 
 def test_wrong_model_configuration_rejected(setup):

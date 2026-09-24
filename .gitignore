@@ -1,6 +1,7 @@
 
 models/
 logs/
+results/
 *.json
 .ipynb_checkpoints/
 .DS_Store

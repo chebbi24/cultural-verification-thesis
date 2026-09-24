@@ -82,6 +82,18 @@ def test_snapshot_content_corruption_detected(setup):
         SnapshotStore(config.model_copy(update={"mode": "REPLAY"}), None).read_by_id(snap.snapshot_id)
 
 
+def test_malformed_replay_snapshot_is_reported_cleanly(setup):
+    config, _, _, _ = setup
+    config = config.model_copy(update={"mode": "REPLAY"})
+    store = SnapshotStore(config, None)
+    snapshot_id = "snapshot_" + "a" * 24
+    path = config.cache_directory / f"{snapshot_id}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("{}", encoding="utf-8")
+    with pytest.raises(RetrievalError, match="Malformed frozen snapshot"):
+        store.read_by_id(snapshot_id)
+
+
 def test_round_and_config_limits():
     with pytest.raises(ValidationError):
         SearchQuery(query_id="q", question_id="q", text="x", round=3)

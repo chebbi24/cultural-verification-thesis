@@ -3,24 +3,40 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 import pytest
+import requests
 from pydantic import ValidationError
 from cultverify import CulturalVerifier
-from cultverify.evidence import BlindEvidenceEngine
+from cultverify.evidence import (
+    BlindEvidenceEngine,
+    LLM_DOCUMENT_TEXT_LIMIT,
+    _normalized_source_classification,
+    _safe_query_text,
+)
 from cultverify.schemas import (
     ContextFact,
     ContextFrame,
     DimensionApplicability,
     DimensionPlan,
     DimensionScore,
+    Followup,
     InitialQuestions,
     MaterialTarget,
     RunTrace,
+    SourceClassification,
+    SourceType,
     TargetBatch,
+    VerificationQuestion,
 )
+from cultverify.prompts import PROMPTS
 from cultverify.scoring import aggregate, rank_results
 from cultverify.trace import digest
-from cultverify.validation import validate_context, validate_document_citation, validate_trace_links
-from conftest import FixtureLLM, FixtureRetriever, PROMPT, RESPONSE
+from cultverify.validation import (
+    matching_support_documents,
+    validate_context,
+    validate_document_citation,
+    validate_trace_links,
+)
+from conftest import FixtureLLM, FixtureRetriever, PROMPT, RESPONSE, document as make_document
 
 
 def test_context_quote_validation():
@@ -39,6 +55,54 @@ def test_hallucinated_context_retries_then_unknown(setup):
     assert result.context == ContextFrame()
     assert len([c for c in llm.calls if c["stage"] == "context_planner_v1"]) == 2
     assert result.status == "completed"
+
+
+def test_query_rewrite_cannot_collapse_to_generic_context_goal():
+    context = ContextFrame(user_goal=ContextFact(value="How should I respond?", prompt_span="How should I respond?"))
+    question = VerificationQuestion(
+        kind="followup",
+        text="How do legal citizenship and social identity interact in migration contexts?",
+        question_id="question_fixture",
+    )
+    assert _safe_query_text("How should I respond?", question, context) == question.text
+    rewritten = "legal citizenship social identity migration"
+    assert _safe_query_text(rewritten, question, context) == rewritten
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://en.wikipedia.org/wiki/Example",
+        "https://www.researchgate.net/publication/123",
+        "https://www.academia.edu/123/example",
+        "https://www.ebsco.com/research-starters/law/example",
+        "https://pmc.ncbi.nlm.nih.gov/articles/PMC123/",
+    ],
+)
+def test_secondary_hosts_cannot_be_primary_official_issuers(url):
+    document = make_document(url=url)
+    source = SourceClassification(
+        document_id=document.document_id,
+        source_type=SourceType.OFFICIAL,
+        provenance_basis="explicit",
+        reason="The host is authoritative, so this is official legal material.",
+    )
+    normalized = _normalized_source_classification(source, document)
+    assert normalized.source_type == SourceType.UNKNOWN
+    assert normalized.provenance_basis == "unclear"
+
+
+def test_primary_public_authority_can_remain_official():
+    document = make_document(url="https://verwaltung.bund.de/leistungsverzeichnis/example")
+    source = SourceClassification(
+        document_id=document.document_id,
+        source_type=SourceType.OFFICIAL,
+        provenance_basis="explicit",
+        reason="Issued directly by a public authority as official administrative guidance.",
+    )
+    normalized = _normalized_source_classification(source, document)
+    assert normalized.source_type == SourceType.OFFICIAL
+    assert normalized.provenance_basis == "explicit"
 
 
 @pytest.mark.parametrize("dimension", ["D00", "D11", "T1"])
@@ -70,7 +134,7 @@ def test_invalid_target_quote_abstains(setup):
     assert Path(result.trace_path).exists()
 
 
-def test_target_limit_and_internal_type():
+def test_target_limit_and_epistemic_retrieval_routing():
     target = dict(
         response_quote="x",
         proposition="x",
@@ -83,6 +147,18 @@ def test_target_limit_and_internal_type():
         TargetBatch(targets=(target,) * 4)
     with pytest.raises(ValidationError):
         MaterialTarget(**{**target, "epistemic_type": "response_internal_quality"}, target_id="t")
+    with pytest.raises(ValidationError):
+        MaterialTarget(**{**target, "retrieval_appropriate": False}, target_id="t")
+    with pytest.raises(ValidationError):
+        MaterialTarget(
+            **{**target, "epistemic_type": "descriptive_cultural_norm", "retrieval_appropriate": False},
+            target_id="t",
+        )
+    with pytest.raises(ValidationError):
+        MaterialTarget(
+            **{**target, "epistemic_type": "context_dependent_recommendation", "retrieval_appropriate": False},
+            target_id="t",
+        )
 
 
 def test_configured_target_limit(setup):
@@ -113,7 +189,13 @@ def test_blind_boundary_and_query_inputs(setup):
     sentinel = "UNIQUE_CANDIDATE_CONTENT_67243"
     result = verifier.verify(PROMPT, sentinel)
     assert result.status == "completed"
-    blind_stages = {"query_rewriter_v1", "source_classifier_v1", "evidence_memo_v1", "followup_v1"}
+    blind_stages = {
+        "query_rewriter_v1",
+        "source_classifier_v1",
+        "evidence_memo_v1",
+        "evidence_relevance_v1",
+        "followup_v1",
+    }
     forbidden = {"response", "candidate_response", "target", "candidate_label", "human_chosen", "expected_issue"}
     for call in llm.calls:
         if call["stage"] in blind_stages:
@@ -128,6 +210,630 @@ def test_blind_boundary_and_query_inputs(setup):
     assert order.index("evidence_memo_v1") < order.index("target_comparator_v1")
 
 
+def test_source_classifier_does_not_receive_placeholder_type(setup):
+    _, llm, _, verifier = setup
+    result = verifier.verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    calls = [c for c in llm.calls if c["stage"] == "source_classifier_v1"]
+    assert calls
+    for call in calls:
+        for document in call["payload"]["documents"]:
+            assert set(document) == {"document_id", "url", "title", "text"}
+            assert "source_type" not in document
+
+
+def test_llm_evidence_payload_truncates_text_but_keeps_full_snapshot(setup):
+    config, _, _, _ = setup
+
+    class LongRetriever(FixtureRetriever):
+        def search(self, query, *, top_k, timeout):
+            self.calls.append(query)
+            doc = super().search(query, top_k=top_k, timeout=timeout)[0]
+            text = "x" * (LLM_DOCUMENT_TEXT_LIMIT + 500)
+            return (doc.model_copy(update={"text": text, "content_hash": digest(text)}),)
+
+    retriever = LongRetriever()
+    llm = FixtureLLM(config)
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert len(result.evidence[0].documents[0].text) == LLM_DOCUMENT_TEXT_LIMIT + 500
+
+    for call in llm.calls:
+        if call["stage"] in {"source_classifier_v1", "evidence_memo_v1"}:
+            assert all(len(d["text"]) <= LLM_DOCUMENT_TEXT_LIMIT for d in call["payload"]["documents"])
+        if call["stage"] == "evidence_memo_v1":
+            assert all("source_ref" not in d and "document_id" not in d for d in call["payload"]["documents"])
+
+
+def test_classifier_failure_falls_back_to_unknown(setup):
+    config, _, retriever, _ = setup
+    llm = FixtureLLM(config, overrides={"source_classifier_v1": {"sources": []}})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert result.evidence[0].source_classifications
+    assert all(s.source_type == "unknown" for s in result.evidence[0].source_classifications)
+
+
+def test_unsupported_legal_label_is_downgraded(setup):
+    config, _, retriever, _ = setup
+
+    def legal_memo(payload):
+        supports = [{"quote": d["text"][:300]} for d in payload["documents"]]
+        return {
+            "answer": "Documented cultural guidance.",
+            "scope": "x",
+            "variation": "x",
+            "agreement": "x",
+            "sufficiency": "sufficient",
+            "confidence": "medium",
+            "statements": [
+                {
+                    "text": "Documented cultural guidance.",
+                    "kind": "legal_institutional_rule",
+                    "supports": supports,
+                }
+            ],
+        }
+
+    llm = FixtureLLM(config, overrides={"evidence_memo_v1": legal_memo})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert all(statement.kind == "context_sensitive_practice" for statement in result.evidence[0].memos[-1].statements)
+
+
+def test_inferred_strong_provenance_is_downgraded(setup):
+    config, _, retriever, _ = setup
+
+    def inferred_academic(payload):
+        return {
+            "sources": [
+                {
+                    "document_id": d["document_id"],
+                    "source_type": "academic_peer_reviewed",
+                    "provenance_basis": "inferred",
+                    "reason": "The page looks academic, but peer review is not explicitly established.",
+                }
+                for d in payload["documents"]
+            ]
+        }
+
+    llm = FixtureLLM(config, overrides={"source_classifier_v1": inferred_academic})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert all(s.source_type == "unknown" for s in result.evidence[0].source_classifications)
+
+
+def test_contradictory_strong_source_reason_is_downgraded(setup):
+    config, _, retriever, _ = setup
+
+    def contradictory_official(payload):
+        return {
+            "sources": [
+                {
+                    "document_id": d["document_id"],
+                    "source_type": "official_legal",
+                    "provenance_basis": "explicit",
+                    "reason": "This source is not an official government document.",
+                }
+                for d in payload["documents"]
+            ]
+        }
+
+    llm = FixtureLLM(config, overrides={"source_classifier_v1": contradictory_official})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert all(s.source_type == "unknown" for s in result.evidence[0].source_classifications)
+    assert all(s.provenance_basis == "unclear" for s in result.evidence[0].source_classifications)
+
+
+def test_self_contradictory_institutional_label_is_downgraded(setup):
+    config, _, retriever, _ = setup
+
+    def contradictory_institutional(payload):
+        return {
+            "sources": [
+                {
+                    "document_id": d["document_id"],
+                    "source_type": "institutional_professional",
+                    "provenance_basis": "explicit",
+                    "reason": (
+                        "This is a commercial tutoring platform, not a recognized institution or professional body. "
+                        "The source type should be commercial_lifestyle."
+                    ),
+                }
+                for d in payload["documents"]
+            ]
+        }
+
+    llm = FixtureLLM(config, overrides={"source_classifier_v1": contradictory_institutional})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert all(s.source_type == "unknown" for s in result.evidence[0].source_classifications)
+    assert all(s.provenance_basis == "unclear" for s in result.evidence[0].source_classifications)
+
+
+def test_support_matching_normalizes_whitespace_case_and_typographic_quotes():
+    doc = make_document(text="Du is used:\n\n By equal peers, family, friends and lovers. It is someone’s choice.")
+    matches = matching_support_documents(
+        "DU IS USED: BY EQUAL PEERS, FAMILY, FRIENDS AND LOVERS. IT IS SOMEONE'S CHOICE.",
+        (doc,),
+    )
+    assert matches == (doc,)
+
+
+def test_ungrounded_support_is_dropped_and_memo_downgraded(setup):
+    config, _, retriever, _ = setup
+
+    def bad_support(payload):
+        return {
+            "answer": "Unsupported",
+            "scope": "x",
+            "variation": "x",
+            "agreement": "x",
+            "sufficiency": "sufficient",
+            "confidence": "high",
+            "statements": [
+                {
+                    "text": "Unsupported",
+                    "kind": "context_sensitive_practice",
+                    "supports": [{"quote": "not present in the retrieved document"}],
+                }
+            ],
+        }
+
+    llm = FixtureLLM(config, overrides={"evidence_memo_v1": bad_support})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert result.evidence[0].memos[-1].sufficiency == "insufficient"
+    assert result.evidence[0].memos[-1].confidence == "low"
+    assert result.evidence[0].memos[-1].statements == ()
+    assert result.verdicts[0].verdict == "insufficient"
+
+
+def test_partial_grounding_loss_preserves_sufficient_evidence_with_lower_confidence(setup):
+    config, _, retriever, _ = setup
+
+    def partial_memo(payload):
+        valid_quote = payload["documents"][0]["text"][:300]
+        return {
+            "answer": "One grounded statement survives.",
+            "scope": "x",
+            "variation": "x",
+            "agreement": "x",
+            "sufficiency": "sufficient",
+            "confidence": "high",
+            "statements": [
+                {
+                    "text": "The organiser publishes arrangements.",
+                    "kind": "context_sensitive_practice",
+                    "supports": [{"quote": valid_quote}],
+                },
+                {
+                    "text": "Unsupported extra claim.",
+                    "kind": "context_sensitive_practice",
+                    "supports": [{"quote": "not present in any supplied document"}],
+                },
+            ],
+        }
+
+    llm = FixtureLLM(config, overrides={"evidence_memo_v1": partial_memo})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    memo = result.evidence[0].memos[-1]
+    assert result.status == "completed"
+    assert memo.sufficiency == "sufficient"
+    assert memo.confidence == "medium"
+    assert len(memo.statements) == 1
+    assert result.evidence_coverage == 1
+    assert result.verdicts[0].verdict == "supported"
+
+
+def test_grounded_but_unsupported_synthesis_is_filtered(setup):
+    config, _, retriever, _ = setup
+
+    def overclaim_memo(payload):
+        return {
+            "answer": "Overclaim",
+            "scope": "x",
+            "variation": "x",
+            "agreement": "x",
+            "sufficiency": "sufficient",
+            "confidence": "high",
+            "statements": [
+                {
+                    "text": "The organiser requires every visitor to do something universal.",
+                    "kind": "universal_claim",
+                    "supports": [{"quote": payload["documents"][0]["text"][:300]}],
+                }
+            ],
+        }
+
+    def support_gate(payload):
+        return {
+            "judgments": [
+                {
+                    "statement_index": statement["statement_index"],
+                    "supported_by_quotes": False,
+                    "relevant": True,
+                    "reason": "The claim materially exceeds the quoted evidence.",
+                }
+                for statement in payload["statements"]
+            ]
+        }
+
+    llm = FixtureLLM(
+        config,
+        overrides={"evidence_memo_v1": overclaim_memo, "evidence_relevance_v1": support_gate},
+    )
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    memo = result.evidence[0].memos[-1]
+    assert result.status == "completed"
+    assert memo.statements == ()
+    assert memo.sufficiency == "insufficient"
+    assert memo.confidence == "low"
+    assert result.verdicts[0].verdict == "insufficient"
+
+
+def test_irrelevant_grounded_statement_is_filtered_before_freeze(setup):
+    config, _, retriever, _ = setup
+
+    def irrelevant_memo(payload):
+        return {
+            "answer": "Contains retrieval noise.",
+            "scope": "x",
+            "variation": "x",
+            "agreement": "x",
+            "sufficiency": "sufficient",
+            "confidence": "high",
+            "statements": [
+                {
+                    "text": "The organiser publishes arrangements.",
+                    "kind": "context_sensitive_practice",
+                    "supports": [{"quote": payload["documents"][0]["text"][:300]}],
+                }
+            ],
+        }
+
+    def irrelevant_gate(payload):
+        return {
+            "judgments": [
+                {
+                    "statement_index": statement["statement_index"],
+                    "supported_by_quotes": True,
+                    "relevant": False,
+                    "reason": "The statement is grounded but does not answer either verification question.",
+                }
+                for statement in payload["statements"]
+            ]
+        }
+
+    llm = FixtureLLM(
+        config,
+        overrides={
+            "evidence_memo_v1": irrelevant_memo,
+            "evidence_relevance_v1": irrelevant_gate,
+        },
+    )
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    memo = result.evidence[0].memos[-1]
+    assert result.status == "completed"
+    assert memo.statements == ()
+    assert memo.sufficiency == "insufficient"
+    assert memo.confidence == "low"
+    assert result.verdicts[0].verdict == "insufficient"
+    assert not any(call["stage"] == "target_comparator_v1" for call in llm.calls)
+
+
+def test_downstream_decisions_receive_only_exact_or_structured_inputs(setup):
+    _, llm, _, verifier = setup
+    result = verifier.verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+
+    target_call = next(call for call in llm.calls if call["stage"] == "target_extractor_v1")
+    assert "reasoning" not in target_call["payload"]["dimension_plan"]
+    assert all(
+        set(dimension) == {"dimension_id", "role"}
+        for dimension in target_call["payload"]["dimension_plan"]["dimensions"]
+    )
+
+    question_call = next(call for call in llm.calls if call["stage"] == "verification_question_v1")
+    assert set(question_call["payload"]["target"]) == {"response_quote", "epistemic_type", "dimension_ids"}
+    assert not {"target_id", "proposition", "materiality"}.intersection(question_call["payload"]["target"])
+
+    comparator_call = next(call for call in llm.calls if call["stage"] == "target_comparator_v1")
+    assert set(comparator_call["payload"]["target"]) == {"target_id", "response_quote"}
+    assert set(comparator_call["payload"]["memo"]) == {"memo_id", "sufficiency", "evidence_groups"}
+    assert not {
+        "answer",
+        "scope",
+        "variation",
+        "agreement",
+        "confidence",
+        "citations",
+        "statements",
+    }.intersection(comparator_call["payload"]["memo"])
+    assert all(set(group) == {"supports"} for group in comparator_call["payload"]["memo"]["evidence_groups"])
+
+    scorer_call = next(call for call in llm.calls if call["stage"] == "dimension_scorer_v1")
+    assert all(
+        set(dimension) == {"dimension_id"} for dimension in scorer_call["payload"]["dimension_plan"]["dimensions"]
+    )
+    assert all(
+        set(target) == {"target_id", "response_quote", "dimension_ids", "epistemic_type", "retrieval_appropriate"}
+        for target in scorer_call["payload"]["targets"]
+    )
+    assert all(set(verdict) == {"target_id", "memo_id", "verdict"} for verdict in scorer_call["payload"]["verdicts"])
+    assert all(set(memo) == {"memo_id", "sufficiency", "evidence_groups"} for memo in scorer_call["payload"]["memos"])
+
+
+def test_directional_verdict_forces_numeric_score_retry(setup):
+    config, _, retriever, _ = setup
+    attempts = {"n": 0}
+
+    def scorer(payload):
+        attempts["n"] += 1
+        value = "abstain" if attempts["n"] == 1 else 1
+        return {
+            "scores": [
+                {
+                    "dimension_id": d["dimension_id"],
+                    "score": value,
+                    "rationale": "Assessable but incomplete evidence.",
+                    "response_quotes": [payload["response"]],
+                }
+                for d in payload["dimension_plan"]["dimensions"]
+            ]
+        }
+
+    llm = FixtureLLM(config, overrides={"dimension_scorer_v1": scorer})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert attempts["n"] == 2
+    assert all(score.score == 1 for score in result.dimension_scores)
+
+
+def test_numeric_score_gets_assessable_target_link_from_python(setup):
+    config, _, retriever, _ = setup
+    attempts = {"n": 0}
+
+    def scorer(payload):
+        attempts["n"] += 1
+        return {
+            "scores": [
+                {
+                    "dimension_id": d["dimension_id"],
+                    "score": 2,
+                    "rationale": "Assessable evidence.",
+                    "response_quotes": [payload["response"]],
+                }
+                for d in payload["dimension_plan"]["dimensions"]
+            ]
+        }
+
+    llm = FixtureLLM(config, overrides={"dimension_scorer_v1": scorer})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert attempts["n"] == 1
+    assert all(score.target_ids for score in result.dimension_scores)
+
+
+def test_forced_abstention_dimension_is_omitted_from_scorer_payload(setup):
+    config, _, _, _ = setup
+    retriever = FixtureRetriever(empty=True)
+
+    def scorer(_payload):
+        raise AssertionError("Scorer must not run when every planned dimension is forced to abstain")
+
+    llm = FixtureLLM(config, overrides={"dimension_scorer_v1": scorer})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert all(score.score == "abstain" for score in result.dimension_scores)
+
+
+def test_all_external_insufficient_requires_dimension_abstention(setup):
+    config, _, _, _ = setup
+    retriever = FixtureRetriever(empty=True)
+    attempts = {"n": 0}
+
+    def scorer(payload):
+        attempts["n"] += 1
+        return {
+            "scores": [
+                {
+                    "dimension_id": d["dimension_id"],
+                    "score": 2,
+                    "rationale": "The model incorrectly tries to score unavailable evidence.",
+                    "response_quotes": [payload["response"]],
+                    "target_ids": [
+                        t["target_id"] for t in payload["targets"] if d["dimension_id"] in t["dimension_ids"]
+                    ],
+                }
+                for d in payload["dimension_plan"]["dimensions"]
+            ]
+        }
+
+    llm = FixtureLLM(config, overrides={"dimension_scorer_v1": scorer})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert attempts["n"] == 0
+    assert all(score.score == "abstain" for score in result.dimension_scores)
+    assert all(not score.response_quotes for score in result.dimension_scores)
+    assert all("abstained deterministically" in score.rationale for score in result.dimension_scores)
+    assert all(score.target_ids for score in result.dimension_scores)
+    assert all(score.memo_ids for score in result.dimension_scores)
+    assert result.overall_score is None
+    assert result.candidate_abstained
+
+
+def test_invalid_followup_output_keeps_current_memo(setup):
+    config, _, _, _ = setup
+    retriever = FixtureRetriever(empty=True)
+    llm = FixtureLLM(
+        config, overrides={"followup_v1": {"question": {"kind": "baseline", "text": "bad"}, "reason": "x"}}
+    )
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert len(result.evidence[0].memos) == 1
+    assert result.evidence[0].memos[-1].sufficiency == "insufficient"
+    assert "Follow-up planning unavailable" in result.evidence[0].followup_reason
+    assert result.verdicts[0].verdict == "insufficient"
+
+
+def test_initial_memo_timeout_becomes_explicit_insufficient_memo(setup):
+    config, _, retriever, _ = setup
+
+    def timeout(_payload):
+        raise requests.ReadTimeout("fixture timeout")
+
+    llm = FixtureLLM(config, overrides={"evidence_memo_v1": timeout})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+
+    assert result.status == "completed"
+    assert len(result.evidence) == 1
+    bundle = result.evidence[0]
+    assert len(bundle.memos) == 1
+    assert bundle.memos[-1].sufficiency == "insufficient"
+    assert bundle.memos[-1].confidence == "low"
+    assert not bundle.memos[-1].statements
+    assert len(bundle.questions) == 2
+    assert len(bundle.queries) == 2
+    assert len(bundle.snapshots) == 2
+    assert "Initial evidence synthesis unavailable" in bundle.followup_reason
+    assert result.verdicts[0].verdict == "insufficient"
+    assert result.candidate_abstained
+    assert not any(call["stage"] == "followup_v1" for call in llm.calls)
+
+    trace = RunTrace.model_validate_json(Path(result.trace_path).read_text())
+    timeout_calls = [
+        call for call in trace.calls if call.stage == "evidence_memo_v1" and call.error and "ReadTimeout" in call.error
+    ]
+    assert len(timeout_calls) == 2
+
+
+def test_followup_memo_timeout_keeps_round_one_frozen_memo(setup):
+    config, _, retriever, _ = setup
+    memo_calls = {"n": 0}
+
+    def memo_then_timeout(payload):
+        memo_calls["n"] += 1
+        if memo_calls["n"] > 1:
+            raise requests.ReadTimeout("fixture timeout")
+        supports = [{"quote": d["text"][:300]} for d in payload["documents"]]
+        return {
+            "answer": "Some grounded evidence exists, but it is not sufficient.",
+            "scope": "The documented event",
+            "variation": "More specific evidence would help.",
+            "agreement": "Limited evidence",
+            "sufficiency": "insufficient",
+            "confidence": "low",
+            "statements": [
+                {
+                    "text": "The organiser publishes arrangements.",
+                    "kind": "context_sensitive_practice",
+                    "supports": supports,
+                }
+            ],
+        }
+
+    llm = FixtureLLM(config, overrides={"evidence_memo_v1": memo_then_timeout})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+
+    assert result.status == "completed"
+    assert len(result.evidence) == 1
+    bundle = result.evidence[0]
+    assert len(bundle.memos) == 1
+    assert bundle.memos[-1].sufficiency == "insufficient"
+    assert len(bundle.questions) == 2
+    assert len(bundle.queries) == 2
+    assert len(bundle.snapshots) == 2
+    assert "Follow-up evidence refinement unavailable" in bundle.followup_reason
+    assert result.verdicts[0].verdict == "insufficient"
+    assert result.candidate_abstained
+
+    trace = RunTrace.model_validate_json(Path(result.trace_path).read_text())
+    timeout_calls = [
+        call for call in trace.calls if call.stage == "evidence_memo_v1" and call.error and "ReadTimeout" in call.error
+    ]
+    assert timeout_calls
+
+
+def test_followup_receives_only_grounded_statement_level_memo(setup):
+    config, _, _, _ = setup
+    retriever = FixtureRetriever(empty=True)
+    llm = FixtureLLM(config)
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    followup_call = next(call for call in llm.calls if call["stage"] == "followup_v1")
+    assert set(followup_call["payload"]["memo"]) == {"sufficiency", "evidence_groups"}
+    assert not {
+        "answer",
+        "scope",
+        "variation",
+        "agreement",
+        "confidence",
+        "citations",
+        "memo_id",
+        "statements",
+    }.intersection(followup_call["payload"]["memo"])
+    assert all(set(group) == {"supports"} for group in followup_call["payload"]["memo"]["evidence_groups"])
+
+
+def test_duplicate_followup_is_skipped(setup):
+    config, _, _, _ = setup
+    retriever = FixtureRetriever(empty=True)
+
+    def duplicate(payload):
+        return {
+            "question": {
+                "kind": "followup",
+                "text": payload["questions"][0]["text"],
+            },
+            "reason": "No distinct searchable gap beyond the existing baseline question.",
+        }
+
+    llm = FixtureLLM(config, overrides={"followup_v1": duplicate})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert len(result.evidence[0].questions) == 2
+    assert len(retriever.calls) == 2
+    assert len(result.evidence[0].memos) == 1
+
+
+def test_followup_reason_is_bounded_and_prompt_is_concise():
+    Followup(question=None, reason="Short reason.")
+    with pytest.raises(ValidationError):
+        Followup(question=None, reason="x" * 401)
+    assert "1-2 concise sentences" in PROMPTS["followup_v1"]
+    assert "must not repeat or paraphrase" in PROMPTS["followup_v1"]
+
+
+def test_scope_and_query_prompts_prefer_general_then_authoritative():
+    question_prompt = PROMPTS["verification_question_v1"]
+    query_prompt = PROMPTS["query_rewriter_v1"]
+    assert "broadest justified" in question_prompt
+    assert "named city or region" in question_prompt
+    assert "academic or linguistic" in query_prompt
+    assert "official or institutional" in query_prompt
+    assert "must never replace the verification question" in query_prompt
+    assert "provenance_basis" in PROMPTS["source_classifier_v1"]
+    assert "Classify the ISSUER" in PROMPTS["source_classifier_v1"]
+    assert "Wikipedia is never primary official/legal material" in PROMPTS["source_classifier_v1"]
+    assert "REQUIRE provenance_basis=explicit" in PROMPTS["source_classifier_v1"]
+    assert "VERBATIM span" in PROMPTS["evidence_memo_v1"]
+    assert "Do not return source references" in PROMPTS["evidence_memo_v1"]
+    assert "ONLY for an actual binding law" in PROMPTS["evidence_memo_v1"]
+    assert "supported_by_quotes" in PROMPTS["evidence_relevance_v1"]
+    assert "materially" in PROMPTS["evidence_relevance_v1"]
+    assert "supplied frozen" in PROMPTS["target_comparator_v1"]
+    assert "support quotes" in PROMPTS["target_comparator_v1"]
+    assert "Do not return target_id or memo_id" in PROMPTS["target_comparator_v1"]
+    assert "genuinely unscorable only" in PROMPTS["dimension_scorer_v1"]
+    assert "relevant retrievable target is insufficient" in PROMPTS["dimension_scorer_v1"]
+    assert "Do not return target IDs or memo IDs" in PROMPTS["dimension_scorer_v1"]
+    assert "explicitly named places belong in location" in PROMPTS["context_planner_v1"]
+    assert "Prefer the smallest" in PROMPTS["dimension_planner_v1"]
+    assert "sufficient set of dimensions" in PROMPTS["dimension_planner_v1"]
+
+
 def test_max_two_rounds_one_followup(setup):
     config, _, _, _ = setup
     retriever = FixtureRetriever(empty=True)
@@ -140,6 +846,51 @@ def test_max_two_rounds_one_followup(setup):
     assert len(bundle.memos) == 2 and bundle.memos[-1].sufficiency == "insufficient"
     assert sum(c["stage"] == "followup_v1" for c in llm.calls) == 1
     assert result.evidence_coverage == 0
+    assert result.verdicts[0].verdict == "insufficient"
+    assert not any(c["stage"] == "target_comparator_v1" for c in llm.calls)
+
+
+def test_memo_quotes_map_to_exact_document_ids(setup):
+    _, llm, _, verifier = setup
+    result = verifier.verify(PROMPT, RESPONSE)
+    memo_call = next(c for c in llm.calls if c["stage"] == "evidence_memo_v1")
+    assert all("document_id" not in d for d in memo_call["payload"]["documents"])
+
+    memo = result.evidence[0].memos[-1]
+    documents = {document.document_id: document for document in result.evidence[0].documents}
+    assert set(memo.citations) <= set(documents)
+    for statement in memo.statements:
+        for support in statement.supports:
+            assert support.document_id in documents
+            assert support.quote in documents[support.document_id].text
+
+
+def test_memo_citations_are_derived_from_statement_union(setup):
+    _, _, _, verifier = setup
+    result = verifier.verify(PROMPT, RESPONSE)
+    memo = result.evidence[0].memos[-1]
+    expected = tuple(dict.fromkeys(c for statement in memo.statements for c in statement.citations))
+    assert memo.citations == expected
+
+
+def test_memo_draft_rejects_more_than_five_statements():
+    from cultverify.schemas import MemoDraft
+
+    statement = {
+        "text": "x",
+        "kind": "context_sensitive_practice",
+        "supports": [{"quote": "x"}],
+    }
+    with pytest.raises(ValidationError):
+        MemoDraft(
+            answer="x",
+            scope="x",
+            variation="x",
+            agreement="x",
+            sufficiency="sufficient",
+            confidence="medium",
+            statements=[statement] * 6,
+        )
 
 
 def test_citations_require_retrieved_document(setup):
@@ -195,6 +946,16 @@ def test_rank_shared_planning_and_exact_tie(setup):
     assert all(c.dimension_plan is result.candidates[0].dimension_plan for c in result.candidates)
 
 
+def test_ranking_with_failed_candidate_returns_no_clear_winner(setup):
+    _, _, _, verifier = setup
+    candidate = verifier.verify(PROMPT, RESPONSE)
+    failed = candidate.model_copy(update={"status": "failed", "errors": ("fixture",)})
+    ranking = rank_results([candidate, candidate, failed, candidate])
+    assert ranking.winner == "no_clear_winner"
+    assert ranking.tied_indices == ()
+    assert ranking.coverage_comparable is False
+
+
 def test_ranking_all_abstain_and_unique_winner(setup):
     _, _, _, verifier = setup
     candidate = verifier.verify(PROMPT, RESPONSE)
@@ -217,6 +978,23 @@ def test_replay_no_live_calls_and_no_query_rewrite(setup):
     assert replay.evidence[0].snapshots == live.evidence[0].snapshots
     assert not any(c["stage"] == "query_rewriter_v1" for c in llm.calls)
     assert replay.evidence[0].memos == live.evidence[0].memos
+
+
+def test_result_summary_invariants_are_trace_validated(setup):
+    _, _, _, verifier = setup
+    result = verifier.verify(PROMPT, RESPONSE)
+    trace = RunTrace.model_validate_json(Path(result.trace_path).read_text())
+
+    with pytest.raises(ValueError, match="Overall score mismatch"):
+        validate_trace_links(trace.model_copy(update={"result": result.model_copy(update={"overall_score": 0.123})}))
+    with pytest.raises(ValueError, match="Evidence coverage summary mismatch"):
+        validate_trace_links(
+            trace.model_copy(update={"result": result.model_copy(update={"evidence_coverage": 0.123})})
+        )
+    with pytest.raises(ValueError, match="Abstained dimension summary mismatch"):
+        validate_trace_links(
+            trace.model_copy(update={"result": result.model_copy(update={"abstained_dimensions": ("D01",)})})
+        )
 
 
 def test_trace_links_and_corruption(setup):
@@ -273,8 +1051,6 @@ def test_no_python_score_override_on_contradiction(setup):
 
     def contradicted(payload):
         return {
-            "target_id": payload["target"]["target_id"],
-            "memo_id": payload["memo"]["memo_id"],
             "verdict": "contradicted",
             "reasoning": "Contradicted fixture",
         }
@@ -285,31 +1061,117 @@ def test_no_python_score_override_on_contradiction(setup):
     assert result.status == "completed" and result.overall_score == 1
 
 
-def test_broken_score_memo_links_retry_then_abstain(setup):
+def test_target_comparator_ids_are_python_derived(setup):
     config, _, retriever, _ = setup
+
+    def comparator(_payload):
+        return {
+            "verdict": "supported",
+            "reasoning": "The frozen evidence supports the target.",
+        }
+
+    llm = FixtureLLM(config, overrides={"target_comparator_v1": comparator})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    verdict = result.verdicts[0]
+    assert verdict.target_id == result.targets[0].target_id
+    assert verdict.memo_id == result.evidence[0].memos[-1].memo_id
+
+    comparator_call = next(call for call in llm.calls if call["stage"] == "target_comparator_v1")
+    assert "target_id" not in comparator_call["schema"]["properties"]
+    assert "memo_id" not in comparator_call["schema"]["properties"]
+
+
+def test_scoring_links_are_python_owned_and_dimension_safe(setup):
+    config, _, retriever, _ = setup
+
+    def plan(_payload):
+        return {
+            "dimensions": [
+                {"dimension_id": "D03", "role": "primary", "reason": "primary"},
+                {"dimension_id": "D02", "role": "secondary", "reason": "secondary"},
+            ],
+            "reasoning": "Two applicable dimensions.",
+        }
+
+    def target(_payload):
+        return {
+            "targets": [
+                {
+                    "response_quote": RESPONSE,
+                    "proposition": "A social-etiquette claim.",
+                    "epistemic_type": "external_fact",
+                    "dimension_ids": ["D03"],
+                    "materiality": "high",
+                    "retrieval_appropriate": True,
+                }
+            ]
+        }
+
+    def scorer(payload):
+        assert [d["dimension_id"] for d in payload["dimension_plan"]["dimensions"]] == ["D03", "D02"]
+        return {
+            "scores": [
+                {
+                    "dimension_id": "D03",
+                    "score": 2,
+                    "rationale": "Supported etiquette.",
+                    "response_quotes": [RESPONSE],
+                },
+                {
+                    "dimension_id": "D02",
+                    "score": 1,
+                    "rationale": "Direct language assessment.",
+                    "response_quotes": [RESPONSE],
+                },
+            ]
+        }
+
     llm = FixtureLLM(
         config,
         overrides={
-            "dimension_scorer_v1": {
-                "scores": [
-                    {
-                        "dimension_id": "D03",
-                        "score": 2,
-                        "rationale": "x",
-                        "response_quotes": [RESPONSE],
-                        "target_ids": [],
-                        "memo_ids": ["invented"],
-                    }
-                ]
-            }
+            "dimension_planner_v1": plan,
+            "target_extractor_v1": target,
+            "dimension_scorer_v1": scorer,
         },
     )
     result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
-    assert result.status == "failed" and result.candidate_abstained
-    assert sum(c["stage"] == "dimension_scorer_v1" for c in llm.calls) == 2
+    assert result.status == "completed"
+    by_dimension = {score.dimension_id: score for score in result.dimension_scores}
+    assert by_dimension["D03"].target_ids
+    assert by_dimension["D02"].target_ids == ()
+    assert by_dimension["D02"].memo_ids == ()
 
 
-def test_missing_citations_fail_before_target_comparison(setup):
+def test_score_memo_links_are_derived_from_target_ids(setup):
+    config, _, retriever, _ = setup
+
+    def scorer(payload):
+        return {
+            "scores": [
+                {
+                    "dimension_id": "D03",
+                    "score": 2,
+                    "rationale": "x",
+                    "response_quotes": [RESPONSE],
+                }
+            ]
+        }
+
+    llm = FixtureLLM(config, overrides={"dimension_scorer_v1": scorer})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    score_result = result.dimension_scores[0]
+    verdict_by_target = {verdict.target_id: verdict for verdict in result.verdicts}
+    assert score_result.target_ids
+    assert score_result.memo_ids == tuple(verdict_by_target[target_id].memo_id for target_id in score_result.target_ids)
+    scorer_call = next(call for call in llm.calls if call["stage"] == "dimension_scorer_v1")
+    scorer_schema = json.dumps(scorer_call["schema"], sort_keys=True)
+    assert "target_ids" not in scorer_schema
+    assert "memo_ids" not in scorer_schema
+
+
+def test_ungrounded_support_cannot_reach_target_comparison(setup):
     config, _, retriever, _ = setup
     llm = FixtureLLM(
         config,
@@ -321,16 +1183,20 @@ def test_missing_citations_fail_before_target_comparison(setup):
                 "agreement": "x",
                 "sufficiency": "sufficient",
                 "confidence": "high",
-                "statements": [],
-                "citations": [],
+                "statements": [
+                    {
+                        "text": "Unsupported fact",
+                        "kind": "context_sensitive_practice",
+                        "supports": [{"quote": "not present in any supplied document"}],
+                    }
+                ],
             }
         },
     )
     result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
-    assert result.status == "failed" and not result.verdicts
-    trace = RunTrace.model_validate_json(Path(result.trace_path).read_text())
-    assert trace.partial_evidence_json and "snapshots" in trace.partial_evidence_json
-    assert sum(c.stage == "evidence_memo_v1" for c in trace.calls) == 2
+    assert result.status == "completed"
+    assert result.verdicts[0].verdict == "insufficient"
+    assert not any(c["stage"] == "target_comparator_v1" for c in llm.calls)
 
 
 def test_citation_trace_score_reference_validation(setup):
@@ -342,3 +1208,44 @@ def test_citation_trace_score_reference_validation(setup):
         validate_trace_links(
             trace.model_copy(update={"result": result.model_copy(update={"dimension_scores": (bad_score,)})})
         )
+
+
+def test_conflicting_final_memo_counts_as_evidence_coverage(setup):
+    config, _, retriever, _ = setup
+
+    def conflicting(payload):
+        supports = [{"quote": d["text"][:300]} for d in payload["documents"]]
+        return {
+            "answer": "The retrieved sources do not resolve the question consistently.",
+            "scope": "The documented context",
+            "variation": "Relevant sources differ.",
+            "agreement": "Conflicting evidence",
+            "sufficiency": "conflicting",
+            "confidence": "medium",
+            "statements": [
+                {
+                    "text": "The retrieved sources do not resolve the question consistently.",
+                    "kind": "context_sensitive_practice",
+                    "supports": supports,
+                }
+            ],
+        }
+
+    llm = FixtureLLM(config, overrides={"evidence_memo_v1": conflicting})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert result.evidence[0].memos[-1].sufficiency == "conflicting"
+    assert result.evidence_coverage == 1
+
+
+def test_insufficient_memo_cannot_produce_directional_verdict(setup):
+    config, _, _, _ = setup
+    retriever = FixtureRetriever(empty=True)
+    llm = FixtureLLM(
+        config,
+        overrides={"target_comparator_v1": AssertionError("Comparator must not run on insufficient evidence")},
+    )
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert result.verdicts[0].verdict == "insufficient"
+    assert result.evidence[0].memos[-1].sufficiency == "insufficient"

@@ -1,0 +1,11 @@
+{
+  "derived": {
+    "human_gold_candidates.csv": "e4b82643263f3d62e1e5f04cba1a249f8ab95d3239bf51b782d522eabc93c35e",
+    "human_gold_prompts.csv": "c35c6a14b017973b1bb09effd246b061e045cfa2c184bc68375fde665ad600b4",
+    "human_gold_summary.json": "22bdf0af8762383824f40fd9b6dc617c16e19bd38bf4b95de44250b5405ad9da"
+  },
+  "freeze_version": "human-gold-v1",
+  "policy": "Raw annotations are immutable. Derived files are regenerated only from the frozen source workbook.",
+  "source_file": "human_annotations_raw.xlsx",
+  "source_sha256": "67718010e07331e1090bfcfcf3c26f8c3ee975c0e0a6369d4fe85ad23f9ea558"
+}

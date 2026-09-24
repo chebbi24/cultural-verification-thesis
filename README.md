@@ -11,15 +11,17 @@ are hard-coded in Python.
 Prompt → supported context → shared dimension plan → up to three material targets
 → two neutral questions per retrievable target → **candidate-blind evidence**
 → query rewriting → retrieval and provenance filtering → source classification
-→ evidence memo → optional single gap-specific follow-up → **frozen memo**
+→ evidence memo → exact-span grounding → blind support/relevance gate
+→ optional single gap-specific follow-up → **frozen memo**
 → target comparison → D01–D10 scoring → equal aggregation → JSON trace.
 
 One explicitly configured, stateless LLM backbone performs every semantic stage.
 Temperature defaults to zero; there is no model fallback. Python validates structure,
 quotes, citations, links and budgets; it does not decide cultural appropriateness.
 Each nonempty dimension plan has one primary dimension, but **all dimensions have
-equal scoring weight**. No external search is performed for internal-quality or
-non-verifiable-value targets. These are assessed directly in dimension scoring.
+equal scoring weight**. External facts, descriptive cultural norms and context-dependent recommendations always require
+evidence retrieval. No external search is performed for internal-quality or non-verifiable-value
+targets; those are assessed directly in dimension scoring.
 
 The runtime rubric preserves the existing D01–D10 definitions and scoring anchors.
 Its packaged copy standardizes the requested names, removes benchmark parent mappings,
@@ -75,7 +77,8 @@ configuration file → supported environment variables → explicit CLI flags.
 
 Both commands print structured JSON. Exit code 0 indicates completed execution
 (including genuine abstention); 2 indicates invalid configuration or pipeline failure.
-Winner indices are **zero-based**; ties and all-abstained sets return `no_clear_winner`.
+Winner indices are **zero-based**; ties, all-abstained sets and any ranking containing
+a failed candidate return `no_clear_winner`.
 
 ## Python API
 
@@ -137,11 +140,19 @@ The two neutral questions necessarily convey the issue under investigation; this
 is a structural candidate-blind boundary, **not proof that question wording is unbiased**.
 Source text is untrusted data in all semantic prompts.
 
-The memo and its nested records/collections are immutable. Only after it is frozen
+The memo and its nested records/collections are immutable. Free-form memo summaries and statement paraphrases are not passed to the follow-up planner,
+target comparator or dimension scorer. Post-freeze decisions use exact retrieved support
+quotes plus structured IDs/verdict labels; comparator reasoning is also excluded from scoring. Only after the memo is frozen
 does target comparison receive the target again. Trace events record this ordering.
-Every cited factual statement links to retrieved document IDs; Python validates the
-references, while whether a source actually supports a statement remains a semantic
-judgment requiring empirical audit.
+Every cited factual statement links to retrieved document IDs. Python resolves citations
+only from source spans that match retrieved text after conservative formatting
+normalization. A separate candidate-blind semantic gate rejects statements that exceed
+their quoted supports or do not materially answer a verification question. Invalid or
+irrelevant supports are removed individually; if usable grounded statements survive, the
+memo is retained and confidence is conservatively reduced rather than automatically
+discarding the entire evidence round. If none survive, the memo becomes
+`insufficient/low`. These checks reduce unsupported synthesis but remain model judgments
+that require empirical audit.
 
 Configure `excluded_domains`, `excluded_repos` (owner/repository) and
 `excluded_paths` (URL/path globs) for the exact external benchmark sources used.
@@ -155,17 +166,21 @@ are loaded by the package.
 prompt/response hashes, rubric/template hashes and versions, timestamped semantic
 calls and retry outcomes, context, plan, targets, questions, queries, documents,
 source classifications, memo revisions, final memo links, verdicts, scores, coverage,
-errors and partial evidence on failed runs. Ranking writes one complete trace per
-candidate and reuses the exact prompt-level plan across all four.
+errors and partial evidence on failed runs. Final trace validation recomputes scoring
+coverage, overall score, abstention state, evidence coverage and final memo links so these
+summary fields cannot silently disagree with their underlying records. Ranking writes one
+complete trace per candidate and reuses the exact prompt-level plan across all four.
 
 ## Scores and limitations
 
-Dimensions receive 0, 1, 2 or `abstain`. The overall score is the mean of scored
+Dimensions receive 0, 1, 2 or `abstain`. If every retrievable target relevant to a
+dimension ends `insufficient` and there is no relevant non-retrieval target that can be
+assessed directly, that dimension must abstain. The overall score is the mean of scored
 dimensions divided by two; if none can be scored it is `null`. There are no caps or
 primary/secondary weighting differences. Ranking uses exact rational comparison,
 so floating-point rounding cannot break a mathematical tie. No tie margin is added.
 
-- `evidence_coverage`: proportion of retrievable targets with a sufficient final memo;
+- `evidence_coverage`: proportion of retrievable targets whose final memo is not `insufficient` (`sufficient` or `conflicting`);
   `null` when no target required external evidence. This is not factual accuracy.
 - `scored_count`, `applicable_count`, `abstained_dimensions`: scoring coverage.
 - `coverage_comparable`: whether all candidates scored the same dimension set.

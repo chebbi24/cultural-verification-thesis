@@ -1,7 +1,7 @@
 """Independent Skywork reward-model Best-of-4 baseline.
 
-This file is intentionally separate from verifier.py: the reward-model score is
-never used by the proposed cultural verifier.
+This file is intentionally separate from the cultverify package: reward-model scores
+never enter the proposed cultural verifier.
 """
 
 from __future__ import annotations
@@ -67,20 +67,23 @@ def main() -> None:
         scores = {label: rm.score(row["prompt"], row[f"response_{label}"]) for label in "abcd"}
         winner = max(scores, key=scores.get)
         human = (row.get("human_chosen") or "").strip().lower()
-        output.append({
-            "set_id": row.get("set_id", f"row_{index}"),
-            "prompt_id": row.get("prompt_id", ""),
-            "human_chosen": human,
-            "rm_winner": winner,
-            "rm_correct": int(bool(human) and winner == human),
-            **{f"rm_score_{label}": scores[label] for label in "abcd"},
-        })
+        output.append(
+            {
+                "set_id": row.get("set_id", f"row_{index}"),
+                "prompt_id": row.get("prompt_id", ""),
+                "human_chosen": human,
+                "rm_winner": winner,
+                "rm_correct": int(bool(human) and winner == human),
+                **{f"rm_score_{label}": scores[label] for label in "abcd"},
+            }
+        )
 
     args.output_csv.parent.mkdir(parents=True, exist_ok=True)
     fields = ["set_id", "prompt_id", "human_chosen", "rm_winner", "rm_correct"] + [f"rm_score_{x}" for x in "abcd"]
     with args.output_csv.open("w", encoding="utf-8-sig", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fields)
-        writer.writeheader(); writer.writerows(output)
+        writer.writeheader()
+        writer.writerows(output)
 
     labelled = [row for row in output if row["human_chosen"]]
     if labelled:

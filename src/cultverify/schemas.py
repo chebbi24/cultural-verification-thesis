@@ -67,6 +67,13 @@ class TargetDraft(Record):
 
     @model_validator(mode="after")
     def retrieval_type(self):
+        if (
+            self.epistemic_type in (EpistemicType.EXTERNAL, EpistemicType.NORM, EpistemicType.RECOMMENDATION)
+            and not self.retrieval_appropriate
+        ):
+            raise ValueError(
+                "External facts, descriptive norms and context-dependent recommendations require retrieval"
+            )
         if self.retrieval_appropriate and self.epistemic_type in (EpistemicType.INTERNAL, EpistemicType.VALUE):
             raise ValueError("Internal quality/value targets must not trigger retrieval")
         if len(set(self.dimension_ids)) != len(self.dimension_ids):
@@ -139,6 +146,7 @@ class RetrievedDocument(Record):
 class SourceClassification(Record):
     document_id: Text
     source_type: SourceType
+    provenance_basis: Literal["explicit", "inferred", "unclear"]
     reason: Text
 
 
@@ -146,10 +154,37 @@ class SourceBatch(Record):
     sources: tuple[SourceClassification, ...]
 
 
+class EvidenceSupportDraft(Record):
+    quote: Annotated[str, Field(min_length=1, max_length=300)]
+
+
+class EvidenceSupport(Record):
+    document_id: Text
+    quote: Annotated[str, Field(min_length=1, max_length=300)]
+
+
+class EvidenceStatementDraft(Record):
+    text: Text
+    kind: Literal["tendency", "context_sensitive_practice", "legal_institutional_rule", "universal_claim"]
+    supports: tuple[EvidenceSupportDraft, ...] = Field(min_length=1)
+
+
 class EvidenceStatement(Record):
     text: Text
     kind: Literal["tendency", "context_sensitive_practice", "legal_institutional_rule", "universal_claim"]
     citations: tuple[Text, ...] = Field(min_length=1)
+    supports: tuple[EvidenceSupport, ...] = ()
+
+
+class StatementRelevance(Record):
+    statement_index: Annotated[int, Field(strict=True, ge=0, le=4)]
+    supported_by_quotes: Annotated[bool, Field(strict=True)]
+    relevant: Annotated[bool, Field(strict=True)]
+    reason: Text
+
+
+class StatementRelevanceBatch(Record):
+    judgments: tuple[StatementRelevance, ...] = Field(max_length=5)
 
 
 class MemoDraft(Record):
@@ -159,18 +194,25 @@ class MemoDraft(Record):
     agreement: Text
     sufficiency: Literal["sufficient", "conflicting", "insufficient"]
     confidence: Literal["low", "medium", "high"]
-    statements: tuple[EvidenceStatement, ...]
+    statements: tuple[EvidenceStatementDraft, ...] = Field(max_length=5)
+
+
+class EvidenceMemo(Record):
+    answer: Text
+    scope: Text
+    variation: Text
+    agreement: Text
+    sufficiency: Literal["sufficient", "conflicting", "insufficient"]
+    confidence: Literal["low", "medium", "high"]
+    statements: tuple[EvidenceStatement, ...] = Field(max_length=5)
     citations: tuple[Text, ...]
-
-
-class EvidenceMemo(MemoDraft):
     memo_id: Text
     question_ids: tuple[Text, ...]
 
 
 class Followup(Record):
     question: QuestionDraft | None
-    reason: Text
+    reason: Annotated[str, Field(min_length=1, max_length=400)]
 
     @model_validator(mode="after")
     def kind(self):
@@ -179,18 +221,28 @@ class Followup(Record):
         return self
 
 
-class TargetVerdict(Record):
-    target_id: Text
-    memo_id: Text
+class TargetVerdictDraft(Record):
     verdict: Literal["supported", "contradicted", "mixed", "insufficient"]
     reasoning: Text
 
 
-class DimensionScore(Record):
+class TargetVerdict(TargetVerdictDraft):
+    target_id: Text
+    memo_id: Text
+
+
+class DimensionScoreDraft(Record):
     dimension_id: DimensionID
     score: Annotated[int, Field(strict=True, ge=0, le=2)] | Literal["abstain"]
     rationale: Text
     response_quotes: tuple[Text, ...]
+
+
+class ScoreDraftBatch(Record):
+    scores: tuple[DimensionScoreDraft, ...]
+
+
+class DimensionScore(DimensionScoreDraft):
     target_ids: tuple[Text, ...]
     memo_ids: tuple[Text, ...]
 

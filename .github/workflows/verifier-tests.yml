@@ -3,7 +3,8 @@ name: Verifier tests
 on:
   push:
     branches:
-      - agent/final-standalone-verifier
+      - agent/clean-standalone-verifier
+      - agent/final-verifier
   pull_request:
 
 jobs:
@@ -16,10 +17,14 @@ jobs:
         with:
           python-version: '3.11'
           cache: pip
-          cache-dependency-path: src/requirements.txt
+          cache-dependency-path: pyproject.toml
       - name: Install dependencies
-        run: python -m pip install -r src/requirements.txt
+        run: python -m pip install -e '.[test]'
       - name: Compile
-        run: python -m compileall -q src tests
+        run: python -m compileall -q src scripts tests
       - name: Unit tests
-        run: python -m unittest discover -s tests -v
+        run: python -m pytest -q
+      - name: Ruff lint
+        run: ruff check src scripts tests
+      - name: Ruff format
+        run: ruff format --check src scripts tests

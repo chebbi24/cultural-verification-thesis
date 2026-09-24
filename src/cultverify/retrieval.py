@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Protocol
 from urllib.parse import unquote, urlsplit, urlunsplit
 import requests
+from pydantic import ValidationError
 from .config import PIPELINE_VERSION, Config
 from .schemas import FilteredResult, RetrievedDocument, RetrievalSnapshot, SearchQuery
 from .trace import digest, stable_id, timestamp, write_json
@@ -47,17 +48,31 @@ class TavilyRetriever:
             timeout=timeout,
         )
         response.raise_for_status()
+        try:
+            data = response.json()
+            results = data["results"]
+            if not isinstance(results, list):
+                raise TypeError("results must be a list")
+        except (ValueError, KeyError, TypeError) as exc:
+            raise RetrievalError("Malformed search provider response") from exc
+
         documents = []
-        for rank, item in enumerate(response.json()["results"], 1):
+        for rank, item in enumerate(results, 1):
+            if not isinstance(item, dict):
+                raise RetrievalError("Malformed search result item")
+            url = item.get("url")
+            title = item.get("title") or ""
             content = item.get("content") or ""
-            if not item.get("url") or not content.strip():
+            if not isinstance(url, str) or not isinstance(title, str) or not isinstance(content, str):
+                raise RetrievalError("Malformed search result fields")
+            if not url.strip() or not content.strip():
                 continue
             documents.append(
                 RetrievedDocument(
-                    document_id=stable_id("doc", [canonical_url(item["url"]), content]),
+                    document_id=stable_id("doc", [canonical_url(url), content]),
                     query=query,
-                    url=item["url"],
-                    title=item.get("title", ""),
+                    url=url,
+                    title=title,
                     text=content,
                     rank=rank,
                     provider_score=item.get("score"),
@@ -176,5 +191,9 @@ class SnapshotStore:
         path = self.config.cache_directory / f"{snapshot_id}.json"
         if not path.exists():
             raise RetrievalError("Missing frozen snapshot")
-        raw = json.loads(path.read_text())
-        return self._read(path, SearchQuery.model_validate(raw["query"]), snapshot_id)
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            query = SearchQuery.model_validate(raw["query"])
+        except (ValueError, KeyError, TypeError, ValidationError) as exc:
+            raise RetrievalError("Malformed frozen snapshot") from exc
+        return self._read(path, query, snapshot_id)

@@ -1,5 +1,8 @@
 """Structural validation only. Scores and cultural conclusions belong to the LLM."""
 
+import re
+import unicodedata
+
 from .schemas import ContextFact
 from .trace import digest
 
@@ -33,14 +36,44 @@ def validate_targets(batch, response, plan, limit):
         require(set(target.dimension_ids) <= allowed, "Target dimensions must be planned")
 
 
+_SUPPORT_TRANSLATION = str.maketrans(
+    {
+        "\u2018": "'",
+        "\u2019": "'",
+        "\u201c": '"',
+        "\u201d": '"',
+        "\u00a0": " ",
+    }
+)
+
+
+def normalize_support_text(text):
+    normalized = unicodedata.normalize("NFKC", text).translate(_SUPPORT_TRANSLATION)
+    return re.sub(r"\s+", " ", normalized).strip().casefold()
+
+
+def matching_support_documents(quote, documents):
+    normalized_quote = normalize_support_text(quote)
+    return tuple(
+        document
+        for document in documents
+        if normalized_quote and normalized_quote in normalize_support_text(document.text)
+    )
+
+
+def validate_statement_relevance(batch, statement_count):
+    indices = [judgment.statement_index for judgment in batch.judgments]
+    require(len(indices) == len(set(indices)), "Duplicate statement relevance judgments")
+    require(set(indices) == set(range(statement_count)), "Judge every grounded statement exactly once")
+
+
 def validate_document_citation(memo, documents):
     ids = {d.document_id for d in documents}
-    citations = set(memo.citations)
-    require(citations <= ids, "Citations must reference retrieved documents")
     statement_citations = {c for s in memo.statements for c in s.citations}
-    require(statement_citations == citations, "Every citation must ground a statement")
+    require(statement_citations <= ids, "Citations must reference retrieved documents")
+    require(set(memo.citations) == statement_citations, "Memo citations must equal statement citation union")
     if memo.sufficiency != "insufficient":
-        require(bool(citations), "Sufficient/conflicting evidence needs citations")
+        require(bool(statement_citations), "Sufficient/conflicting evidence needs citations")
     if not documents:
         require(
             memo.sufficiency == "insufficient" and memo.confidence == "low",
@@ -54,29 +87,65 @@ def validate_sources(batch, documents):
     require(set(found) == {d.document_id for d in documents}, "Classify each document once")
 
 
-def validate_scores(batch, response, plan, targets, memos):
+def validate_score_drafts(batch, response, plan, targets, verdicts, ignored_dimensions=()):
     ids = [s.dimension_id for s in batch.scores]
     require(len(ids) == len(set(ids)), "Duplicate dimension score")
-    require(set(ids) == {d.dimension_id for d in plan.dimensions}, "Score every planned dimension only")
-    targets_by_id = {t.target_id: t for t in targets}
-    memo_ids = {m.memo_id for m in memos}
-    memo_target = {m.memo_id: t for m, t in zip(memos, (t for t in targets if t.retrieval_appropriate))}
+    planned = {d.dimension_id for d in plan.dimensions}
+    ignored = set(ignored_dimensions)
+    require(set(ids) == planned - ignored, "Score every non-forced planned dimension only")
+    verdicts_by_target = {v.target_id: v for v in verdicts}
     for score in batch.scores:
         for quote in score.response_quotes:
             validate_response_quote(quote, response)
-        require(set(score.target_ids) <= targets_by_id.keys(), "Unknown target ID")
-        require(set(score.memo_ids) <= memo_ids, "Unknown memo ID")
-        for memo_id in score.memo_ids:
-            require(score.dimension_id in memo_target[memo_id].dimension_ids, "Memo/dimension mismatch")
-        for tid in score.target_ids:
-            require(score.dimension_id in targets_by_id[tid].dimension_ids, "Target/dimension mismatch")
+        relevant_targets = [t for t in targets if score.dimension_id in t.dimension_ids]
+        relevant_verdicts = [
+            verdicts_by_target[t.target_id] for t in relevant_targets if t.target_id in verdicts_by_target
+        ]
+        directional = any(v.verdict in {"supported", "mixed", "contradicted"} for v in relevant_verdicts)
+        if directional:
+            require(
+                score.score != "abstain",
+                "Directional evidence exists for this dimension; score 0, 1 or 2 instead of abstain",
+            )
         if score.score != "abstain" and response:
             require(bool(score.response_quotes), "A scored response requires a supporting quote")
+
+
+def validate_scores(batch, response, plan, targets, verdicts, memos):
+    validate_score_drafts(batch, response, plan, targets, verdicts)
+    memo_ids = {m.memo_id for m in memos}
+    memo_target = {v.memo_id: v.target_id for v in verdicts}
+    targets_by_id = {t.target_id: t for t in targets}
+    verdicts_by_target = {v.target_id: v for v in verdicts}
+    for score in batch.scores:
+        require(set(score.target_ids) <= targets_by_id.keys(), "Unknown target ID")
+        for target_id in score.target_ids:
+            require(score.dimension_id in targets_by_id[target_id].dimension_ids, "Target/dimension mismatch")
+        relevant_targets = [t for t in targets if score.dimension_id in t.dimension_ids]
+        direct_targets = [t for t in relevant_targets if not t.retrieval_appropriate]
+        relevant_verdicts = [
+            verdicts_by_target[t.target_id] for t in relevant_targets if t.target_id in verdicts_by_target
+        ]
+        assessable_target_ids = {t.target_id for t in direct_targets} | {
+            v.target_id for v in relevant_verdicts if v.verdict in {"supported", "mixed", "contradicted"}
+        }
+        if score.score != "abstain" and assessable_target_ids:
+            require(
+                bool(set(score.target_ids) & assessable_target_ids),
+                "A numeric score must reference at least one assessable target for the dimension",
+            )
+        require(set(score.memo_ids) <= memo_ids, "Unknown memo ID")
+        for memo_id in score.memo_ids:
+            target_id = memo_target.get(memo_id)
+            require(target_id is not None, "Memo is not linked to a target verdict")
+            require(score.dimension_id in targets_by_id[target_id].dimension_ids, "Memo/dimension mismatch")
 
 
 def validate_verdict(verdict, target, memo):
     require(verdict.target_id == target.target_id, "Wrong target link")
     require(verdict.memo_id == memo.memo_id, "Wrong memo link")
+    if memo.sufficiency == "insufficient":
+        require(verdict.verdict == "insufficient", "Insufficient evidence requires an insufficient verdict")
 
 
 def validate_trace_links(trace):
@@ -136,5 +205,26 @@ def validate_trace_links(trace):
                 ),
                 "Score memo has no dimension-linked target",
             )
-    require(result.scored_count == sum(s.score != "abstain" for s in result.dimension_scores), "Scored count mismatch")
+    scored = tuple(s for s in result.dimension_scores if s.score != "abstain")
+    abstained = tuple(s.dimension_id for s in result.dimension_scores if s.score == "abstain")
+    require(result.scored_count == len(scored), "Scored count mismatch")
     require(result.applicable_count == len(result.dimension_plan.dimensions), "Applicable count mismatch")
+    require(result.abstained_dimensions == abstained, "Abstained dimension summary mismatch")
+    expected_overall = sum(s.score for s in scored) / (2 * len(scored)) if scored else None
+    require(result.overall_score == expected_overall, "Overall score mismatch")
+    require(result.candidate_abstained == (expected_overall is None), "Candidate abstention mismatch")
+
+    external_targets = tuple(t for t in result.targets if t.retrieval_appropriate)
+    if external_targets:
+        covered = sum(bundle.memos[-1].sufficiency != "insufficient" for bundle in result.evidence)
+        require(result.evidence_coverage == covered / len(external_targets), "Evidence coverage summary mismatch")
+    else:
+        require(result.evidence_coverage is None, "Evidence coverage must be null without retrievable targets")
+
+    if result.status == "completed":
+        require(len(result.evidence) == len(external_targets), "Evidence bundle coverage mismatch")
+        final_memos = {bundle.final_memo_id for bundle in result.evidence}
+        require(
+            {link.memo_id for link in trace.target_evidence_links} == final_memos,
+            "Target links must reference exactly the final frozen memos",
+        )

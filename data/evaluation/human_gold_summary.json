@@ -1,0 +1,24 @@
+{
+  "at_least_4_of_5_prompts": 7,
+  "consensus": {
+    "ambiguous": 13,
+    "majority": 10,
+    "strong_consensus": 7
+  },
+  "majority_3_of_5_or_more_prompts": 17,
+  "n_annotators": 5,
+  "n_candidate_ratings": 600,
+  "n_candidate_responses": 120,
+  "n_candidates_per_prompt": 4,
+  "n_prompts": 30,
+  "n_winner_votes": 150,
+  "rating_distribution": {
+    "1": 202,
+    "2": 207,
+    "3": 191
+  },
+  "schema_version": "human-gold-v1",
+  "top_vote_ties": 10,
+  "unanimous_prompts": 1,
+  "winner_fleiss_kappa": 0.090494
+}

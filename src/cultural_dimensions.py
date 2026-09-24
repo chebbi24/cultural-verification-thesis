@@ -12,15 +12,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 DIMENSION_IDS = tuple(f"D{i:02d}" for i in range(1, 11))
-DEFAULT_RUBRIC_PATH = (
-    Path(__file__).resolve().parents[1]
-    / "data"
-    / "csv"
-    / "cultural_dimension_rubric.csv"
-)
-DEFAULT_BENCHMARK_DOMAINS_PATH = (
-    Path(__file__).resolve().parents[1] / "data" / "csv" / "domains.csv"
-)
+DEFAULT_RUBRIC_PATH = Path(__file__).resolve().parents[1] / "data" / "csv" / "cultural_dimension_rubric.csv"
+DEFAULT_BENCHMARK_DOMAINS_PATH = Path(__file__).resolve().parents[1] / "data" / "csv" / "domains.csv"
 
 
 @dataclass(frozen=True)
@@ -46,20 +39,14 @@ def load_dimensions(path: Path | None = None) -> dict[str, CulturalDimension]:
 
     found = [row.get("dimension_id", "").strip() for row in rows]
     if tuple(found) != DIMENSION_IDS:
-        raise ValueError(
-            f"Cultural rubric must contain exactly {DIMENSION_IDS} in order; found {tuple(found)}"
-        )
+        raise ValueError(f"Cultural rubric must contain exactly {DIMENSION_IDS} in order; found {tuple(found)}")
 
     registry: dict[str, CulturalDimension] = {}
     for row in rows:
         missing = [key for key, value in row.items() if not str(value or "").strip()]
         if missing:
-            raise ValueError(
-                f"Dimension {row.get('dimension_id', '<unknown>')} has empty fields: {missing}"
-            )
-        dimension = CulturalDimension(
-            **{key: str(value).strip() for key, value in row.items()}
-        )
+            raise ValueError(f"Dimension {row.get('dimension_id', '<unknown>')} has empty fields: {missing}")
+        dimension = CulturalDimension(**{key: str(value).strip() for key, value in row.items()})
         registry[dimension.dimension_id] = dimension
     return registry
 
@@ -75,15 +62,9 @@ def validate_benchmark_domain_alignment(
     path = domains_path or DEFAULT_BENCHMARK_DOMAINS_PATH
     with path.open(encoding="utf-8-sig", newline="") as stream:
         rows = list(csv.DictReader(stream))
-    benchmark = {
-        str(row.get("domain_id", "")).strip(): row
-        for row in rows
-        if str(row.get("domain_id", "")).strip()
-    }
+    benchmark = {str(row.get("domain_id", "")).strip(): row for row in rows if str(row.get("domain_id", "")).strip()}
     if tuple(benchmark) != DIMENSION_IDS:
-        raise ValueError(
-            "Benchmark domains and verifier rubric must contain the same ordered D01-D10 ids"
-        )
+        raise ValueError("Benchmark domains and verifier rubric must contain the same ordered D01-D10 ids")
     for dimension_id, dimension in current.items():
         row = benchmark[dimension_id]
         if str(row.get("domain_name", "")).strip() != dimension.dimension_name:
@@ -98,14 +79,7 @@ validate_benchmark_domain_alignment()
 def prompt_dimension_records(
     dimension_ids: list[str] | tuple[str, ...],
 ) -> list[dict[str, str]]:
-    unknown = [
-        dimension_id
-        for dimension_id in dimension_ids
-        if dimension_id not in CULTURAL_DIMENSIONS
-    ]
+    unknown = [dimension_id for dimension_id in dimension_ids if dimension_id not in CULTURAL_DIMENSIONS]
     if unknown:
         raise ValueError(f"Unknown cultural dimension ids: {unknown}")
-    return [
-        CULTURAL_DIMENSIONS[dimension_id].prompt_record()
-        for dimension_id in dimension_ids
-    ]
+    return [CULTURAL_DIMENSIONS[dimension_id].prompt_record() for dimension_id in dimension_ids]
