@@ -70,10 +70,7 @@ def _context_texts(context):
         *((context.user_goal,) if context.user_goal else ()),
     )
     return {
-        _normalized_text(text)
-        for fact in facts
-        for text in (fact.value, fact.prompt_span)
-        if text and text.strip()
+        _normalized_text(text) for fact in facts for text in (fact.value, fact.prompt_span) if text and text.strip()
     }
 
 
@@ -130,9 +127,7 @@ def _normalized_source_classification(source, document=None):
         for other in SourceType
     )
     secondary_host_claims_primary_official = (
-        source_type == SourceType.OFFICIAL
-        and document is not None
-        and _is_secondary_provenance_host(document.url)
+        source_type == SourceType.OFFICIAL and document is not None and _is_secondary_provenance_host(document.url)
     )
     if (
         (source_type in strong_types and provenance_basis != "explicit")
