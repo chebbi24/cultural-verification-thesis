@@ -101,8 +101,9 @@ assessed directly from the response, abstain for that dimension. Use only the ru
 response, explicit context, exact target response quotes, structured verdict labels and frozen exact
 support quotes supplied in evidence_groups. Intermediate target propositions, planner rationales,
 memo summaries, statement paraphrases and comparator reasoning are intentionally unavailable. No numeric confidence. Cite relevant exact
-response quotes and target IDs; only provided target references are allowed. Do not return memo IDs;
-the pipeline derives memo links deterministically from the selected target IDs. For an empty
+response quotes only. Do not return target IDs or memo IDs; the pipeline attaches dimension-linked
+target IDs and memo links deterministically. Dimensions already forced to abstain by deterministic
+evidence-sufficiency rules are omitted from this scoring request. For an empty
 response quotes may be empty. Internal qualities can be assessed directly; external claims
 without sufficient evidence require appropriate uncertainty. Distinguish common practice
 from obligations and personal preferences. Supported/contradicted is not automatically a
