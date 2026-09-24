@@ -563,6 +563,19 @@ def test_numeric_score_requires_assessable_target_link(setup):
     assert all(score.target_ids for score in result.dimension_scores)
 
 
+def test_forced_abstention_dimension_is_omitted_from_scorer_payload(setup):
+    config, _, _, _ = setup
+    retriever = FixtureRetriever(empty=True)
+
+    def scorer(_payload):
+        raise AssertionError("Scorer must not run when every planned dimension is forced to abstain")
+
+    llm = FixtureLLM(config, overrides={"dimension_scorer_v1": scorer})
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert all(score.score == "abstain" for score in result.dimension_scores)
+
+
 def test_all_external_insufficient_requires_dimension_abstention(setup):
     config, _, _, _ = setup
     retriever = FixtureRetriever(empty=True)
@@ -588,7 +601,7 @@ def test_all_external_insufficient_requires_dimension_abstention(setup):
     llm = FixtureLLM(config, overrides={"dimension_scorer_v1": scorer})
     result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
     assert result.status == "completed"
-    assert attempts["n"] == 1
+    assert attempts["n"] == 0
     assert all(score.score == "abstain" for score in result.dimension_scores)
     assert all(not score.response_quotes for score in result.dimension_scores)
     assert all("abstained deterministically" in score.rationale for score in result.dimension_scores)
@@ -979,6 +992,67 @@ def test_target_comparator_ids_are_python_derived(setup):
     assert "memo_id" not in comparator_call["schema"]["properties"]
 
 
+def test_scoring_links_are_python_owned_and_dimension_safe(setup):
+    config, _, retriever, _ = setup
+
+    def plan(_payload):
+        return {
+            "dimensions": [
+                {"dimension_id": "D03", "role": "primary", "reason": "primary"},
+                {"dimension_id": "D02", "role": "secondary", "reason": "secondary"},
+            ],
+            "reasoning": "Two applicable dimensions.",
+        }
+
+    def target(_payload):
+        return {
+            "targets": [
+                {
+                    "response_quote": RESPONSE,
+                    "proposition": "A social-etiquette claim.",
+                    "epistemic_type": "external_fact",
+                    "dimension_ids": ["D03"],
+                    "materiality": "high",
+                    "retrieval_appropriate": True,
+                }
+            ]
+        }
+
+    def scorer(payload):
+        assert [d["dimension_id"] for d in payload["dimension_plan"]["dimensions"]] == ["D03", "D02"]
+        return {
+            "scores": [
+                {
+                    "dimension_id": "D03",
+                    "score": 2,
+                    "rationale": "Supported etiquette.",
+                    "response_quotes": [RESPONSE],
+                },
+                {
+                    "dimension_id": "D02",
+                    "score": 1,
+                    "rationale": "Direct language assessment.",
+                    "response_quotes": [RESPONSE],
+                },
+            ]
+        }
+
+    llm = FixtureLLM(
+        config,
+        overrides={
+            "dimension_planner_v1": plan,
+            "target_extractor_v1": target,
+            "dimension_scorer_v1": scorer,
+        },
+    )
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    by_dimension = {score.dimension_id: score for score in result.dimension_scores}
+    assert by_dimension["D03"].target_ids
+    assert by_dimension["D02"].target_ids == ()
+    assert by_dimension["D02"].memo_ids == ()
+
+
 def test_score_memo_links_are_derived_from_target_ids(setup):
     config, _, retriever, _ = setup
 
@@ -991,7 +1065,6 @@ def test_score_memo_links_are_derived_from_target_ids(setup):
                     "score": 2,
                     "rationale": "x",
                     "response_quotes": [RESPONSE],
-                    "target_ids": [target_id],
                 }
             ]
         }
@@ -1001,9 +1074,11 @@ def test_score_memo_links_are_derived_from_target_ids(setup):
     assert result.status == "completed"
     score_result = result.dimension_scores[0]
     verdict_by_target = {verdict.target_id: verdict for verdict in result.verdicts}
+    assert score_result.target_ids
     assert score_result.memo_ids == tuple(verdict_by_target[target_id].memo_id for target_id in score_result.target_ids)
     scorer_call = next(call for call in llm.calls if call["stage"] == "dimension_scorer_v1")
-    assert "memo_ids" not in scorer_call["schema"]
+    assert "target_ids" not in scorer_call["schema"]["properties"]["scores"]["items"]["properties"]
+    assert "memo_ids" not in scorer_call["schema"]["properties"]["scores"]["items"]["properties"]
 
 
 def test_ungrounded_support_cannot_reach_target_comparison(setup):
