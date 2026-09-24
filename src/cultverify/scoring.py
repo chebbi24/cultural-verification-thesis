@@ -110,9 +110,7 @@ def score_dimensions(session, prompt, response, context, plan, targets, verdicts
                 "response": response,
                 "context": context.model_dump(mode="json"),
                 "dimension_plan": {
-                    "dimensions": [
-                        {"dimension_id": dimension.dimension_id} for dimension in active_dimensions
-                    ]
+                    "dimensions": [{"dimension_id": dimension.dimension_id} for dimension in active_dimensions]
                 },
                 "targets": [_target_scoring_view(t) for t in active_targets],
                 "verdicts": [_verdict_scoring_view(v) for v in active_verdicts],
@@ -149,17 +147,13 @@ def score_dimensions(session, prompt, response, context, plan, targets, verdicts
                 target_ids=linked_target_ids,
                 memo_ids=tuple(
                     dict.fromkeys(
-                        memo_by_target[target_id]
-                        for target_id in linked_target_ids
-                        if target_id in memo_by_target
+                        memo_by_target[target_id] for target_id in linked_target_ids if target_id in memo_by_target
                     )
                 ),
             )
         else:
             draft = drafts_by_dimension[dimension_id]
-            direct_target_ids = {
-                target.target_id for target in relevant_targets if not target.retrieval_appropriate
-            }
+            direct_target_ids = {target.target_id for target in relevant_targets if not target.retrieval_appropriate}
             directional_target_ids = {
                 target.target_id
                 for target in relevant_targets
