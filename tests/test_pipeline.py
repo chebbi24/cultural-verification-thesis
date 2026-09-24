@@ -6,7 +6,12 @@ import pytest
 import requests
 from pydantic import ValidationError
 from cultverify import CulturalVerifier
-from cultverify.evidence import BlindEvidenceEngine, LLM_DOCUMENT_TEXT_LIMIT
+from cultverify.evidence import (
+    BlindEvidenceEngine,
+    LLM_DOCUMENT_TEXT_LIMIT,
+    _normalized_source_classification,
+    _safe_query_text,
+)
 from cultverify.schemas import (
     ContextFact,
     ContextFrame,
@@ -17,7 +22,10 @@ from cultverify.schemas import (
     InitialQuestions,
     MaterialTarget,
     RunTrace,
+    SourceClassification,
+    SourceType,
     TargetBatch,
+    VerificationQuestion,
 )
 from cultverify.prompts import PROMPTS
 from cultverify.scoring import aggregate, rank_results
@@ -47,6 +55,56 @@ def test_hallucinated_context_retries_then_unknown(setup):
     assert result.context == ContextFrame()
     assert len([c for c in llm.calls if c["stage"] == "context_planner_v1"]) == 2
     assert result.status == "completed"
+
+
+def test_query_rewrite_cannot_collapse_to_generic_context_goal():
+    context = ContextFrame(
+        user_goal=ContextFact(value="How should I respond?", prompt_span="How should I respond?")
+    )
+    question = VerificationQuestion(
+        kind="followup",
+        text="How do legal citizenship and social identity interact in migration contexts?",
+        question_id="question_fixture",
+    )
+    assert _safe_query_text("How should I respond?", question, context) == question.text
+    rewritten = "legal citizenship social identity migration"
+    assert _safe_query_text(rewritten, question, context) == rewritten
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://en.wikipedia.org/wiki/Example",
+        "https://www.researchgate.net/publication/123",
+        "https://www.academia.edu/123/example",
+        "https://www.ebsco.com/research-starters/law/example",
+        "https://pmc.ncbi.nlm.nih.gov/articles/PMC123/",
+    ],
+)
+def test_secondary_hosts_cannot_be_primary_official_issuers(url):
+    document = make_document(url=url)
+    source = SourceClassification(
+        document_id=document.document_id,
+        source_type=SourceType.OFFICIAL,
+        provenance_basis="explicit",
+        reason="The host is authoritative, so this is official legal material.",
+    )
+    normalized = _normalized_source_classification(source, document)
+    assert normalized.source_type == SourceType.UNKNOWN
+    assert normalized.provenance_basis == "unclear"
+
+
+def test_primary_public_authority_can_remain_official():
+    document = make_document(url="https://verwaltung.bund.de/leistungsverzeichnis/example")
+    source = SourceClassification(
+        document_id=document.document_id,
+        source_type=SourceType.OFFICIAL,
+        provenance_basis="explicit",
+        reason="Issued directly by a public authority as official administrative guidance.",
+    )
+    normalized = _normalized_source_classification(source, document)
+    assert normalized.source_type == SourceType.OFFICIAL
+    assert normalized.provenance_basis == "explicit"
 
 
 @pytest.mark.parametrize("dimension", ["D00", "D11", "T1"])
@@ -757,7 +815,10 @@ def test_scope_and_query_prompts_prefer_general_then_authoritative():
     assert "named city or region" in question_prompt
     assert "academic or linguistic" in query_prompt
     assert "official or institutional" in query_prompt
+    assert "must never replace the verification question" in query_prompt
     assert "provenance_basis" in PROMPTS["source_classifier_v1"]
+    assert "Classify the ISSUER" in PROMPTS["source_classifier_v1"]
+    assert "Wikipedia is never primary official/legal material" in PROMPTS["source_classifier_v1"]
     assert "REQUIRE provenance_basis=explicit" in PROMPTS["source_classifier_v1"]
     assert "VERBATIM span" in PROMPTS["evidence_memo_v1"]
     assert "Do not return source references" in PROMPTS["evidence_memo_v1"]
