@@ -523,7 +523,6 @@ def test_directional_verdict_forces_numeric_score_retry(setup):
                     "score": value,
                     "rationale": "Assessable but incomplete evidence.",
                     "response_quotes": [payload["response"]],
-                    "target_ids": [t["target_id"] for t in payload["targets"]],
                 }
                 for d in payload["dimension_plan"]["dimensions"]
             ]
@@ -536,13 +535,12 @@ def test_directional_verdict_forces_numeric_score_retry(setup):
     assert all(score.score == 1 for score in result.dimension_scores)
 
 
-def test_numeric_score_requires_assessable_target_link(setup):
+def test_numeric_score_gets_assessable_target_link_from_python(setup):
     config, _, retriever, _ = setup
     attempts = {"n": 0}
 
     def scorer(payload):
         attempts["n"] += 1
-        target_ids = [] if attempts["n"] == 1 else [payload["targets"][0]["target_id"]]
         return {
             "scores": [
                 {
@@ -550,7 +548,6 @@ def test_numeric_score_requires_assessable_target_link(setup):
                     "score": 2,
                     "rationale": "Assessable evidence.",
                     "response_quotes": [payload["response"]],
-                    "target_ids": target_ids,
                 }
                 for d in payload["dimension_plan"]["dimensions"]
             ]
@@ -559,7 +556,7 @@ def test_numeric_score_requires_assessable_target_link(setup):
     llm = FixtureLLM(config, overrides={"dimension_scorer_v1": scorer})
     result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
     assert result.status == "completed"
-    assert attempts["n"] == 2
+    assert attempts["n"] == 1
     assert all(score.target_ids for score in result.dimension_scores)
 
 
@@ -741,7 +738,7 @@ def test_scope_and_query_prompts_prefer_general_then_authoritative():
     assert "Do not return target_id or memo_id" in PROMPTS["target_comparator_v1"]
     assert "genuinely unscorable only" in PROMPTS["dimension_scorer_v1"]
     assert "relevant retrievable target is insufficient" in PROMPTS["dimension_scorer_v1"]
-    assert "Do not return memo IDs" in PROMPTS["dimension_scorer_v1"]
+    assert "Do not return target IDs or memo IDs" in PROMPTS["dimension_scorer_v1"]
 
 
 def test_max_two_rounds_one_followup(setup):
@@ -1057,7 +1054,6 @@ def test_score_memo_links_are_derived_from_target_ids(setup):
     config, _, retriever, _ = setup
 
     def scorer(payload):
-        target_id = payload["targets"][0]["target_id"]
         return {
             "scores": [
                 {
@@ -1077,8 +1073,9 @@ def test_score_memo_links_are_derived_from_target_ids(setup):
     assert score_result.target_ids
     assert score_result.memo_ids == tuple(verdict_by_target[target_id].memo_id for target_id in score_result.target_ids)
     scorer_call = next(call for call in llm.calls if call["stage"] == "dimension_scorer_v1")
-    assert "target_ids" not in scorer_call["schema"]["properties"]["scores"]["items"]["properties"]
-    assert "memo_ids" not in scorer_call["schema"]["properties"]["scores"]["items"]["properties"]
+    scorer_schema = json.dumps(scorer_call["schema"], sort_keys=True)
+    assert "target_ids" not in scorer_schema
+    assert "memo_ids" not in scorer_schema
 
 
 def test_ungrounded_support_cannot_reach_target_comparison(setup):
