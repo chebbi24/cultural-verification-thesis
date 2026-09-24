@@ -170,9 +170,7 @@ def score_dimensions(session, prompt, response, context, plan, targets, verdicts
                 target_ids=linked_target_ids,
                 memo_ids=tuple(
                     dict.fromkeys(
-                        memo_by_target[target_id]
-                        for target_id in linked_target_ids
-                        if target_id in memo_by_target
+                        memo_by_target[target_id] for target_id in linked_target_ids if target_id in memo_by_target
                     )
                 ),
             )
