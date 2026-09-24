@@ -90,17 +90,13 @@ def validate_sources(batch, documents):
 def validate_score_drafts(batch, response, plan, targets, verdicts, ignored_dimensions=()):
     ids = [s.dimension_id for s in batch.scores]
     require(len(ids) == len(set(ids)), "Duplicate dimension score")
-    require(set(ids) == {d.dimension_id for d in plan.dimensions}, "Score every planned dimension only")
-    targets_by_id = {t.target_id: t for t in targets}
+    planned = {d.dimension_id for d in plan.dimensions}
+    ignored = set(ignored_dimensions)
+    require(set(ids) == planned - ignored, "Score every non-forced planned dimension only")
     verdicts_by_target = {v.target_id: v for v in verdicts}
     for score in batch.scores:
-        if score.dimension_id in ignored_dimensions:
-            continue
         for quote in score.response_quotes:
             validate_response_quote(quote, response)
-        require(set(score.target_ids) <= targets_by_id.keys(), "Unknown target ID")
-        for tid in score.target_ids:
-            require(score.dimension_id in targets_by_id[tid].dimension_ids, "Target/dimension mismatch")
         relevant_targets = [t for t in targets if score.dimension_id in t.dimension_ids]
         relevant_verdicts = [
             verdicts_by_target[t.target_id] for t in relevant_targets if t.target_id in verdicts_by_target
@@ -111,26 +107,6 @@ def validate_score_drafts(batch, response, plan, targets, verdicts, ignored_dime
                 score.score != "abstain",
                 "Directional evidence exists for this dimension; score 0, 1 or 2 instead of abstain",
             )
-        external_targets = [t for t in relevant_targets if t.retrieval_appropriate]
-        direct_targets = [t for t in relevant_targets if not t.retrieval_appropriate]
-        all_external_insufficient = bool(external_targets) and all(
-            verdicts_by_target.get(t.target_id) is not None
-            and verdicts_by_target[t.target_id].verdict == "insufficient"
-            for t in external_targets
-        )
-        if all_external_insufficient and not direct_targets:
-            require(
-                score.score == "abstain",
-                "All relevant retrievable targets are insufficient; this dimension must abstain",
-            )
-        assessable_target_ids = {t.target_id for t in direct_targets} | {
-            v.target_id for v in relevant_verdicts if v.verdict in {"supported", "mixed", "contradicted"}
-        }
-        if score.score != "abstain" and assessable_target_ids:
-            require(
-                bool(set(score.target_ids) & assessable_target_ids),
-                "A numeric score must reference at least one assessable target for the dimension",
-            )
         if score.score != "abstain" and response:
             require(bool(score.response_quotes), "A scored response requires a supporting quote")
 
@@ -140,7 +116,24 @@ def validate_scores(batch, response, plan, targets, verdicts, memos):
     memo_ids = {m.memo_id for m in memos}
     memo_target = {v.memo_id: v.target_id for v in verdicts}
     targets_by_id = {t.target_id: t for t in targets}
+    verdicts_by_target = {v.target_id: v for v in verdicts}
     for score in batch.scores:
+        require(set(score.target_ids) <= targets_by_id.keys(), "Unknown target ID")
+        for target_id in score.target_ids:
+            require(score.dimension_id in targets_by_id[target_id].dimension_ids, "Target/dimension mismatch")
+        relevant_targets = [t for t in targets if score.dimension_id in t.dimension_ids]
+        direct_targets = [t for t in relevant_targets if not t.retrieval_appropriate]
+        relevant_verdicts = [
+            verdicts_by_target[t.target_id] for t in relevant_targets if t.target_id in verdicts_by_target
+        ]
+        assessable_target_ids = {t.target_id for t in direct_targets} | {
+            v.target_id for v in relevant_verdicts if v.verdict in {"supported", "mixed", "contradicted"}
+        }
+        if score.score != "abstain" and assessable_target_ids:
+            require(
+                bool(set(score.target_ids) & assessable_target_ids),
+                "A numeric score must reference at least one assessable target for the dimension",
+            )
         require(set(score.memo_ids) <= memo_ids, "Unknown memo ID")
         for memo_id in score.memo_ids:
             target_id = memo_target.get(memo_id)
