@@ -58,9 +58,7 @@ def test_hallucinated_context_retries_then_unknown(setup):
 
 
 def test_query_rewrite_cannot_collapse_to_generic_context_goal():
-    context = ContextFrame(
-        user_goal=ContextFact(value="How should I respond?", prompt_span="How should I respond?")
-    )
+    context = ContextFrame(user_goal=ContextFact(value="How should I respond?", prompt_span="How should I respond?"))
     question = VerificationQuestion(
         kind="followup",
         text="How do legal citizenship and social identity interact in migration contexts?",
