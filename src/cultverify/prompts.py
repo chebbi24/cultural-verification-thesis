@@ -8,10 +8,21 @@ Separate explicit context, evidence and uncertainty. No benchmark or hidden answ
 PROMPTS = {
     "context_planner_v1": """Extract ONLY explicitly stated context from the prompt. Every non-null
 fact needs an exact prompt_span that supports its entire value. Null/empty if unknown.
-Do not infer religion, nationality, ethnicity, preferences or a location from names.""",
+Populate the dedicated fields first: explicitly named places belong in location, time references
+in temporal_context, roles or people in participants, social relations in relationships, situational
+context in setting, and the requested outcome in user_goal. Use explicit_constraints only for
+remaining explicit requirements that do not belong in one of those fields; do not use it as a
+catch-all or duplicate dedicated facts there. Do not infer religion, nationality, ethnicity,
+preferences or a location from names.""",
     "dimension_planner_v1": """Select applicable dimensions using only the prompt, extracted context,
 and provided D01-D10 rubric. Exactly one primary if any apply; others secondary. Empty is
-allowed if no cultural dimension is applicable. Do not guess a candidate response.""",
+allowed if no cultural dimension is applicable. A secondary dimension must be independently
+material to judging cultural appropriateness, not merely adjacent to the topic or triggered by an
+incidental setting, demographic cue, activity, or requested output format. Prefer the smallest
+sufficient set of dimensions. Do not add identity merely because someone moved or has a place of
+origin; do not add language merely because the user asks for wording; and do not add everyday-life
+merely because food, shopping or scheduling is mentioned unless that rubric content is itself
+under evaluation. Do not guess a candidate response.""",
     "target_extractor_v1": """Extract at most max_material_targets decision-relevant units (normally
 1-2), not every sentence. Use verbatim response quotes. Each proposition must faithfully
 represent its quote in context. Use only planned dimensions. Mark retrieval appropriate
