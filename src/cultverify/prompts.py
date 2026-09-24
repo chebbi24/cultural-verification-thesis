@@ -39,11 +39,14 @@ documented and what contextual variation matters. Do not assume the target is tr
 or bad. Remove candidate wording, evaluations and identifiers; retain only the subject necessary
 to investigate. Do not presuppose disputed premises. Questions must not request proof for or
 against a candidate. Do not add demographic facts.""",
-    "query_rewriter_v1": """Rewrite the neutral question into one effective search query using
-only supplied explicit context. Preserve neutrality and relevant scope; do not add a verdict.
-When appropriate, phrase the query to favor authoritative evidence such as academic or linguistic
-research, official or institutional sources, and surveys. Do not force a source category when
-credible community or professional evidence is more suitable for lived cultural practice.""",
+    "query_rewriter_v1": """Rewrite the supplied neutral verification question into one effective
+search query. The query MUST preserve the question's informational subject and purpose. Explicit
+context may add scope or disambiguation, but it must never replace the verification question with
+the user's generic goal, original request, or an unrelated context span. Preserve neutrality and
+relevant scope; do not add a verdict. When appropriate, phrase the query to favor authoritative
+evidence such as academic or linguistic research, official or institutional sources, and surveys.
+Do not force a source category when credible community or professional evidence is more suitable
+for lived cultural practice.""",
     "source_classifier_v1": """Classify every provided document once using ONLY these source types:
 official_legal = primary government/legal/public-authority material;
 academic_peer_reviewed = provenance explicitly supports a peer-reviewed scholarly publication;
@@ -59,9 +62,14 @@ inferred = provenance is only inferred from names, domain, style or context;
 unclear = provenance cannot be established.
 official_legal, academic_peer_reviewed, statistical_survey and institutional_professional
 REQUIRE provenance_basis=explicit. A blog,
-language-learning site, tutoring site, company page or hosting platform is not official_legal or
-academic_peer_reviewed merely because it sounds authoritative. The selected enum MUST agree with
-the reason and provenance_basis. Do not invent category names outside the schema.""",
+language-learning site, tutoring site, company page, repository or hosting platform is not
+official_legal or academic_peer_reviewed merely because it sounds authoritative or hosts material
+about law or research. Classify the ISSUER of the retrieved document, not the topic it discusses
+and not the authority of the hosting platform. Wikipedia is never primary official/legal material.
+ResearchGate and Academia.edu do not establish peer review by hosting alone. PMC hosting does not
+turn a journal article into government/legal material, and EBSCO research summaries are not primary
+legal issuers. The selected enum MUST agree with the reason and provenance_basis. Do not invent
+category names outside the schema.""",
     "evidence_memo_v1": """Answer the provided questions using ONLY retrieved documents. Keep
 answer, scope, variation and agreement concise. Return at most five substantive evidence
 statements. Each statement must contain supports. Every support contains ONLY quote: a short
