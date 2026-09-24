@@ -1,5 +1,7 @@
 """Blind evidence engine: its public input contains no candidate or target object."""
 
+from urllib.parse import urlparse
+
 from .config import PIPELINE_VERSION
 from .llm import SemanticSession, StageError
 from .prompts import COMMON, PROMPTS
@@ -39,7 +41,51 @@ def _llm_document(document):
     return data
 
 
-def _normalized_source_classification(source):
+_SECONDARY_PROVENANCE_HOSTS = {
+    "wikipedia.org",
+    "researchgate.net",
+    "academia.edu",
+    "ebsco.com",
+    "pmc.ncbi.nlm.nih.gov",
+}
+
+
+def _normalized_text(text):
+    return " ".join(text.casefold().split())
+
+
+def _is_secondary_provenance_host(url):
+    host = (urlparse(url).hostname or "").casefold()
+    return any(host == domain or host.endswith(f".{domain}") for domain in _SECONDARY_PROVENANCE_HOSTS)
+
+
+def _context_texts(context):
+    facts = (
+        *((context.setting,) if context.setting else ()),
+        *context.participants,
+        *context.relationships,
+        *((context.location,) if context.location else ()),
+        *((context.temporal_context,) if context.temporal_context else ()),
+        *context.explicit_constraints,
+        *((context.user_goal,) if context.user_goal else ()),
+    )
+    return {
+        _normalized_text(text)
+        for fact in facts
+        for text in (fact.value, fact.prompt_span)
+        if text and text.strip()
+    }
+
+
+def _safe_query_text(query_text, question, context):
+    candidate = _normalized_text(query_text)
+    question_text = _normalized_text(question.text)
+    if candidate and candidate != question_text and candidate in _context_texts(context):
+        return question.text
+    return query_text
+
+
+def _normalized_source_classification(source, document=None):
     reason = " ".join(source.reason.casefold().split())
     source_type = source.source_type
     provenance_basis = source.provenance_basis
@@ -83,7 +129,17 @@ def _normalized_source_classification(source):
         )
         for other in SourceType
     )
-    if (source_type in strong_types and provenance_basis != "explicit") or contradicts_selected or contradicts_enum:
+    secondary_host_claims_primary_official = (
+        source_type == SourceType.OFFICIAL
+        and document is not None
+        and _is_secondary_provenance_host(document.url)
+    )
+    if (
+        (source_type in strong_types and provenance_basis != "explicit")
+        or contradicts_selected
+        or contradicts_enum
+        or secondary_host_claims_primary_official
+    ):
         source_type = SourceType.UNKNOWN
         provenance_basis = "unclear"
     return source.model_copy(update={"source_type": source_type, "provenance_basis": provenance_basis})
@@ -163,11 +219,12 @@ class BlindEvidenceEngine:
                         {"question": question.model_dump(mode="json"), "context": context.model_dump(mode="json")},
                         QueryDraft,
                     )
+                    effective_query_text = _safe_query_text(query_text.text, question, context)
                     query = SearchQuery(
-                        text=query_text.text,
+                        text=effective_query_text,
                         question_id=question.question_id,
                         round=round_number,
-                        query_id=stable_id("query", [question.question_id, query_text.text, round_number]),
+                        query_id=stable_id("query", [question.question_id, effective_query_text, round_number]),
                     )
                     snapshot = self._store.get(query)
                 else:
@@ -203,8 +260,10 @@ class BlindEvidenceEngine:
                             SourceBatch,
                             lambda b: validate_sources(b, new),
                         )
+                        document_by_id = {document.document_id: document for document in new}
                         classified_sources = tuple(
-                            _normalized_source_classification(source) for source in classified.sources
+                            _normalized_source_classification(source, document_by_id[source.document_id])
+                            for source in classified.sources
                         )
                     except StageError:
                         classified_sources = tuple(
