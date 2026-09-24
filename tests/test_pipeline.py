@@ -771,7 +771,8 @@ def test_scope_and_query_prompts_prefer_general_then_authoritative():
     assert "relevant retrievable target is insufficient" in PROMPTS["dimension_scorer_v1"]
     assert "Do not return target IDs or memo IDs" in PROMPTS["dimension_scorer_v1"]
     assert "explicitly named places belong in location" in PROMPTS["context_planner_v1"]
-    assert "smallest sufficient set of dimensions" in PROMPTS["dimension_planner_v1"]
+    assert "Prefer the smallest" in PROMPTS["dimension_planner_v1"]
+    assert "sufficient set of dimensions" in PROMPTS["dimension_planner_v1"]
 
 
 def test_max_two_rounds_one_followup(setup):
