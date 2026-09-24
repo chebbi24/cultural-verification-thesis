@@ -92,64 +92,99 @@ def _forced_abstain_dimensions(plan, targets, verdicts):
 
 def score_dimensions(session, prompt, response, context, plan, targets, verdicts, memos, rubric):
     forced_abstentions = _forced_abstain_dimensions(plan, targets, verdicts)
-    result = session.call(
-        "dimension_scorer_v1",
-        {
-            "prompt": prompt,
-            "response": response,
-            "context": context.model_dump(mode="json"),
-            "dimension_plan": _plan_scoring_view(plan),
-            "targets": [_target_scoring_view(t) for t in targets],
-            "verdicts": [_verdict_scoring_view(v) for v in verdicts],
-            "memos": [_memo_evidence_view(m) for m in memos],
-            "rubric": rubric,
-        },
-        ScoreDraftBatch,
-        lambda b: validate_score_drafts(
-            b,
-            response,
-            plan,
-            targets,
-            verdicts,
-            ignored_dimensions=forced_abstentions,
-        ),
+    active_dimensions = tuple(
+        dimension for dimension in plan.dimensions if dimension.dimension_id not in forced_abstentions
     )
-    targets_by_dimension = {
-        dimension.dimension_id: tuple(
-            target.target_id
-            for target in targets
-            if dimension.dimension_id in target.dimension_ids and target.retrieval_appropriate
-        )
-        for dimension in plan.dimensions
-    }
-    repaired_scores = tuple(
-        score.model_copy(
-            update={
-                "score": "abstain",
-                "rationale": (
-                    "All relevant retrievable targets are insufficient; dimension abstained deterministically."
-                ),
-                "response_quotes": (),
-                "target_ids": targets_by_dimension[score.dimension_id],
-            }
-        )
-        if score.dimension_id in forced_abstentions
-        else score
-        for score in result.scores
-    )
-    memo_by_target = {verdict.target_id: verdict.memo_id for verdict in verdicts}
-    scores = tuple(
-        DimensionScore(
-            **score.model_dump(mode="json"),
-            memo_ids=tuple(
-                dict.fromkeys(
-                    memo_by_target[target_id] for target_id in score.target_ids if target_id in memo_by_target
-                )
+    active_ids = {dimension.dimension_id for dimension in active_dimensions}
+    active_targets = tuple(target for target in targets if active_ids.intersection(target.dimension_ids))
+    active_target_ids = {target.target_id for target in active_targets}
+    active_verdicts = tuple(verdict for verdict in verdicts if verdict.target_id in active_target_ids)
+    active_memo_ids = {verdict.memo_id for verdict in active_verdicts}
+    active_memos = tuple(memo for memo in memos if memo.memo_id in active_memo_ids)
+
+    if active_dimensions:
+        result = session.call(
+            "dimension_scorer_v1",
+            {
+                "prompt": prompt,
+                "response": response,
+                "context": context.model_dump(mode="json"),
+                "dimension_plan": {
+                    "dimensions": [
+                        {"dimension_id": dimension.dimension_id} for dimension in active_dimensions
+                    ]
+                },
+                "targets": [_target_scoring_view(t) for t in active_targets],
+                "verdicts": [_verdict_scoring_view(v) for v in active_verdicts],
+                "memos": [_memo_evidence_view(m) for m in active_memos],
+                "rubric": rubric,
+            },
+            ScoreDraftBatch,
+            lambda b: validate_score_drafts(
+                b,
+                response,
+                plan,
+                targets,
+                verdicts,
+                ignored_dimensions=forced_abstentions,
             ),
         )
-        for score in repaired_scores
-    )
-    final = ScoreBatch(scores=scores)
+        drafts_by_dimension = {score.dimension_id: score for score in result.scores}
+    else:
+        drafts_by_dimension = {}
+
+    verdicts_by_target = {verdict.target_id: verdict for verdict in verdicts}
+    memo_by_target = {verdict.target_id: verdict.memo_id for verdict in verdicts}
+    scores = []
+    for dimension in plan.dimensions:
+        dimension_id = dimension.dimension_id
+        relevant_targets = [target for target in targets if dimension_id in target.dimension_ids]
+        if dimension_id in forced_abstentions:
+            linked_target_ids = tuple(target.target_id for target in relevant_targets if target.retrieval_appropriate)
+            score = DimensionScore(
+                dimension_id=dimension_id,
+                score="abstain",
+                rationale="All relevant retrievable targets are insufficient; dimension abstained deterministically.",
+                response_quotes=(),
+                target_ids=linked_target_ids,
+                memo_ids=tuple(
+                    dict.fromkeys(
+                        memo_by_target[target_id]
+                        for target_id in linked_target_ids
+                        if target_id in memo_by_target
+                    )
+                ),
+            )
+        else:
+            draft = drafts_by_dimension[dimension_id]
+            direct_target_ids = {
+                target.target_id for target in relevant_targets if not target.retrieval_appropriate
+            }
+            directional_target_ids = {
+                target.target_id
+                for target in relevant_targets
+                if target.target_id in verdicts_by_target
+                and verdicts_by_target[target.target_id].verdict in {"supported", "mixed", "contradicted"}
+            }
+            linked_target_ids = tuple(
+                target.target_id
+                for target in relevant_targets
+                if target.target_id in direct_target_ids | directional_target_ids
+            )
+            score = DimensionScore(
+                **draft.model_dump(mode="json"),
+                target_ids=linked_target_ids,
+                memo_ids=tuple(
+                    dict.fromkeys(
+                        memo_by_target[target_id]
+                        for target_id in linked_target_ids
+                        if target_id in memo_by_target
+                    )
+                ),
+            )
+        scores.append(score)
+
+    final = ScoreBatch(scores=tuple(scores))
     validate_scores(final, response, plan, targets, verdicts, memos)
     return final.scores
 
