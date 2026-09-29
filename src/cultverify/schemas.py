@@ -301,6 +301,14 @@ class CandidateResult(Record):
     verdicts: tuple[TargetVerdict, ...]
     dimension_scores: tuple[DimensionScore, ...]
     overall_score: float | None
+    vericult_score: float | None
+    cultural_appropriateness: Literal[
+        "culturally_appropriate",
+        "partially_culturally_appropriate",
+        "culturally_inappropriate",
+        "insufficient_evidence",
+    ]
+    abstention_reason: str | None
     applicable_count: int
     scored_count: int
     abstained_dimensions: tuple[DimensionID, ...]
@@ -317,6 +325,7 @@ class RankingResult(Record):
     winner: int | Literal["no_clear_winner"]
     tied_indices: tuple[int, ...]
     coverage_comparable: bool
+    tie_break_reason: str | None
 
 
 class RunTrace(Record):
