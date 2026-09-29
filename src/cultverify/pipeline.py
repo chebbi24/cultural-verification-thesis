@@ -7,7 +7,16 @@ from .planner import load_rubric, plan_prompt
 from .prompts import COMMON, PROMPTS
 from .retrieval import RetrievalError, SnapshotStore
 from .schemas import CandidateResult, ContextFrame, DimensionPlan, RunTrace, TargetEvidenceLink
-from .scoring import abstain_scores, aggregate, compare_target, rank_results, score_dimensions
+from .scoring import (
+    abstain_scores,
+    abstention_reason,
+    aggregate,
+    compare_target,
+    cultural_appropriateness,
+    rank_results,
+    score_dimensions,
+    vericult_score,
+)
 from .targets import extract_targets, neutral_questions
 from .trace import canonical, digest, git_commit, timestamp, write_json
 from .validation import validate_trace_links
@@ -123,6 +132,9 @@ class CulturalVerifier:
             verdicts=tuple(verdicts),
             dimension_scores=scores,
             overall_score=overall,
+            vericult_score=vericult_score(scores),
+            cultural_appropriateness=cultural_appropriateness(scores),
+            abstention_reason=abstention_reason(scores),
             applicable_count=len(plan.dimensions),
             scored_count=sum(s.score != "abstain" for s in scores),
             abstained_dimensions=tuple(s.dimension_id for s in scores if s.score == "abstain"),
