@@ -296,5 +296,7 @@ def rank_results(candidates):
         winner="no_clear_winner",
         tied_indices=tied,
         coverage_comparable=comparable,
-        tie_break_reason="Candidates remain identical on overall and primary-dimension scores; no arbitrary winner was forced.",
+        tie_break_reason=(
+            "Candidates remain identical on overall and primary-dimension scores; no arbitrary winner was forced."
+        ),
     )
