@@ -1,0 +1,32 @@
+{
+  "schema_version": "best-of4-v1",
+  "status": "frozen canonical evaluation input",
+  "n_prompts": 30,
+  "n_candidates": 120,
+  "candidates_per_prompt": 4,
+  "generator_model": "llama3.2:3b",
+  "generator_provenance": "legacy_30x4_snapshot",
+  "candidate_order": {
+    "A": "candidate_position 1 / run 1",
+    "B": "candidate_position 2 / run 2",
+    "C": "candidate_position 3 / run 3",
+    "D": "candidate_position 4 / run 4"
+  },
+  "source": {
+    "repository": "chebbi24/cultural-verification-thesis",
+    "ref": "chore/rebuild-thesis-repo",
+    "path": "data/pilot/candidates.csv",
+    "git_blob_sha": "00122bc9113d9c63427ba34f8900a4c2e43227e8",
+    "sha256": "5e52b444fb3eb462d65c808f6f20b14c2874b8902c32e7b498483afdba7f5231"
+  },
+  "canonical": {
+    "path": "data/evaluation/best_of4_v1.csv",
+    "sha256": "bb1f096dfbc74913a80219c983edeadb2b26f9b64ce912313d8cad29501a7587"
+  },
+  "uploaded_plaintext": {
+    "filename": "candidates_questions_answers_plaintext(3).txt",
+    "sha256": "94adc05dea4d0b842a7622dbcc808f261889f8f8dc74d85addd06b5822a61e6d",
+    "role": "human-readable corroborating export"
+  },
+  "contamination_policy": "No human labels, winner votes, verifier outputs, reward-model outputs, or direct-judge outputs are included in this input file."
+}
