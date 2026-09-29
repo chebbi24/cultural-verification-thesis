@@ -205,6 +205,42 @@ def aggregate(scores):
     return float(score) if score is not None else None
 
 
+def vericult_score(scores):
+    """Human-readable 0-100 view of the unchanged normalized aggregate."""
+    score = exact_score(scores)
+    return float(score * 100) if score is not None else None
+
+
+def cultural_appropriateness(scores):
+    """Deterministic label derived from the existing 0/1/2 dimension rubric."""
+    scored = [s.score for s in scores if s.score != "abstain"]
+    if not scored:
+        return "insufficient_evidence"
+    if any(value == 0 for value in scored):
+        return "culturally_inappropriate"
+    if all(value == 2 for value in scored) and all(s.score != "abstain" for s in scores):
+        return "culturally_appropriate"
+    return "partially_culturally_appropriate"
+
+
+def abstention_reason(scores):
+    abstained = [s for s in scores if s.score == "abstain"]
+    if not abstained:
+        return None
+    return " | ".join(f"{s.dimension_id}: {s.rationale}" for s in abstained)
+
+
+def _primary_dimension_score(candidate):
+    primary = next(
+        (dimension.dimension_id for dimension in candidate.dimension_plan.dimensions if dimension.role == "primary"),
+        None,
+    )
+    if primary is None:
+        return None
+    score = next((score.score for score in candidate.dimension_scores if score.dimension_id == primary), None)
+    return score if isinstance(score, int) and not isinstance(score, bool) else None
+
+
 def rank_results(candidates):
     scores = [exact_score(c.dimension_scores) for c in candidates]
     comparable = (
@@ -217,13 +253,48 @@ def rank_results(candidates):
             winner="no_clear_winner",
             tied_indices=(),
             coverage_comparable=False,
+            tie_break_reason="At least one candidate failed; no ranking was forced.",
         )
+
     available = [s for s in scores if s is not None]
     tied = tuple(i for i, s in enumerate(scores) if s is not None and s == max(available)) if available else ()
-    # Implements the frozen highest-score rule, with an explicit coverage diagnostic.
+    if not tied:
+        return RankingResult(
+            candidates=tuple(candidates),
+            winner="no_clear_winner",
+            tied_indices=(),
+            coverage_comparable=comparable,
+            tie_break_reason="All candidates abstained; there is no scored basis for a winner.",
+        )
+    if len(tied) == 1:
+        return RankingResult(
+            candidates=tuple(candidates),
+            winner=tied[0],
+            tied_indices=tied,
+            coverage_comparable=comparable,
+            tie_break_reason="Highest overall verifier score.",
+        )
+
+    # Minimal deterministic tie-break: prefer the candidate that scores higher
+    # on the already-planned primary cultural dimension. No extra LLM call is introduced.
+    primary_scores = {index: _primary_dimension_score(candidates[index]) for index in tied}
+    scored_primary = {index: value for index, value in primary_scores.items() if value is not None}
+    if scored_primary:
+        best_primary = max(scored_primary.values())
+        primary_tied = tuple(index for index in tied if primary_scores[index] == best_primary)
+        if len(primary_tied) == 1:
+            return RankingResult(
+                candidates=tuple(candidates),
+                winner=primary_tied[0],
+                tied_indices=tied,
+                coverage_comparable=comparable,
+                tie_break_reason="Overall scores tied; higher primary-dimension score selected the winner.",
+            )
+
     return RankingResult(
         candidates=tuple(candidates),
-        winner=tied[0] if len(tied) == 1 else "no_clear_winner",
+        winner="no_clear_winner",
         tied_indices=tied,
         coverage_comparable=comparable,
+        tie_break_reason="Candidates remain identical on overall and primary-dimension scores; no arbitrary winner was forced.",
     )
