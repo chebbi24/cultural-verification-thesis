@@ -212,6 +212,22 @@ def validate_trace_links(trace):
     require(result.abstained_dimensions == abstained, "Abstained dimension summary mismatch")
     expected_overall = sum(s.score for s in scored) / (2 * len(scored)) if scored else None
     require(result.overall_score == expected_overall, "Overall score mismatch")
+    expected_vericult = expected_overall * 100 if expected_overall is not None else None
+    require(result.vericult_score == expected_vericult, "Vericult score mismatch")
+    if not scored:
+        expected_label = "insufficient_evidence"
+    elif any(s.score == 0 for s in scored):
+        expected_label = "culturally_inappropriate"
+    elif len(scored) == len(result.dimension_scores) and all(s.score == 2 for s in scored):
+        expected_label = "culturally_appropriate"
+    else:
+        expected_label = "partially_culturally_appropriate"
+    require(result.cultural_appropriateness == expected_label, "Cultural appropriateness mismatch")
+    expected_abstention_reason = (
+        " | ".join(f"{s.dimension_id}: {s.rationale}" for s in result.dimension_scores if s.score == "abstain")
+        or None
+    )
+    require(result.abstention_reason == expected_abstention_reason, "Abstention reason mismatch")
     require(result.candidate_abstained == (expected_overall is None), "Candidate abstention mismatch")
 
     external_targets = tuple(t for t in result.targets if t.retrieval_appropriate)
