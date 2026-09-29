@@ -224,8 +224,7 @@ def validate_trace_links(trace):
         expected_label = "partially_culturally_appropriate"
     require(result.cultural_appropriateness == expected_label, "Cultural appropriateness mismatch")
     expected_abstention_reason = (
-        " | ".join(f"{s.dimension_id}: {s.rationale}" for s in result.dimension_scores if s.score == "abstain")
-        or None
+        " | ".join(f"{s.dimension_id}: {s.rationale}" for s in result.dimension_scores if s.score == "abstain") or None
     )
     require(result.abstention_reason == expected_abstention_reason, "Abstention reason mismatch")
     require(result.candidate_abstained == (expected_overall is None), "Candidate abstention mismatch")
