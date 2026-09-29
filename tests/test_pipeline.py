@@ -661,6 +661,10 @@ def test_all_external_insufficient_requires_dimension_abstention(setup):
     assert all(score.target_ids for score in result.dimension_scores)
     assert all(score.memo_ids for score in result.dimension_scores)
     assert result.overall_score is None
+    assert result.vericult_score is None
+    assert result.cultural_appropriateness == "insufficient_evidence"
+    assert result.abstention_reason is not None
+    assert "D03:" in result.abstention_reason
     assert result.candidate_abstained
 
 
@@ -940,10 +944,41 @@ def test_rank_shared_planning_and_exact_tie(setup):
     result = verifier.rank(PROMPT, [RESPONSE, RESPONSE + " B", RESPONSE + " C", RESPONSE + " D"])
     assert all(c.status == "completed" for c in result.candidates)
     assert result.winner == "no_clear_winner" and result.tied_indices == (0, 1, 2, 3)
+    assert "no arbitrary winner" in result.tie_break_reason
     assert sum(c["stage"] == "context_planner_v1" for c in llm.calls) == 1
     assert sum(c["stage"] == "dimension_planner_v1" for c in llm.calls) == 1
     assert all(c.context is result.candidates[0].context for c in result.candidates)
     assert all(c.dimension_plan is result.candidates[0].dimension_plan for c in result.candidates)
+
+
+def test_primary_dimension_breaks_exact_overall_tie(setup):
+    _, _, _, verifier = setup
+    candidate = verifier.verify(PROMPT, RESPONSE)
+    plan = DimensionPlan(
+        dimensions=(
+            DimensionApplicability(dimension_id="D03", role="primary", reason="primary"),
+            DimensionApplicability(dimension_id="D01", role="secondary", reason="secondary"),
+        ),
+        reasoning="fixture",
+    )
+    primary_high = candidate.model_copy(
+        update={
+            "dimension_plan": plan,
+            "dimension_scores": (score(2, "D03"), score(0, "D01")),
+            "overall_score": 0.5,
+        }
+    )
+    primary_low = candidate.model_copy(
+        update={
+            "dimension_plan": plan,
+            "dimension_scores": (score(1, "D03"), score(1, "D01")),
+            "overall_score": 0.5,
+        }
+    )
+    ranking = rank_results([primary_low, primary_high, primary_low, primary_low])
+    assert ranking.winner == 1
+    assert ranking.tied_indices == (0, 1, 2, 3)
+    assert "primary-dimension" in ranking.tie_break_reason
 
 
 def test_ranking_with_failed_candidate_returns_no_clear_winner(setup):
