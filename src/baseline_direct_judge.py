@@ -190,6 +190,8 @@ def main() -> None:
         output.append(
             {
                 "prompt_id": prompt_id,
+                "judge_model": args.model,
+                "judge_permutation_seed": args.permutation_seed,
                 "judge_status": status,
                 "judge_presented_order": order,
                 "judge_winner_presented": presented_winner,
@@ -202,6 +204,8 @@ def main() -> None:
     args.output_csv.parent.mkdir(parents=True, exist_ok=True)
     fields = [
         "prompt_id",
+        "judge_model",
+        "judge_permutation_seed",
         "judge_status",
         "judge_presented_order",
         "judge_winner_presented",
