@@ -43,8 +43,6 @@ def test_final_runner_resume_only_skips_completed_matching_mode(tmp_path):
     assert load_completed(output, "REPLAY") == {"PLT003"}
 
 
-
-
 def test_runtime_manifest_must_match_config_and_model_digest(tmp_path):
     config = tmp_path / "config.json"
     config.write_text('{"model": "fixture"}\n', encoding="utf-8")
@@ -62,6 +60,7 @@ def test_runtime_manifest_must_match_config_and_model_digest(tmp_path):
     config.write_text('{"model": "changed"}\n', encoding="utf-8")
     with pytest.raises(RuntimeError, match="different verifier config"):
         verify_runtime_manifest(runtime, config)
+
 
 def test_replay_evidence_manifest_detects_mutation(tmp_path):
     evidence = tmp_path / "snapshot.json"
