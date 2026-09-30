@@ -47,18 +47,21 @@ it is not fitted to Human Gold or PLT outcomes.
 
 The order is fixed:
 
-1. **LIVE acquisition** — run all 30 Best-of-4 sets. LIVE may retrieve web evidence
+1. **Runtime preflight** — verify the frozen checkout/dataset/config, require the
+   Tavily credential, confirm the local `qwen3:4b` installation and record its
+   Ollama digest plus Python/package versions.
+2. **LIVE acquisition** — run all 30 Best-of-4 sets. LIVE may retrieve web evidence
    and stores immutable evidence snapshots/schedules.
-2. **Evidence freeze audit** — require 30 completed prompt records and 120 candidate
+3. **Evidence freeze audit** — require 30 completed prompt records and 120 candidate
    traces; hash the LIVE output, every candidate trace and every evidence/schedule
    file into `artifacts/final_experiment/evidence_manifest.json`.
-3. **REPLAY primary Vericult evaluation** — verify the evidence-manifest hashes,
+4. **REPLAY primary Vericult evaluation** — verify the evidence-manifest hashes,
    reuse the frozen evidence without live retrieval, and rerun the semantic stages.
-4. **Skywork reward-model baseline** — score the same 120 candidates independently.
-5. **Direct Qwen judge baseline** — one no-retrieval Best-of-4 judgment using the
+5. **Skywork reward-model baseline** — score the same 120 candidates independently.
+6. **Direct Qwen judge baseline** — one no-retrieval Best-of-4 judgment using the
    same D01–D10 rubric and selective decision space. Candidate presentation is
    deterministically permuted with seed `20260930` and mapped back to canonical A–D.
-6. **Only after all predictions are persisted**, join them to Human Gold for analysis.
+7. **Only after all predictions are persisted**, join them to Human Gold for analysis.
 
 REPLAY is the primary reported Vericult result. LIVE exists to acquire and freeze
 external evidence and is not substituted for the primary REPLAY result.
@@ -77,6 +80,7 @@ final PLT results. Any unavoidable execution-only deviation must be documented.
 
 ## Output locations
 
+- Runtime manifest: `artifacts/final_experiment/runtime_manifest.json`
 - LIVE summary: `artifacts/final_experiment/results/vericult_live.jsonl`
 - LIVE traces: `artifacts/final_experiment/traces/live/`
 - Frozen evidence: `artifacts/final_experiment/evidence/`
@@ -98,6 +102,7 @@ python -m pytest -q
 ruff check src scripts tests
 ruff format --check src scripts tests
 CULTVERIFY_RUN_LIVE=1 python -m pytest -q -m live
+python scripts/preflight_final_experiment.py
 ```
 
 The credential-gated smoke test is development-only and must not use PLT001–PLT030.
