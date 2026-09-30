@@ -10,18 +10,18 @@ import argparse
 import csv
 from pathlib import Path
 
-DEFAULT_RM = "Skywork/Skywork-Reward-V2-Qwen3-4B"
-
+DEFAULT_RM = "Skywork/Skywork-Reward-V2-Qwen3-4B"\nDEFAULT_RM_REVISION = "fd958fe"\n
 
 class SkyworkRewardModel:
-    def __init__(self, model_name: str = DEFAULT_RM, device_map: str = "auto"):
+    def __init__(\n        self, model_name: str = DEFAULT_RM, revision: str = DEFAULT_RM_REVISION, device_map: str = "auto"\n    ):
         import torch
         from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
         self.torch = torch
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name, revision=revision)
         self.model = AutoModelForSequenceClassification.from_pretrained(
             model_name,
+            revision=revision,
             torch_dtype="auto",
             device_map=device_map,
             num_labels=1,
@@ -62,6 +62,7 @@ def main() -> None:
     parser.add_argument("input_csv", type=Path)
     parser.add_argument("output_csv", type=Path)
     parser.add_argument("--model", default=DEFAULT_RM)
+    parser.add_argument("--revision", default=DEFAULT_RM_REVISION)
     parser.add_argument("--limit", type=int, default=0)
     args = parser.parse_args()
 
@@ -69,7 +70,7 @@ def main() -> None:
     if args.limit > 0:
         rows = rows[: args.limit]
 
-    rm = SkyworkRewardModel(args.model)
+    rm = SkyworkRewardModel(args.model, args.revision)
     output = []
     for index, row in enumerate(rows, 1):
         scores = {label: rm.score(row["prompt"], row[f"response_{label.lower()}"]) for label in "ABCD"}
@@ -77,13 +78,17 @@ def main() -> None:
             {
                 "set_id": row.get("set_id", f"row_{index}"),
                 "prompt_id": row.get("prompt_id", ""),
+                "rm_model": args.model,
+                "rm_revision": args.revision,
                 "rm_winner": select_unique_winner(scores),
                 **{f"rm_score_{label}": scores[label] for label in "ABCD"},
             }
         )
 
     args.output_csv.parent.mkdir(parents=True, exist_ok=True)
-    fields = ["set_id", "prompt_id", "rm_winner"] + [f"rm_score_{label}" for label in "ABCD"]
+    fields = ["set_id", "prompt_id", "rm_model", "rm_revision", "rm_winner"] + [
+        f"rm_score_{label}" for label in "ABCD"
+    ]
     with args.output_csv.open("w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
