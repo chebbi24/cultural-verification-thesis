@@ -236,7 +236,8 @@ It receives the same selective decision space as Vericult and uses a determinist
 candidate-presentation permutation (seed 20260930) that is mapped back to original
 A-D labels. Neither baseline enters `cultverify`. The final verifier configuration is
 stored in `experiments/final_vericult_config.json`; the experiment freeze is recorded
-in `experiments/final_manifest.json`. The RM extra pins Transformers 4.52.3 for the frozen baseline; install it with\n`pip install -e '.[rm]'`.
+in `experiments/final_manifest.json`. The RM extra pins Transformers 4.52.3 for the frozen baseline; install it with
+`pip install -e '.[rm]'`.
 
 ## Frozen final experiment execution
 
