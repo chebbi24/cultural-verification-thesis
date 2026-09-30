@@ -1,5 +1,4 @@
-# Implementation validation
-
+# Historical implementation validation — Vericult 1.0\n\nThis file records the pre-gold clean-verifier validation at commit `2e546a48ba0950e78f7bd244b5b37b7b475ccf2d`. Vericult 1.1 changes only the post-score selective Best-of-4 decision layer and final experiment harness; use `docs/final_validation.md` for the experiment-ready freeze.\n
 Validation environment: Python 3.12; exact tested dependency versions in
 `requirements.lock`. No paid model or search calls were made.
 
