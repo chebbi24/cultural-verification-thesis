@@ -10,10 +10,14 @@ import argparse
 import csv
 from pathlib import Path
 
-DEFAULT_RM = "Skywork/Skywork-Reward-V2-Qwen3-4B"\nDEFAULT_RM_REVISION = "fd958fe"\n
+DEFAULT_RM = "Skywork/Skywork-Reward-V2-Qwen3-4B"
+DEFAULT_RM_REVISION = "fd958fe"
+
 
 class SkyworkRewardModel:
-    def __init__(\n        self, model_name: str = DEFAULT_RM, revision: str = DEFAULT_RM_REVISION, device_map: str = "auto"\n    ):
+    def __init__(
+        self, model_name: str = DEFAULT_RM, revision: str = DEFAULT_RM_REVISION, device_map: str = "auto"
+    ):
         import torch
         from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
