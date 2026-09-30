@@ -230,18 +230,13 @@ def abstention_reason(scores):
     return " | ".join(f"{s.dimension_id}: {s.rationale}" for s in abstained)
 
 
-def _primary_dimension_score(candidate):
-    primary = next(
-        (dimension.dimension_id for dimension in candidate.dimension_plan.dimensions if dimension.role == "primary"),
-        None,
-    )
-    if primary is None:
-        return None
-    score = next((score.score for score in candidate.dimension_scores if score.dimension_id == primary), None)
-    return score if isinstance(score, int) and not isinstance(score, bool) else None
-
-
 def rank_results(candidates):
+    """Rank only candidates that pass the absolute cultural-appropriateness gate.
+
+    A scored dimension value of 0 is already defined by the frozen rubric as a
+    material cultural misalignment, so such a candidate is ineligible for
+    endorsement. The gate does not alter any candidate's relative score.
+    """
     scores = [exact_score(c.dimension_scores) for c in candidates]
     comparable = (
         len({tuple(sorted(s.dimension_id for s in c.dimension_scores if s.score != "abstain")) for c in candidates})
@@ -253,50 +248,70 @@ def rank_results(candidates):
             winner="no_clear_winner",
             tied_indices=(),
             coverage_comparable=False,
-            tie_break_reason="At least one candidate failed; no ranking was forced.",
+            tie_break_reason="At least one candidate failed technically; no ranking was forced.",
         )
 
-    available = [s for s in scores if s is not None]
-    tied = tuple(i for i, s in enumerate(scores) if s is not None and s == max(available)) if available else ()
-    if not tied:
+    labels = [candidate.cultural_appropriateness for candidate in candidates]
+    if any(label == "insufficient_evidence" for label in labels):
+        unresolved = tuple(i for i, label in enumerate(labels) if label == "insufficient_evidence")
         return RankingResult(
             candidates=tuple(candidates),
-            winner="no_clear_winner",
-            tied_indices=(),
+            winner="insufficient_evidence",
+            tied_indices=unresolved,
             coverage_comparable=comparable,
-            tie_break_reason="All candidates abstained; there is no scored basis for a winner.",
+            tie_break_reason=(
+                "At least one candidate has no scored cultural basis; the full Best-of-4 comparison is unresolved."
+            ),
         )
+
+    eligible = tuple(
+        i
+        for i, label in enumerate(labels)
+        if label in {"culturally_appropriate", "partially_culturally_appropriate"}
+    )
+    if not eligible:
+        available = [score for score in scores if score is not None]
+        relative_top = (
+            tuple(i for i, score in enumerate(scores) if score is not None and score == max(available))
+            if available
+            else ()
+        )
+        return RankingResult(
+            candidates=tuple(candidates),
+            winner="no_acceptable_candidate",
+            tied_indices=relative_top,
+            coverage_comparable=comparable,
+            tie_break_reason=(
+                "Every candidate contains at least one score-0 material cultural misalignment; "
+                "relative scores are retained diagnostically but no candidate is endorsed."
+            ),
+        )
+
+    eligible_scores = {i: scores[i] for i in eligible if scores[i] is not None}
+    if len(eligible_scores) != len(eligible):
+        return RankingResult(
+            candidates=tuple(candidates),
+            winner="insufficient_evidence",
+            tied_indices=tuple(i for i in eligible if scores[i] is None),
+            coverage_comparable=comparable,
+            tie_break_reason="An otherwise eligible candidate has no exact aggregate score.",
+        )
+
+    best = max(eligible_scores.values())
+    tied = tuple(i for i in eligible if eligible_scores[i] == best)
     if len(tied) == 1:
         return RankingResult(
             candidates=tuple(candidates),
             winner=tied[0],
             tied_indices=tied,
             coverage_comparable=comparable,
-            tie_break_reason="Highest overall verifier score.",
+            tie_break_reason="Unique highest exact score among culturally eligible candidates.",
         )
-
-    # Minimal deterministic tie-break: prefer the candidate that scores higher
-    # on the already-planned primary cultural dimension. No extra LLM call is introduced.
-    primary_scores = {index: _primary_dimension_score(candidates[index]) for index in tied}
-    scored_primary = {index: value for index, value in primary_scores.items() if value is not None}
-    if scored_primary:
-        best_primary = max(scored_primary.values())
-        primary_tied = tuple(index for index in tied if primary_scores[index] == best_primary)
-        if len(primary_tied) == 1:
-            return RankingResult(
-                candidates=tuple(candidates),
-                winner=primary_tied[0],
-                tied_indices=tied,
-                coverage_comparable=comparable,
-                tie_break_reason="Overall scores tied; higher primary-dimension score selected the winner.",
-            )
 
     return RankingResult(
         candidates=tuple(candidates),
         winner="no_clear_winner",
         tied_indices=tied,
         coverage_comparable=comparable,
-        tie_break_reason=(
-            "Candidates remain identical on overall and primary-dimension scores; no arbitrary winner was forced."
-        ),
+        tie_break_reason="Eligible candidates share the exact highest score; no arbitrary tie-break was applied.",
     )
