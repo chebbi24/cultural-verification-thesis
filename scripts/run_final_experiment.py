@@ -90,6 +90,16 @@ def validate_freeze_files(manifest: dict, dataset: Path, config_path: Path) -> N
         raise RuntimeError("Verifier config hash does not match final_manifest.json")
 
 
+def verify_runtime_manifest(path: Path, config_path: Path) -> None:
+    if not path.is_file():
+        raise RuntimeError("Final experiment requires the captured runtime manifest")
+    runtime = json.loads(path.read_text(encoding="utf-8"))
+    if runtime.get("config_sha256") != sha256_file(config_path):
+        raise RuntimeError("Runtime manifest was captured for a different verifier config")
+    if not runtime.get("verifier_model", {}).get("digest"):
+        raise RuntimeError("Runtime manifest does not contain the frozen Ollama model digest")
+
+
 def verify_evidence_manifest(path: Path) -> None:
     if not path.is_file():
         raise RuntimeError("REPLAY requires the frozen LIVE evidence manifest")
@@ -168,6 +178,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--manifest", type=Path, default=Path("experiments/final_manifest.json"))
     parser.add_argument("--output", type=Path)
     parser.add_argument(
+        "--runtime-manifest",
+        type=Path,
+        default=Path("artifacts/final_experiment/runtime_manifest.json"),
+    )
+    parser.add_argument(
         "--evidence-manifest",
         type=Path,
         default=Path("artifacts/final_experiment/evidence_manifest.json"),
@@ -179,6 +194,7 @@ def main(argv: list[str] | None = None) -> int:
     assert_frozen_checkout(manifest)
     validate_freeze_files(manifest, args.input, args.config)
     rows = read_rows(args.input)
+    verify_runtime_manifest(args.runtime_manifest, args.config)
     if args.mode == "REPLAY":
         verify_evidence_manifest(args.evidence_manifest)
 
