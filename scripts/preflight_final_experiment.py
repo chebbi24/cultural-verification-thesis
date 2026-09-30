@@ -63,9 +63,9 @@ def main(argv: list[str] | None = None) -> int:
     runtime = {
         "schema_version": "final-runtime-v1",
         "captured_at_utc": datetime.now(timezone.utc).isoformat(),
-        "git_head": __import__("subprocess").run(
-            ["git", "rev-parse", "HEAD"], check=True, capture_output=True, text=True
-        ).stdout.strip(),
+        "git_head": __import__("subprocess")
+        .run(["git", "rev-parse", "HEAD"], check=True, capture_output=True, text=True)
+        .stdout.strip(),
         "python": sys.version,
         "platform": platform.platform(),
         "dataset_sha256": sha256_file(args.dataset),
@@ -78,10 +78,7 @@ def main(argv: list[str] | None = None) -> int:
             "size": model.get("size"),
             "modified_at": model.get("modified_at"),
         },
-        "packages": {
-            name: importlib.metadata.version(name)
-            for name in ("cultverify", "pydantic", "requests")
-        },
+        "packages": {name: importlib.metadata.version(name) for name in ("cultverify", "pydantic", "requests")},
         "credentials_present": {
             "TAVILY_API_KEY": bool(os.getenv("TAVILY_API_KEY")),
             "OPENROUTER_API_KEY": bool(os.getenv("OPENROUTER_API_KEY")),
