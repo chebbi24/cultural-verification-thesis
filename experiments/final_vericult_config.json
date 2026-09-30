@@ -1,0 +1,27 @@
+{
+  "verifier_model_provider": "ollama",
+  "verifier_model_id": "qwen3:4b",
+  "temperature": 0,
+  "retry_count": 1,
+  "transport_retry_count": 1,
+  "llm_timeout": 180,
+  "retrieval_timeout": 45,
+  "top_k": 3,
+  "max_material_targets": 3,
+  "max_retrieval_rounds": 2,
+  "mode": "LIVE",
+  "cache_directory": "artifacts/evidence/final_qwen3_4b",
+  "trace_directory": "artifacts/traces/final_qwen3_4b",
+  "search_depth": "advanced",
+  "excluded_domains": [],
+  "excluded_repos": [
+    "chebbi24/cultural-verification-thesis"
+  ],
+  "excluded_paths": [
+    "*/annotations/*",
+    "*/results/*",
+    "*human_label*",
+    "*silver_label*",
+    "*provisional_annotations*"
+  ]
+}
