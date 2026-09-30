@@ -951,7 +951,7 @@ def test_rank_shared_planning_and_exact_tie(setup):
     assert all(c.dimension_plan is result.candidates[0].dimension_plan for c in result.candidates)
 
 
-def test_primary_dimension_breaks_exact_overall_tie(setup):
+def test_exact_tie_is_never_broken_by_primary_dimension(setup):
     _, _, _, verifier = setup
     candidate = verifier.verify(PROMPT, RESPONSE)
     plan = DimensionPlan(
@@ -964,21 +964,95 @@ def test_primary_dimension_breaks_exact_overall_tie(setup):
     primary_high = candidate.model_copy(
         update={
             "dimension_plan": plan,
-            "dimension_scores": (score(2, "D03"), score(0, "D01")),
-            "overall_score": 0.5,
+            "dimension_scores": (score(2, "D03"), score(1, "D01")),
+            "overall_score": 0.75,
+            "cultural_appropriateness": "partially_culturally_appropriate",
         }
     )
     primary_low = candidate.model_copy(
         update={
             "dimension_plan": plan,
-            "dimension_scores": (score(1, "D03"), score(1, "D01")),
-            "overall_score": 0.5,
+            "dimension_scores": (score(1, "D03"), score(2, "D01")),
+            "overall_score": 0.75,
+            "cultural_appropriateness": "partially_culturally_appropriate",
         }
     )
     ranking = rank_results([primary_low, primary_high, primary_low, primary_low])
-    assert ranking.winner == 1
+    assert ranking.winner == "no_clear_winner"
     assert ranking.tied_indices == (0, 1, 2, 3)
-    assert "primary-dimension" in ranking.tie_break_reason
+    assert "no arbitrary tie-break" in ranking.tie_break_reason
+
+
+def test_all_inappropriate_returns_no_acceptable_candidate(setup):
+    _, _, _, verifier = setup
+    candidate = verifier.verify(PROMPT, RESPONSE)
+    inappropriate = candidate.model_copy(
+        update={
+            "dimension_scores": (score(0),),
+            "overall_score": 0.0,
+            "vericult_score": 0.0,
+            "cultural_appropriateness": "culturally_inappropriate",
+        }
+    )
+    higher_relative = inappropriate.model_copy(
+        update={
+            "dimension_scores": (score(0), score(2, "D01"), score(2, "D02")),
+            "overall_score": 2 / 3,
+            "vericult_score": 200 / 3,
+        }
+    )
+    ranking = rank_results([inappropriate, higher_relative, inappropriate, inappropriate])
+    assert ranking.winner == "no_acceptable_candidate"
+    assert ranking.tied_indices == (1,)
+    assert "no candidate is endorsed" in ranking.tie_break_reason
+
+
+def test_inappropriate_candidate_is_excluded_from_relative_ranking(setup):
+    _, _, _, verifier = setup
+    candidate = verifier.verify(PROMPT, RESPONSE)
+    eligible = candidate.model_copy(
+        update={
+            "dimension_scores": (score(1),),
+            "overall_score": 0.5,
+            "vericult_score": 50.0,
+            "cultural_appropriateness": "partially_culturally_appropriate",
+        }
+    )
+    ineligible = candidate.model_copy(
+        update={
+            "dimension_scores": (score(0), score(2, "D01"), score(2, "D02")),
+            "overall_score": 2 / 3,
+            "vericult_score": 200 / 3,
+            "cultural_appropriateness": "culturally_inappropriate",
+        }
+    )
+    ranking = rank_results([ineligible, eligible, ineligible, ineligible])
+    assert ranking.winner == 1
+    assert ranking.tied_indices == (1,)
+
+
+def test_insufficient_candidate_blocks_full_comparison(setup):
+    _, _, _, verifier = setup
+    candidate = verifier.verify(PROMPT, RESPONSE)
+    insufficient = candidate.model_copy(
+        update={
+            "dimension_scores": (score("abstain"),),
+            "overall_score": None,
+            "vericult_score": None,
+            "cultural_appropriateness": "insufficient_evidence",
+        }
+    )
+    eligible = candidate.model_copy(
+        update={
+            "dimension_scores": (score(2),),
+            "overall_score": 1.0,
+            "vericult_score": 100.0,
+            "cultural_appropriateness": "culturally_appropriate",
+        }
+    )
+    ranking = rank_results([eligible, eligible, insufficient, eligible])
+    assert ranking.winner == "insufficient_evidence"
+    assert ranking.tied_indices == (2,)
 
 
 def test_ranking_with_failed_candidate_returns_no_clear_winner(setup):
@@ -994,11 +1068,33 @@ def test_ranking_with_failed_candidate_returns_no_clear_winner(setup):
 def test_ranking_all_abstain_and_unique_winner(setup):
     _, _, _, verifier = setup
     candidate = verifier.verify(PROMPT, RESPONSE)
-    abstained = candidate.model_copy(update={"dimension_scores": (score("abstain"),), "overall_score": None})
-    assert rank_results([abstained] * 4).winner == "no_clear_winner"
-    low = candidate.model_copy(update={"dimension_scores": (score(1),), "overall_score": 0.5})
-    assert rank_results([low, candidate, low, low]).winner == 1
-    assert rank_results([low, candidate, abstained, low]).coverage_comparable is False
+    abstained = candidate.model_copy(
+        update={
+            "dimension_scores": (score("abstain"),),
+            "overall_score": None,
+            "vericult_score": None,
+            "cultural_appropriateness": "insufficient_evidence",
+        }
+    )
+    assert rank_results([abstained] * 4).winner == "insufficient_evidence"
+    low = candidate.model_copy(
+        update={
+            "dimension_scores": (score(1),),
+            "overall_score": 0.5,
+            "vericult_score": 50.0,
+            "cultural_appropriateness": "partially_culturally_appropriate",
+        }
+    )
+    high = candidate.model_copy(
+        update={
+            "dimension_scores": (score(2),),
+            "overall_score": 1.0,
+            "vericult_score": 100.0,
+            "cultural_appropriateness": "culturally_appropriate",
+        }
+    )
+    assert rank_results([low, high, low, low]).winner == 1
+    assert rank_results([low, high, abstained, low]).winner == "insufficient_evidence"
 
 
 def test_replay_no_live_calls_and_no_query_rewrite(setup):
