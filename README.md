@@ -52,7 +52,7 @@ appropriate; the program does **not** automatically source `.env` files.
 
 ```bash
 export CULTVERIFY_PROVIDER=ollama
-export CULTVERIFY_MODEL='qwen3:4b'  # setup example, not a recommended final research model
+export CULTVERIFY_MODEL='qwen3:4b'  # frozen final thesis backbone
 export TAVILY_API_KEY='your-key'
 python -m cultverify.cli verify \
   --prompt 'How should I write a first email to a university professor?' \
@@ -210,8 +210,13 @@ software contracts, not empirical cultural accuracy or superiority to reward mod
 For the separately gated real-provider LIVE → REPLAY smoke test, configure the model
 and keys, then run `CULTVERIFY_RUN_LIVE=1 pytest -q -m live`.
 
-`src/baseline_rm.py` remains independent and unchanged. Install its optional stack
-with `pip install -e '.[rm]'`. Its input and output never enter `cultverify`.
+`src/baseline_rm.py` is the frozen independent reward-model baseline using
+`Skywork/Skywork-Reward-V2-Qwen3-4B`; exact top-score ties return `no_clear_winner`.
+`src/baseline_direct_judge.py` is the frozen direct-LLM baseline using `qwen3:4b`,
+temperature zero, the same D01-D10 rubric, one Best-of-4 judgment, and no retrieval.
+Neither baseline enters `cultverify`. The final verifier configuration is stored in
+`experiments/final_vericult_config.json`; the experiment freeze is recorded in
+`experiments/final_manifest.json`. Install the reward-model stack with `pip install -e '.[rm]'`.
 
 ## Repository cleanup
 
