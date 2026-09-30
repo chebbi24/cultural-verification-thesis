@@ -90,6 +90,16 @@ def validate_freeze_files(manifest: dict, dataset: Path, config_path: Path) -> N
         raise RuntimeError("Verifier config hash does not match final_manifest.json")
 
 
+def verify_evidence_manifest(path: Path) -> None:
+    if not path.is_file():
+        raise RuntimeError("REPLAY requires the frozen LIVE evidence manifest")
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    for record in manifest.get("evidence_files", []):
+        evidence_path = Path(record["path"])
+        if not evidence_path.is_file() or sha256_file(evidence_path) != record["sha256"]:
+            raise RuntimeError(f"Frozen evidence changed or is missing: {evidence_path}")
+
+
 def load_completed(path: Path, mode: str) -> set[str]:
     if not path.exists():
         return set()
@@ -157,6 +167,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", type=Path, default=Path("experiments/final_vericult_config.json"))
     parser.add_argument("--manifest", type=Path, default=Path("experiments/final_manifest.json"))
     parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--evidence-manifest",
+        type=Path,
+        default=Path("artifacts/final_experiment/evidence_manifest.json"),
+    )
     parser.add_argument("--no-resume", action="store_true")
     args = parser.parse_args(argv)
 
@@ -164,6 +179,8 @@ def main(argv: list[str] | None = None) -> int:
     assert_frozen_checkout(manifest)
     validate_freeze_files(manifest, args.input, args.config)
     rows = read_rows(args.input)
+    if args.mode == "REPLAY":
+        verify_evidence_manifest(args.evidence_manifest)
 
     values = json.loads(args.config.read_text(encoding="utf-8"))
     values["mode"] = args.mode
