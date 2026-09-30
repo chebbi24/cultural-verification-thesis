@@ -227,7 +227,7 @@ def main(argv: list[str] | None = None) -> int:
                 failures += 1
                 print(f"[{prompt_id}] failed; checkpoint saved", file=sys.stderr, flush=True)
             else:
-                print(f"[{prompt_id}] completed -> {record['winner']}", flush=True)
+                print(f"[{prompt_id}] completed", flush=True)
 
     if failures:
         print(f"Final batch completed with {failures} failed prompt(s); rerun with resume after fixing execution issues.")
