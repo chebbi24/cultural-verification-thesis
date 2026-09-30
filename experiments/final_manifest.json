@@ -1,6 +1,6 @@
 {
   "experiment_id": "thesis-final-v1",
-  "freeze_code_commit": "bd2b2558e6639c6067bdc23afd09459b38a5e047",
+  "freeze_code_commit": "feab39c2186d5d06b827a18d68fbd689aa1a63da",
   "dataset": {
     "path": "data/evaluation/best_of4_v1.csv",
     "git_blob_sha": "9eaf58122dc93600853808cf14cfd7b1a713f5b5",
