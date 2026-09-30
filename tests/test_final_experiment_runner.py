@@ -3,7 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from scripts.preflight_final_experiment import find_ollama_model, tags_url\nfrom scripts.run_final_experiment import (
+from scripts.preflight_final_experiment import find_ollama_model, tags_url
+from scripts.run_final_experiment import (
     EXPECTED_PROMPT_IDS,
     load_completed,
     read_rows,
