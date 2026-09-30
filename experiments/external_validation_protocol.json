@@ -1,0 +1,53 @@
+{
+  "schema_version": "external-validation-protocol-v1",
+  "frozen_before_primary_results": true,
+  "selection_seed": 20260930,
+  "purpose": "Secondary external-validity analysis; never used to tune Vericult 1.1.",
+  "common_rules": [
+    "Use only official author-released benchmark data and stable source identifiers.",
+    "Deduplicate exact prompts before sampling.",
+    "Select deterministically by SHA-256 ordering of selection_seed + source_id within each declared stratum.",
+    "Do not inspect Vericult, Skywork, direct-judge, or Human Gold outcomes during selection.",
+    "Preserve original prompt/reference fields and record every transformation explicitly.",
+    "Do not force a benchmark into Best-of-4 when its native labels support only single-response, scope, value, or error analysis.",
+    "Add each source repository/domain to retrieval exclusions before evaluating its items."
+  ],
+  "sources": [
+    {
+      "source": "SafeWorld",
+      "official_repository": "PlusLabNLP/SafeWorld",
+      "status": "public",
+      "target_n": 12,
+      "strata": "culture queries only; 3 deterministic items from each of SpecificAnswer, CompreAnswer, RefuseToAnswer, DoAnswer; maximize distinct countries after deterministic ordering",
+      "evaluation_role": "contextual cultural/legal verification; use native guidelines/reference fields"
+    },
+    {
+      "source": "CultureLLM",
+      "official_repository": "Scarelette/CultureLLM",
+      "status": "public",
+      "target_n": 12,
+      "strata": "World Values Survey seed items; deterministic sample across distinct value questions/cultures where the released fields support it",
+      "evaluation_role": "value variation and pluralism/abstention analysis; do not treat culturally varying values as one universal gold answer"
+    },
+    {
+      "source": "ScopeBench",
+      "official_repository": "HAOJUN-LIANG/ScopeBench",
+      "status": "public",
+      "target_n": 12,
+      "strata": "6 UNIVERSAL and 6 SPECIFIC norms; maximize distinct countries after deterministic ordering",
+      "evaluation_role": "cultural scope-awareness and overgeneralization analysis"
+    },
+    {
+      "source": "CARB",
+      "paper": "Evaluating and Improving Cultural Awareness of Reward Models for LLM Alignment, ICLR 2026",
+      "status": "conditional_on_official_data_availability",
+      "target_n": 12,
+      "strata": "3 deterministic Best-of-N sets from each of commonsense, values, safety, linguistics; maximize culture diversity",
+      "evaluation_role": "native cultural Best-of-N ranking comparison",
+      "fallback": "If official author-released CARB data are not publicly accessible at execution time, omit CARB rather than reconstructing or hand-selecting examples from the paper."
+    }
+  ],
+  "mandatory_external_n": 36,
+  "external_n_with_carb": 48,
+  "freeze_policy": "The protocol may not be changed in response to primary PLT results. Dataset ingestion may implement only the declared deterministic rules and must emit source IDs plus hashes."
+}
