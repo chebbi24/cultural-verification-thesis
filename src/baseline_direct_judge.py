@@ -55,8 +55,8 @@ def rubric_text() -> str:
     if [row["dimension_id"] for row in rows] != [f"D{i:02}" for i in range(1, 11)]:
         raise ValueError("Direct judge requires the frozen D01-D10 rubric")
     return "\n".join(
-        f'{row["dimension_id"]} {row["dimension_name"]}: {row["definition"]} '
-        f'Scoring question: {row["scoring_question"]}'
+        f"{row['dimension_id']} {row['dimension_name']}: {row['definition']} "
+        f"Scoring question: {row['scoring_question']}"
         for row in rows
     )
 
