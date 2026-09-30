@@ -1,20 +1,49 @@
 {
-  "experiment_id": "thesis-final-v1",
-  "freeze_code_commit": "6c4e3b523316f8d8d6002e78f41132a2f31040dd",
+  "schema_version": "thesis-final-v2",
+  "experiment_id": "thesis-final-v2",
+  "pipeline_version": "cultverify-1.1.0",
+  "freeze_code_commit": "cbe62773eb16068b3b22873f3f863a9682f34385",
+  "validation": {
+    "github_actions_run_id": 36738708657,
+    "required_status": "success",
+    "local_live_smoke_required": true
+  },
   "dataset": {
     "path": "data/evaluation/best_of4_v1.csv",
     "git_blob_sha": "9eaf58122dc93600853808cf14cfd7b1a713f5b5",
+    "sha256": "bb1f096dfbc74913a80219c983edeadb2b26f9b64ce912313d8cad29501a7587",
     "prompts": 30,
     "candidates_per_prompt": 4
+  },
+  "human_reference": {
+    "manifest": "data/evaluation/human_gold_manifest.json",
+    "role": "comparison only after all machine predictions are persisted"
   },
   "vericult": {
     "backbone": "qwen3:4b",
     "provider": "ollama",
-    "config": "experiments/final_vericult_config.json"
+    "temperature": 0,
+    "config": "experiments/final_vericult_config.json",
+    "config_sha256": "3742f0ab4cb644760b7b455fdbd350ffbc6849c7579bc719749a57e70815c729",
+    "runtime_digest_manifest": "artifacts/final_experiment/runtime_manifest.json",
+    "decision_space": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "no_clear_winner",
+      "no_acceptable_candidate",
+      "insufficient_evidence"
+    ],
+    "acceptability_gate": "any scored dimension 0 -> culturally_inappropriate -> ineligible for endorsement",
+    "tie_policy": "exact top-score tie among eligible candidates -> no_clear_winner",
+    "insufficient_policy": "any candidate with no scored cultural basis -> insufficient_evidence for full Best-of-4 comparison"
   },
   "reward_model_baseline": {
     "model": "Skywork/Skywork-Reward-V2-Qwen3-4B",
+    "revision": "fd958fe",
     "script": "src/baseline_rm.py",
+    "transformers": "4.52.3",
     "tie_policy": "exact top-score tie -> no_clear_winner"
   },
   "direct_llm_judge_baseline": {
@@ -22,7 +51,26 @@
     "script": "src/baseline_direct_judge.py",
     "temperature": 0,
     "retrieval": false,
-    "decision": "A | B | C | D | no_clear_winner"
+    "permutation_seed": 20260930,
+    "decision_space": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "no_clear_winner",
+      "no_acceptable_candidate",
+      "insufficient_evidence"
+    ]
   },
-  "freeze_policy": "No semantic tuning after this freeze; only documented execution fixes that do not use final labels."
+  "execution_order": [
+    "runtime_preflight",
+    "vericult_live",
+    "evidence_freeze_audit",
+    "vericult_replay_primary",
+    "skywork_reward_model",
+    "direct_llm_judge",
+    "human_gold_join_and_analysis"
+  ],
+  "external_validation_protocol": "experiments/external_validation_protocol.json",
+  "freeze_policy": "No semantic tuning after this freeze. Human Gold is excluded from all inference. Only documented execution fixes that do not use final labels are permitted."
 }
