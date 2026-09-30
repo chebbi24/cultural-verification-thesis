@@ -1,7 +1,13 @@
 import pytest
 from pydantic import ValidationError
 
-from baseline_direct_judge import (\n    DEFAULT_MODEL,\n    JudgeDecision,\n    decision_schema,\n    deterministic_presentation,\n    rubric_text,\n)
+from baseline_direct_judge import (
+    DEFAULT_MODEL,
+    JudgeDecision,
+    decision_schema,
+    deterministic_presentation,
+    rubric_text,
+)
 from baseline_rm import DEFAULT_RM, select_unique_winner
 
 
