@@ -12,7 +12,8 @@ from baseline_rm import DEFAULT_RM, DEFAULT_RM_REVISION, select_unique_winner
 
 
 def test_skywork_model_is_frozen():
-    assert DEFAULT_RM == "Skywork/Skywork-Reward-V2-Qwen3-4B"\n    assert DEFAULT_RM_REVISION == "fd958fe"
+    assert DEFAULT_RM == "Skywork/Skywork-Reward-V2-Qwen3-4B"
+    assert DEFAULT_RM_REVISION == "fd958fe"
 
 
 def test_skywork_unique_winner_and_exact_tie():
