@@ -230,7 +230,9 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"[{prompt_id}] completed", flush=True)
 
     if failures:
-        print(f"Final batch completed with {failures} failed prompt(s); rerun with resume after fixing execution issues.")
+        print(
+            f"Final batch completed with {failures} failed prompt(s); rerun with resume after fixing execution issues."
+        )
         return 2
     return 0
 
