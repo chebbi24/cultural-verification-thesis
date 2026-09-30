@@ -248,6 +248,7 @@ candidate traces; REPLAY verifies those hashes before running and is the primary
 reported Vericult execution.
 
 ```bash
+python scripts/preflight_final_experiment.py
 python scripts/run_final_experiment.py --mode LIVE
 python scripts/audit_final_evidence.py
 python scripts/run_final_experiment.py --mode REPLAY
