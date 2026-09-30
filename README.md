@@ -3,8 +3,10 @@
 `cultverify` evaluates one **prompt + response** pair using an evidence-grounded
 D01–D10 rubric. Reward models are independent baselines: neither their scores nor
 human labels, expected issues, benchmark answers or benchmark metadata enter the
-verifier. No cultural rules, keyword overrides, score caps or hard-failure gates
-are hard-coded in Python.
+verifier. No culture-specific rules, keyword overrides or score caps are hard-coded
+in Python. Vericult 1.1 adds one rubric-semantic eligibility gate: any applicable
+dimension scored 0 ("materially misaligned" in the frozen rubric) makes that
+candidate ineligible for endorsement without changing its relative score.
 
 ## Method
 
@@ -13,7 +15,8 @@ Prompt → supported context → shared dimension plan → up to three material 
 → query rewriting → retrieval and provenance filtering → source classification
 → evidence memo → exact-span grounding → blind support/relevance gate
 → optional single gap-specific follow-up → **frozen memo**
-→ target comparison → D01–D10 scoring → equal aggregation → JSON trace.
+→ target comparison → D01–D10 scoring → equal aggregation → absolute
+appropriateness gate → selective Best-of-4 decision → JSON trace.
 
 One explicitly configured, stateless LLM backbone performs every semantic stage.
 Temperature defaults to zero; there is no model fallback. Python validates structure,
@@ -77,8 +80,11 @@ configuration file → supported environment variables → explicit CLI flags.
 
 Both commands print structured JSON. Exit code 0 indicates completed execution
 (including genuine abstention); 2 indicates invalid configuration or pipeline failure.
-Winner indices are **zero-based**; ties, all-abstained sets and any ranking containing
-a failed candidate return `no_clear_winner`.
+Winner indices are **zero-based**. Best-of-4 has four decision types: a candidate
+index, `no_clear_winner` for an exact eligible tie or technical incompleteness,
+`no_acceptable_candidate` when every candidate contains a score-0 material
+misalignment, and `insufficient_evidence` when at least one candidate has no
+scored cultural basis and the full comparison therefore cannot be established.
 
 ## Python API
 
@@ -178,7 +184,19 @@ dimension ends `insufficient` and there is no relevant non-retrieval target that
 assessed directly, that dimension must abstain. The overall score is the mean of scored
 dimensions divided by two; if none can be scored it is `null`. There are no caps or
 primary/secondary weighting differences. Ranking uses exact rational comparison,
-so floating-point rounding cannot break a mathematical tie. No tie margin is added.
+so floating-point rounding cannot break a mathematical tie. No tie margin or
+primary-dimension tie-break is used.
+
+Candidate-level appropriateness is derived deterministically from the same frozen
+scores: no scored dimensions → `insufficient_evidence`; any scored 0 →
+`culturally_inappropriate`; all applicable dimensions scored 2 with no abstention →
+`culturally_appropriate`; otherwise → `partially_culturally_appropriate`.
+Best-of-4 first applies this absolute gate. Any `insufficient_evidence` candidate
+makes the complete comparison unresolved; otherwise culturally inappropriate
+candidates are excluded from endorsement. If all four are excluded, the outcome is
+`no_acceptable_candidate`. Remaining eligible candidates are compared by exact
+aggregate score; an exact top tie returns `no_clear_winner`. Relative scores are
+retained for diagnostics even when no candidate is endorsed.
 
 - `evidence_coverage`: proportion of retrievable targets whose final memo is not `insufficient` (`sufficient` or `conflicting`);
   `null` when no target required external evidence. This is not factual accuracy.
@@ -211,12 +229,37 @@ For the separately gated real-provider LIVE → REPLAY smoke test, configure the
 and keys, then run `CULTVERIFY_RUN_LIVE=1 pytest -q -m live`.
 
 `src/baseline_rm.py` is the frozen independent reward-model baseline using
-`Skywork/Skywork-Reward-V2-Qwen3-4B`; exact top-score ties return `no_clear_winner`.
+`Skywork/Skywork-Reward-V2-Qwen3-4B` at Hugging Face revision `fd958fe`; exact top-score ties return `no_clear_winner`.
 `src/baseline_direct_judge.py` is the frozen direct-LLM baseline using `qwen3:4b`,
 temperature zero, the same D01-D10 rubric, one Best-of-4 judgment, and no retrieval.
-Neither baseline enters `cultverify`. The final verifier configuration is stored in
-`experiments/final_vericult_config.json`; the experiment freeze is recorded in
-`experiments/final_manifest.json`. Install the reward-model stack with `pip install -e '.[rm]'`.
+It receives the same selective decision space as Vericult and uses a deterministic
+candidate-presentation permutation (seed 20260930) that is mapped back to original
+A-D labels. Neither baseline enters `cultverify`. The final verifier configuration is
+stored in `experiments/final_vericult_config.json`; the experiment freeze is recorded
+in `experiments/final_manifest.json`. The RM extra pins Transformers 4.52.3 for the frozen baseline; install it with
+`pip install -e '.[rm]'`.
+
+## Frozen final experiment execution
+
+The PLT final experiment is intentionally separated into acquisition and evaluation.
+Human-gold files are never read by these runners. LIVE first acquires and freezes web
+evidence; the evidence audit hashes every frozen snapshot/schedule and all 120 LIVE
+candidate traces; REPLAY verifies those hashes before running and is the primary
+reported Vericult execution.
+
+```bash
+python scripts/preflight_final_experiment.py
+python scripts/run_final_experiment.py --mode LIVE
+python scripts/audit_final_evidence.py
+python scripts/run_final_experiment.py --mode REPLAY
+python src/baseline_rm.py data/evaluation/best_of4_v1.csv artifacts/final_experiment/results/skywork.csv
+python src/baseline_direct_judge.py data/evaluation/best_of4_v1.csv artifacts/final_experiment/results/direct_judge.csv
+```
+
+The batch runner requires a clean checkout matching the frozen code revision in
+`experiments/final_manifest.json`, verifies dataset/config hashes, checkpoints each
+prompt, and resumes only prompts already recorded as completed. Do not join any
+machine output with Human Gold until all system predictions have been persisted.
 
 ## Repository cleanup
 

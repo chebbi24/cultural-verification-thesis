@@ -68,3 +68,16 @@ def test_active_verifier_does_not_reference_project_data_files():
     assert "data/" not in source
     assert "data\\" not in source
     assert "plt001" not in source
+
+
+def test_final_inference_runners_do_not_load_human_gold():
+    paths = [
+        ROOT / "scripts" / "run_final_experiment.py",
+        ROOT / "src" / "baseline_rm.py",
+        ROOT / "src" / "baseline_direct_judge.py",
+    ]
+    source = "\n".join(path.read_text(encoding="utf-8").lower() for path in paths)
+    assert "human_gold" not in source
+    assert "human_annotations" not in source
+    assert "winner_votes" not in source
+    assert "majority_winner" not in source

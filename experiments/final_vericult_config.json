@@ -10,8 +10,8 @@
   "max_material_targets": 3,
   "max_retrieval_rounds": 2,
   "mode": "LIVE",
-  "cache_directory": "artifacts/evidence/final_qwen3_4b",
-  "trace_directory": "artifacts/traces/final_qwen3_4b",
+  "cache_directory": "artifacts/final_experiment/evidence",
+  "trace_directory": "artifacts/final_experiment/traces/live",
   "search_depth": "advanced",
   "excluded_domains": [],
   "excluded_repos": [

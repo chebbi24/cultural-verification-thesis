@@ -3,7 +3,7 @@ from typing import Literal
 from pydantic import Field
 from .schemas import Record
 
-PIPELINE_VERSION = "cultverify-1.0.0"
+PIPELINE_VERSION = "cultverify-1.1.0"
 
 
 class Config(Record):
