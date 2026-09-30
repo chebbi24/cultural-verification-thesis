@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.run_final_experiment import (
+from scripts.preflight_final_experiment import find_ollama_model, tags_url\nfrom scripts.run_final_experiment import (
     EXPECTED_PROMPT_IDS,
     load_completed,
     read_rows,
@@ -53,3 +53,14 @@ def test_replay_evidence_manifest_detects_mutation(tmp_path):
     evidence.write_text('{"frozen": false}\n', encoding="utf-8")
     with pytest.raises(RuntimeError, match="Frozen evidence changed"):
         verify_evidence_manifest(manifest)
+
+
+def test_preflight_resolves_ollama_registry_and_frozen_model():
+    assert tags_url("http://localhost:11434/api/chat") == "http://localhost:11434/api/tags"
+    model = find_ollama_model(
+        [{"name": "qwen3:4b", "digest": "abc"}, {"name": "other:latest", "digest": "def"}],
+        "qwen3:4b",
+    )
+    assert model["digest"] == "abc"
+    with pytest.raises(RuntimeError, match="not installed"):
+        find_ollama_model([], "qwen3:4b")
