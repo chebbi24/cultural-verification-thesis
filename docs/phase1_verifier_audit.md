@@ -1,5 +1,4 @@
-# Phase 1 verifier audit — pre-gold freeze gate
-
+# Phase 1 verifier audit — pre-gold freeze gate\n\n> Historical Vericult 1.0 audit. The evidence/scoring architecture remains relevant, but Vericult 1.1 supersedes the post-score Best-of-4 decision semantics with explicit `no_acceptable_candidate` and `insufficient_evidence` outcomes and removes the primary-dimension tie-break.\n
 Branch audited: `agent/clean-standalone-verifier`, created from the clean verifier implementation at commit `2e546a48ba0950e78f7bd244b5b37b7b475ccf2d`.
 
 The audit is architectural and structural. It does not use the PLT human labels to tune verifier behavior and does not claim cultural accuracy.
