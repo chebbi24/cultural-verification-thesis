@@ -16,8 +16,8 @@ def test_skywork_model_is_frozen():
 
 
 def test_skywork_unique_winner_and_exact_tie():
-    assert select_unique_winner({"a": 0.1, "b": 0.7, "c": 0.2, "d": 0.3}) == "b"
-    assert select_unique_winner({"a": 0.7, "b": 0.7, "c": 0.2, "d": 0.3}) == "no_clear_winner"
+    assert select_unique_winner({"A": 0.1, "B": 0.7, "C": 0.2, "D": 0.3}) == "B"
+    assert select_unique_winner({"A": 0.7, "B": 0.7, "C": 0.2, "D": 0.3}) == "no_clear_winner"
 
 
 def test_skywork_requires_best_of_four():
