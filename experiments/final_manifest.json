@@ -1,0 +1,28 @@
+{
+  "experiment_id": "thesis-final-v1",
+  "freeze_code_commit": "4b116489c3b9f747fc692473429b81a24ed903b0",
+  "dataset": {
+    "path": "data/evaluation/best_of4_v1.csv",
+    "git_blob_sha": "9eaf58122dc93600853808cf14cfd7b1a713f5b5",
+    "prompts": 30,
+    "candidates_per_prompt": 4
+  },
+  "vericult": {
+    "backbone": "qwen3:4b",
+    "provider": "ollama",
+    "config": "experiments/final_vericult_config.json"
+  },
+  "reward_model_baseline": {
+    "model": "Skywork/Skywork-Reward-V2-Qwen3-4B",
+    "script": "src/baseline_rm.py",
+    "tie_policy": "exact top-score tie -> no_clear_winner"
+  },
+  "direct_llm_judge_baseline": {
+    "model": "qwen3:4b",
+    "script": "src/baseline_direct_judge.py",
+    "temperature": 0,
+    "retrieval": false,
+    "decision": "A | B | C | D | no_clear_winner"
+  },
+  "freeze_policy": "No semantic tuning after this freeze; only documented execution fixes that do not use final labels."
+}
