@@ -49,6 +49,15 @@ def read_rows(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(f, delimiter=delimiter))
 
 
+def select_unique_winner(scores: dict[str, float]) -> str:
+    """Return the unique top-scoring candidate; exact ties are unresolved."""
+    if set(scores) != set("abcd"):
+        raise ValueError("Best-of-4 scores must contain exactly a, b, c and d")
+    best = max(scores.values())
+    winners = [label for label in "abcd" if scores[label] == best]
+    return winners[0] if len(winners) == 1 else "no_clear_winner"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("input_csv", type=Path)
@@ -65,7 +74,7 @@ def main() -> None:
 
     for index, row in enumerate(rows, 1):
         scores = {label: rm.score(row["prompt"], row[f"response_{label}"]) for label in "abcd"}
-        winner = max(scores, key=scores.get)
+        winner = select_unique_winner(scores)
         human = (row.get("human_chosen") or "").strip().lower()
         output.append(
             {
