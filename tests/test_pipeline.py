@@ -944,7 +944,7 @@ def test_rank_shared_planning_and_exact_tie(setup):
     result = verifier.rank(PROMPT, [RESPONSE, RESPONSE + " B", RESPONSE + " C", RESPONSE + " D"])
     assert all(c.status == "completed" for c in result.candidates)
     assert result.winner == "no_clear_winner" and result.tied_indices == (0, 1, 2, 3)
-    assert "no arbitrary winner" in result.tie_break_reason
+    assert "no arbitrary tie-break" in result.tie_break_reason
     assert sum(c["stage"] == "context_planner_v1" for c in llm.calls) == 1
     assert sum(c["stage"] == "dimension_planner_v1" for c in llm.calls) == 1
     assert all(c.context is result.candidates[0].context for c in result.candidates)
