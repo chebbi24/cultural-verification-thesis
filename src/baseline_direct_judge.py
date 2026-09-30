@@ -10,6 +10,7 @@ import argparse
 import csv
 import json
 from pathlib import Path
+from typing import Literal
 
 import requests
 from pydantic import BaseModel, ConfigDict
@@ -36,7 +37,7 @@ Return only JSON matching the supplied schema."""
 class JudgeDecision(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    winner: str
+    winner: Literal["A", "B", "C", "D", "no_clear_winner"]
     reasoning: str
 
 
@@ -107,8 +108,6 @@ def judge(
             response.raise_for_status()
             raw = response.json()["message"]["content"]
             decision = JudgeDecision.model_validate_json(raw)
-            if decision.winner not in {"A", "B", "C", "D", "no_clear_winner"}:
-                raise ValueError("Invalid winner")
             return decision
         except (requests.RequestException, KeyError, TypeError, ValueError) as exc:
             last_error = exc
