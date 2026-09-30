@@ -265,9 +265,7 @@ def rank_results(candidates):
         )
 
     eligible = tuple(
-        i
-        for i, label in enumerate(labels)
-        if label in {"culturally_appropriate", "partially_culturally_appropriate"}
+        i for i, label in enumerate(labels) if label in {"culturally_appropriate", "partially_culturally_appropriate"}
     )
     if not eligible:
         available = [score for score in scores if score is not None]
