@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from baseline_direct_judge import DEFAULT_MODEL, JudgeDecision, decision_schema, rubric_text
+from baseline_direct_judge import (\n    DEFAULT_MODEL,\n    JudgeDecision,\n    decision_schema,\n    deterministic_presentation,\n    rubric_text,\n)
 from baseline_rm import DEFAULT_RM, select_unique_winner
 
 
@@ -21,8 +21,27 @@ def test_skywork_requires_best_of_four():
 
 def test_direct_judge_model_and_schema_are_frozen():
     assert DEFAULT_MODEL == "qwen3:4b"
-    assert decision_schema()["properties"]["winner"]["enum"] == ["A", "B", "C", "D", "no_clear_winner"]
+    assert decision_schema()["properties"]["winner"]["enum"] == [
+        "A",
+        "B",
+        "C",
+        "D",
+        "no_clear_winner",
+        "no_acceptable_candidate",
+        "insufficient_evidence",
+    ]
 
+
+
+
+def test_direct_judge_permutation_is_deterministic_and_reversible():
+    responses = {label: f"response-{label}" for label in "ABCD"}
+    presented_a, mapping_a, order_a = deterministic_presentation(responses, "PLT001", 20260930)
+    presented_b, mapping_b, order_b = deterministic_presentation(responses, "PLT001", 20260930)
+    assert (presented_a, mapping_a, order_a) == (presented_b, mapping_b, order_b)
+    assert set(order_a) == set("ABCD") and len(order_a) == 4
+    for presented_label, original_label in mapping_a.items():
+        assert presented_a[presented_label] == responses[original_label]
 
 def test_direct_judge_uses_exact_d01_d10_rubric():
     rubric = rubric_text()
