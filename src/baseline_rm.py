@@ -15,9 +15,7 @@ DEFAULT_RM_REVISION = "fd958fe"
 
 
 class SkyworkRewardModel:
-    def __init__(
-        self, model_name: str = DEFAULT_RM, revision: str = DEFAULT_RM_REVISION, device_map: str = "auto"
-    ):
+    def __init__(self, model_name: str = DEFAULT_RM, revision: str = DEFAULT_RM_REVISION, device_map: str = "auto"):
         import torch
         from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
@@ -90,9 +88,7 @@ def main() -> None:
         )
 
     args.output_csv.parent.mkdir(parents=True, exist_ok=True)
-    fields = ["set_id", "prompt_id", "rm_model", "rm_revision", "rm_winner"] + [
-        f"rm_score_{label}" for label in "ABCD"
-    ]
+    fields = ["set_id", "prompt_id", "rm_model", "rm_revision", "rm_winner"] + [f"rm_score_{label}" for label in "ABCD"]
     with args.output_csv.open("w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
