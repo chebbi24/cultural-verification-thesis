@@ -21,7 +21,9 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
       - name: Install dependencies
-        run: |\n          python -m pip install -r requirements.lock\n          python -m pip install --no-deps -e .
+        run: |
+          python -m pip install -r requirements.lock
+          python -m pip install --no-deps -e .
       - name: Compile
         run: python -m compileall -q src scripts tests
       - name: Unit tests
