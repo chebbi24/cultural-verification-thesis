@@ -229,15 +229,14 @@ For the separately gated real-provider LIVE → REPLAY smoke test, configure the
 and keys, then run `CULTVERIFY_RUN_LIVE=1 pytest -q -m live`.
 
 `src/baseline_rm.py` is the frozen independent reward-model baseline using
-`Skywork/Skywork-Reward-V2-Qwen3-4B`; exact top-score ties return `no_clear_winner`.
+`Skywork/Skywork-Reward-V2-Qwen3-4B` at Hugging Face revision `fd958fe`; exact top-score ties return `no_clear_winner`.
 `src/baseline_direct_judge.py` is the frozen direct-LLM baseline using `qwen3:4b`,
 temperature zero, the same D01-D10 rubric, one Best-of-4 judgment, and no retrieval.
 It receives the same selective decision space as Vericult and uses a deterministic
 candidate-presentation permutation (seed 20260930) that is mapped back to original
 A-D labels. Neither baseline enters `cultverify`. The final verifier configuration is
 stored in `experiments/final_vericult_config.json`; the experiment freeze is recorded
-in `experiments/final_manifest.json`. Install the reward-model stack with
-`pip install -e '.[rm]'`.
+in `experiments/final_manifest.json`. The RM extra pins Transformers 4.52.3 for the frozen baseline; install it with\n`pip install -e '.[rm]'`.
 
 ## Frozen final experiment execution
 
