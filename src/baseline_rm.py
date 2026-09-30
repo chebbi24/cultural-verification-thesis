@@ -50,10 +50,10 @@ def read_rows(path: Path) -> list[dict[str, str]]:
 
 def select_unique_winner(scores: dict[str, float]) -> str:
     """Return the unique top-scoring candidate; exact ties are unresolved."""
-    if set(scores) != set("abcd"):
-        raise ValueError("Best-of-4 scores must contain exactly a, b, c and d")
+    if set(scores) != set("ABCD"):
+        raise ValueError("Best-of-4 scores must contain exactly A, B, C and D")
     best = max(scores.values())
-    winners = [label for label in "abcd" if scores[label] == best]
+    winners = [label for label in "ABCD" if scores[label] == best]
     return winners[0] if len(winners) == 1 else "no_clear_winner"
 
 
@@ -72,18 +72,18 @@ def main() -> None:
     rm = SkyworkRewardModel(args.model)
     output = []
     for index, row in enumerate(rows, 1):
-        scores = {label: rm.score(row["prompt"], row[f"response_{label}"]) for label in "abcd"}
+        scores = {label: rm.score(row["prompt"], row[f"response_{label.lower()}"]) for label in "ABCD"}
         output.append(
             {
                 "set_id": row.get("set_id", f"row_{index}"),
                 "prompt_id": row.get("prompt_id", ""),
                 "rm_winner": select_unique_winner(scores),
-                **{f"rm_score_{label}": scores[label] for label in "abcd"},
+                **{f"rm_score_{label}": scores[label] for label in "ABCD"},
             }
         )
 
     args.output_csv.parent.mkdir(parents=True, exist_ok=True)
-    fields = ["set_id", "prompt_id", "rm_winner"] + [f"rm_score_{label}" for label in "abcd"]
+    fields = ["set_id", "prompt_id", "rm_winner"] + [f"rm_score_{label}" for label in "ABCD"]
     with args.output_csv.open("w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
