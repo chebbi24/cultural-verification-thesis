@@ -39,8 +39,6 @@ def test_direct_judge_model_and_schema_are_frozen():
     ]
 
 
-
-
 def test_direct_judge_permutation_is_deterministic_and_reversible():
     responses = {label: f"response-{label}" for label in "ABCD"}
     presented_a, mapping_a, order_a = deterministic_presentation(responses, "PLT001", 20260930)
@@ -49,6 +47,7 @@ def test_direct_judge_permutation_is_deterministic_and_reversible():
     assert set(order_a) == set("ABCD") and len(order_a) == 4
     for presented_label, original_label in mapping_a.items():
         assert presented_a[presented_label] == responses[original_label]
+
 
 def test_direct_judge_uses_exact_d01_d10_rubric():
     rubric = rubric_text()
