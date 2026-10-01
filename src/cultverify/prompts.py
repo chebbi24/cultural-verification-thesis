@@ -24,12 +24,13 @@ origin; do not add language merely because the user asks for wording; and do not
 merely because food, shopping or scheduling is mentioned unless that rubric content is itself
 under evaluation. Do not guess a candidate response.""",
     "target_extractor_v1": """Extract at most max_material_targets decision-relevant units (normally
-1-2), not every sentence. Use verbatim response quotes. Each proposition must faithfully
-represent its quote in context. Use only planned dimensions. Mark retrieval appropriate
-for external_fact, descriptive_cultural_norm and context_dependent_recommendation targets; these
-always require retrieval. Never retrieve for response_internal_quality or
-non_verifiable_value_statement. If other material
-units cannot fit the budget, set truncated=true. Do not confuse caution with failure.""",
+1-2), not every span. The response is supplied as deterministic response_spans. Select the exact
+span_id whose text contains the material unit; NEVER rewrite, reproduce, shorten, merge or invent
+response text. Each proposition must faithfully represent the selected span in context. Use only
+planned dimensions. Mark retrieval appropriate for external_fact, descriptive_cultural_norm and
+context_dependent_recommendation targets; these always require retrieval. Never retrieve for
+response_internal_quality or non_verifiable_value_statement. If other material units cannot fit
+the budget, set truncated=true. Do not confuse caution with failure.""",
     "verification_question_v1": """Produce exactly two neutral questions: baseline/descriptive then
 scope/variation. The baseline should start at the broadest justified cultural or institutional
 scope needed to assess the proposition. Do not make a named city or region a hard evidence
@@ -119,9 +120,10 @@ relevant retrievable target is insufficient and there is no relevant non-retriev
 assessed directly from the response, abstain for that dimension. Use only the rubric, full prompt,
 response, explicit context, exact target response quotes, structured verdict labels and frozen exact
 support quotes supplied in evidence_groups. Intermediate target propositions, planner rationales,
-memo summaries, statement paraphrases and comparator reasoning are intentionally unavailable. No numeric confidence. Cite relevant exact
-response quotes only. Do not return target IDs or memo IDs; the pipeline attaches dimension-linked
-target IDs and memo links deterministically. Dimensions already forced to abstain by deterministic
+memo summaries, statement paraphrases and comparator reasoning are intentionally unavailable. No numeric confidence.
+Return only dimension_id, score and rationale for each requested dimension. Do not reproduce
+response quotes and do not return target IDs or memo IDs; the pipeline attaches exact response
+quotes, dimension-linked target IDs and memo links deterministically. Dimensions already forced to abstain by deterministic
 evidence-sufficiency rules are omitted from this scoring request. For an empty
 response quotes may be empty. Internal qualities can be assessed directly; external claims
 without sufficient evidence require appropriate uncertainty. Distinguish common practice
