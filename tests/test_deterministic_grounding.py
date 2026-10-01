@@ -1,6 +1,6 @@
 from cultverify import CulturalVerifier
 from cultverify.targets import response_spans
-from conftest import FixtureLLM, FixtureRetriever, PROMPT
+from conftest import FixtureLLM, PROMPT
 
 
 def test_response_spans_preserve_exact_markdown_and_punctuation():
