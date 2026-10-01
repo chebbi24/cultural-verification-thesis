@@ -121,9 +121,9 @@ assessed directly from the response, abstain for that dimension. Use only the ru
 response, explicit context, exact target response quotes, structured verdict labels and frozen exact
 support quotes supplied in evidence_groups. Intermediate target propositions, planner rationales,
 memo summaries, statement paraphrases and comparator reasoning are intentionally unavailable. No numeric confidence.
-Return only dimension_id, score and rationale for each requested dimension. Do not reproduce
-response quotes and do not return target IDs or memo IDs; the pipeline attaches exact response
-quotes, dimension-linked target IDs and memo links deterministically. Dimensions already forced to abstain by deterministic
+Return only dimension_id, score and rationale for each requested dimension. Do not return target IDs or memo IDs,
+and do not reproduce response quotes; the pipeline attaches exact response quotes, dimension-linked
+target IDs and memo links deterministically. Dimensions already forced to abstain by deterministic
 evidence-sufficiency rules are omitted from this scoring request. For an empty
 response quotes may be empty. Internal qualities can be assessed directly; external claims
 without sufficient evidence require appropriate uncertainty. Distinguish common practice
