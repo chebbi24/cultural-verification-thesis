@@ -45,7 +45,9 @@ def test_target_extractor_selects_span_id_and_python_restores_exact_quote(setup)
 def test_dimension_scorer_does_not_generate_response_quotes(setup):
     config, _, retriever, _ = setup
     llm = FixtureLLM(config)
-    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, "Respect the published arrangements.")
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(
+        PROMPT, "Respect the published arrangements."
+    )
 
     assert result.status == "completed"
     scorer_call = next(call for call in llm.calls if call["stage"] == "dimension_scorer_v1")
