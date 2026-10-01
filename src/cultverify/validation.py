@@ -36,6 +36,39 @@ def validate_targets(batch, response, plan, limit):
         require(set(target.dimension_ids) <= allowed, "Target dimensions must be planned")
 
 
+def validate_target_selections(batch, spans, plan, limit):
+    require(len(batch.targets) <= limit, "Target budget exceeded")
+    allowed_spans = {span["span_id"] for span in spans}
+    allowed_dimensions = {d.dimension_id for d in plan.dimensions}
+    for target in batch.targets:
+        require(target.span_id in allowed_spans, "Target span must reference supplied response text")
+        require(set(target.dimension_ids) <= allowed_dimensions, "Target dimensions must be planned")
+
+
+def validate_score_decisions(batch, plan, targets, verdicts, ignored_dimensions=()):
+    ids = [score.dimension_id for score in batch.scores]
+    require(len(ids) == len(set(ids)), "Duplicate dimension score")
+    planned = {dimension.dimension_id for dimension in plan.dimensions}
+    ignored = set(ignored_dimensions)
+    require(set(ids) == planned - ignored, "Score every non-forced planned dimension only")
+    verdicts_by_target = {verdict.target_id: verdict for verdict in verdicts}
+    for score in batch.scores:
+        relevant_targets = [target for target in targets if score.dimension_id in target.dimension_ids]
+        relevant_verdicts = [
+            verdicts_by_target[target.target_id]
+            for target in relevant_targets
+            if target.target_id in verdicts_by_target
+        ]
+        directional = any(
+            verdict.verdict in {"supported", "mixed", "contradicted"} for verdict in relevant_verdicts
+        )
+        if directional:
+            require(
+                score.score != "abstain",
+                "Directional evidence exists for this dimension; score 0, 1 or 2 instead of abstain",
+            )
+
+
 _SUPPORT_TRANSLATION = str.maketrans(
     {
         "\u2018": "'",
