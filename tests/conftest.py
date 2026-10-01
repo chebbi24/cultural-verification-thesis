@@ -35,7 +35,7 @@ class FixtureLLM:
             out = {
                 "targets": [
                     {
-                        "response_quote": payload["response"],
+                        "span_id": payload["response_spans"][0]["span_id"],
                         "proposition": "Consult the event arrangements",
                         "epistemic_type": "context_dependent_recommendation",
                         "dimension_ids": ["D03"],
@@ -128,7 +128,6 @@ class FixtureLLM:
                         "rationale": (
                             "Insufficient external evidence." if abstain else "Uses the documented event arrangements"
                         ),
-                        "response_quotes": [] if abstain or not payload["response"] else [payload["response"]],
                     }
                 )
             out = {"scores": scores}

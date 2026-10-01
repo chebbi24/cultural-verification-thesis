@@ -1,14 +1,47 @@
-from .schemas import InitialQuestions, MaterialTarget, TargetBatch, VerificationQuestion
+import re
+
+from .schemas import (
+    InitialQuestions,
+    MaterialTarget,
+    TargetBatch,
+    TargetDraft,
+    TargetSelectionBatch,
+    VerificationQuestion,
+)
 from .trace import stable_id
-from .validation import validate_targets
+from .validation import validate_target_selections, validate_targets
+
+
+_SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?])\s+(?=\S)")
+
+
+def response_spans(response):
+    """Return deterministic exact substrings for model selection.
+
+    The model chooses span IDs; Python owns the source text. This preserves the
+    existing exact-quote audit invariant without asking a generative model to
+    reproduce arbitrary response text byte-for-byte.
+    """
+    spans = []
+    for line in response.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        pieces = tuple(piece.strip() for piece in _SENTENCE_BOUNDARY.split(line) if piece.strip())
+        for piece in pieces or (line,):
+            spans.append({"span_id": f"S{len(spans) + 1:03d}", "text": piece})
+    if response and not spans:
+        spans.append({"span_id": "S001", "text": response})
+    return tuple(spans)
 
 
 def extract_targets(session, prompt, response, context, plan):
+    spans = response_spans(response)
     batch = session.call(
         "target_extractor_v1",
         {
             "prompt": prompt,
-            "response": response,
+            "response_spans": spans,
             "context": context.model_dump(mode="json"),
             "dimension_plan": {
                 "dimensions": [
@@ -17,14 +50,28 @@ def extract_targets(session, prompt, response, context, plan):
             },
             "max_material_targets": session.config.max_material_targets,
         },
-        TargetBatch,
-        lambda b: validate_targets(b, response, plan, session.config.max_material_targets),
+        TargetSelectionBatch,
+        lambda b: validate_target_selections(b, spans, plan, session.config.max_material_targets),
     )
+    span_text = {span["span_id"]: span["text"] for span in spans}
+    drafts = tuple(
+        TargetDraft(
+            response_quote=span_text[target.span_id],
+            proposition=target.proposition,
+            epistemic_type=target.epistemic_type,
+            dimension_ids=target.dimension_ids,
+            materiality=target.materiality,
+            retrieval_appropriate=target.retrieval_appropriate,
+        )
+        for target in batch.targets
+    )
+    grounded = TargetBatch(targets=drafts, truncated=batch.truncated)
+    validate_targets(grounded, response, plan, session.config.max_material_targets)
     targets = tuple(
-        MaterialTarget(**t.model_dump(), target_id=stable_id("target", [i, t.model_dump(mode="json")]))
-        for i, t in enumerate(batch.targets)
+        MaterialTarget(**target.model_dump(), target_id=stable_id("target", [i, target.model_dump(mode="json")]))
+        for i, target in enumerate(grounded.targets)
     )
-    return targets, batch.truncated
+    return targets, grounded.truncated
 
 
 def neutral_questions(session, target, context):
