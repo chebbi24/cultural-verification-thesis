@@ -59,9 +59,7 @@ def validate_score_decisions(batch, plan, targets, verdicts, ignored_dimensions=
             for target in relevant_targets
             if target.target_id in verdicts_by_target
         ]
-        directional = any(
-            verdict.verdict in {"supported", "mixed", "contradicted"} for verdict in relevant_verdicts
-        )
+        directional = any(verdict.verdict in {"supported", "mixed", "contradicted"} for verdict in relevant_verdicts)
         if directional:
             require(
                 score.score != "abstain",
