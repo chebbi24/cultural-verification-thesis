@@ -12,7 +12,7 @@ from .trace import stable_id
 from .validation import validate_target_selections, validate_targets
 
 
-_SENTENCE_BOUNDARY = re.compile(r'(?<=[.!?])\\s+(?=[A-Z0-9"\'“‘(\\[])')
+_SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?])\s+(?=\S)")
 
 
 def response_spans(response):
