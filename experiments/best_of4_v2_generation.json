@@ -6,14 +6,16 @@
   "manifest_output": "artifacts/best_of4_v2/generation_manifest.json",
   "assignment_seed": 20261002,
   "temperature": 0.3,
-  "max_tokens": 700,
-  "timeout_seconds": 180,
-  "retry_count": 2,
+  "num_predict": 700,
+  "timeout_seconds": 600,
+  "retry_count": 1,
+  "ollama_url": "http://localhost:11434/api/chat",
+  "ollama_tags_url": "http://localhost:11434/api/tags",
   "models": [
-    "openai/gpt-5.4",
-    "anthropic/claude-sonnet-4.6",
-    "google/gemini-3.1-pro-preview",
-    "qwen/qwen3-max"
+    "qwen3:8b",
+    "gemma3:12b",
+    "llama3.1:8b",
+    "mistral-nemo:12b"
   ],
   "system_prompt": "You are a helpful general-purpose assistant. Answer the user's request directly, naturally, accurately, and concisely. Follow all explicit constraints in the request. Do not mention evaluation, benchmarks, cultural alignment, candidate generation, or hidden criteria. Do not deliberately introduce mistakes, stereotypes, or adversarial behavior. Produce the answer you would normally give to a real user."
 }
