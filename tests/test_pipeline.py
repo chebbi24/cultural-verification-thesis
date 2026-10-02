@@ -688,7 +688,14 @@ def test_initial_memo_timeout_becomes_explicit_insufficient_memo(setup):
     assert len(bundle.snapshots) == 2
     assert "Initial evidence synthesis unavailable" in bundle.followup_reason
     assert result.verdicts[0].verdict == "insufficient"
-    assert result.candidate_abstained
+    assert not result.candidate_abstained
+    assert result.vericult_score is not None
+    assert result.cultural_appropriateness in {
+        "culturally_appropriate",
+        "partially_culturally_appropriate",
+        "culturally_inappropriate",
+    }
+    assert any(call["stage"] == "contextual_fallback_v1" for call in llm.calls)
     assert not any(call["stage"] == "followup_v1" for call in llm.calls)
 
     trace = RunTrace.model_validate_json(Path(result.trace_path).read_text())
