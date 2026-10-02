@@ -15,7 +15,7 @@ from typing import Any
 import pandas as pd
 import requests
 from datasets import load_dataset
-from huggingface_hub import HfApi
+from huggingface_hub import HfApi, hf_hub_download
 
 SEED = "20261002"
 OUT_VERSION = "external-challenge-30x3-v1"
@@ -319,57 +319,79 @@ def model_family(name: str) -> str:
 
 
 def select_alignment_veto() -> tuple[list[dict], list[dict], dict]:
-    # Stream the 1.5M-row release and retain only the sensitive English personalization
-    # slice plus model families used in this challenge. This avoids loading the full corpus.
-    family_priority = ["gpt5", "gemma12", "llama31_8", "aya32", "qwen_large"]
-    try:
-        ds = load_dataset("PardisSzah/alignment-veto-responses", split="train", streaming=True)
-    except Exception as exc:
-        files = HfApi().list_repo_files(
-            "PardisSzah/alignment-veto-responses", repo_type="dataset"
+    # Alignment Veto publishes one XLSX workbook per model rather than a
+    # datasets-library-native table. Read four fixed model families directly.
+    model_files = {
+        "gpt5": ("gpt_5", "data/gpt_5.xlsx"),
+        "gemma12": ("gemma_3_12b_it", "data/gemma_3_12b_it.xlsx"),
+        "llama31_8": ("llama_3.1_8b_instruct", "data/llama_3.1_8b_instruct.xlsx"),
+        "aya32": ("aya_expanse_32b", "data/aya_expanse_32b.xlsx"),
+    }
+    frames = []
+    workbook_info = {}
+    expected = {
+        "country", "framing", "language", "tier", "question_id",
+        "question_text", "response", "refused", "nvas", "human_mean",
+    }
+    for family, (model_name, filename) in model_files.items():
+        local = hf_hub_download(
+            repo_id="PardisSzah/alignment-veto-responses",
+            filename=filename,
+            repo_type="dataset",
         )
-        raise RuntimeError(
-            f"Alignment Veto datasets-loader failed: {exc}; repository files={files}"
-        ) from exc
-    kept = []
-    for row in ds:
-        try:
-            tier = int(row.get("tier"))
-        except (TypeError, ValueError):
-            continue
-        if tier != 3:
-            continue
-        if str(row.get("framing") or "").lower() != "personalization":
-            continue
-        if str(row.get("language") or "").upper() != "EN":
-            continue
-        fam = model_family(str(row.get("model") or ""))
-        if not fam:
-            continue
-        item = dict(row)
-        item["family"] = fam
-        kept.append(item)
-    if not kept:
-        raise RuntimeError("Alignment Veto: no Tier-3 English Personalization rows found")
-    df = pd.DataFrame(kept)
+        sheets = pd.read_excel(local, sheet_name=None)
+        accepted = []
+        for sheet_name, sdf in sheets.items():
+            sdf.columns = [str(x).strip() for x in sdf.columns]
+            if expected.issubset(set(sdf.columns)):
+                part = sdf.copy()
+                part["model"] = model_name
+                part["family"] = family
+                part["_sheet"] = sheet_name
+                accepted.append(part)
+        if not accepted:
+            schemas = {name: list(sdf.columns) for name, sdf in sheets.items()}
+            raise RuntimeError(
+                f"Alignment Veto workbook {filename} has no expected data sheet; schemas={schemas}"
+            )
+        mdf = pd.concat(accepted, ignore_index=True)
+        frames.append(mdf)
+        workbook_info[family] = {
+            "filename": filename,
+            "model": model_name,
+            "rows": int(len(mdf)),
+            "sheets": sorted(set(mdf["_sheet"].astype(str))),
+        }
 
+    df = pd.concat(frames, ignore_index=True)
+    df = df[
+        (pd.to_numeric(df["tier"], errors="coerce") == 3)
+        & (df["framing"].astype(str).str.lower() == "personalization")
+        & (df["language"].astype(str).str.upper() == "EN")
+    ].copy()
+    if df.empty:
+        raise RuntimeError(
+            f"Alignment Veto: no Tier-3 English Personalization rows; "
+            f"workbooks={workbook_info}"
+        )
+
+    required_families = list(model_files)
     groups = []
     for (country, qid), g in df.groupby(["country", "question_id"], sort=True):
         rows = {}
-        for fam in family_priority:
+        for fam in required_families:
             gg = g[g["family"] == fam]
             if not gg.empty:
-                rows[fam] = gg.sort_values("model").iloc[0]
-        if len(rows) < 4:
+                rows[fam] = gg.iloc[0]
+        if len(rows) != len(required_families):
             continue
-        chosen_fams = [f for f in family_priority if f in rows][:4]
-        rr0 = rows[chosen_fams[0]]
+        rr0 = rows[required_families[0]]
         groups.append({
-            "country": country,
-            "question_id": qid,
+            "country": str(country),
+            "question_id": str(qid),
             "question_text": str(rr0["question_text"]),
             "human_mean": rr0.get("human_mean"),
-            "rows": [rows[f] for f in chosen_fams],
+            "rows": [rows[f] for f in required_families],
             "challenge_score": challenge_score(str(rr0["question_text"])) + 10,
         })
 
@@ -382,6 +404,8 @@ def select_alignment_veto() -> tuple[list[dict], list[dict], dict]:
             key=lambda x: (-x["challenge_score"], stable_hash(SEED, country, x["question_id"]))
         )
 
+    # First cover every available MENA country once. Fill to 30 with a second
+    # distinct sensitive question per country in deterministic order.
     selected = []
     for country in countries:
         if by_country[country]:
@@ -395,16 +419,25 @@ def select_alignment_veto() -> tuple[list[dict], list[dict], dict]:
     if len(selected) < 30:
         used = {(x["country"], x["question_id"]) for x in selected}
         rest = [g for g in groups if (g["country"], g["question_id"]) not in used]
-        rest.sort(key=lambda x: (-x["challenge_score"], stable_hash(SEED, x["country"], x["question_id"])))
+        rest.sort(
+            key=lambda x: (-x["challenge_score"], stable_hash(SEED, x["country"], x["question_id"]))
+        )
         selected.extend(rest[: 30 - len(selected)])
     selected = selected[:30]
     if len(selected) != 30:
-        raise RuntimeError(f"Alignment Veto: expected 30 groups, got {len(selected)}")
+        raise RuntimeError(
+            f"Alignment Veto: expected 30 groups, got {len(selected)}; "
+            f"countries={countries}; groups={len(groups)}"
+        )
 
     blind, labels = [], []
     for i, item in enumerate(selected, 1):
         rows = list(item["rows"])
-        rows.sort(key=lambda r: stable_hash(SEED, "av", item["country"], item["question_id"], r["model"]))
+        rows.sort(
+            key=lambda r: stable_hash(
+                SEED, "av", item["country"], item["question_id"], r["model"]
+            )
+        )
         letters = ["A", "B", "C", "D"]
         row_map = dict(zip(letters, rows))
         blind_row = {
@@ -428,18 +461,19 @@ def select_alignment_veto() -> tuple[list[dict], list[dict], dict]:
             blind_row[f"candidate_{letter}"] = str(rr["response"])
             blind_row[f"model_{letter}"] = str(rr["model"])
             label_row[f"nvas_{letter}"] = None if pd.isna(rr.get("nvas")) else float(rr.get("nvas"))
+            ev = rr.get("ev_nvas") if "ev_nvas" in rr.index else None
+            label_row[f"ev_nvas_{letter}"] = None if ev is None or pd.isna(ev) else float(ev)
             label_row[f"refused_{letter}"] = bool(rr.get("refused"))
         blind.append(blind_row)
         labels.append(label_row)
 
     info = {
         "countries_available": countries,
-        "models_available_t3_personalization_en": sorted(df["model"].astype(str).unique().tolist()),
-        "fixed_family_priority": family_priority,
-        "groups_with_4_fixed_families": len(groups),
+        "models": {fam: name for fam, (name, _) in model_files.items()},
+        "workbooks": workbook_info,
+        "groups_with_all_4_models": len(groups),
     }
     return blind, labels, info
-
 
 def write_txt(path: Path, plural: list[dict], thai: list[dict], av: list[dict]) -> None:
     lines = [
