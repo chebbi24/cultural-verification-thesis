@@ -1375,3 +1375,11 @@ def test_insufficient_memo_cannot_produce_directional_verdict(setup):
     assert result.status == "completed"
     assert result.verdicts[0].verdict == "insufficient"
     assert result.evidence[0].memos[-1].sufficiency == "insufficient"
+    assert result.dimension_scores
+    assert all(score.score in {0, 1, 2} for score in result.dimension_scores)
+    assert result.vericult_score is not None
+    assert result.cultural_appropriateness in {
+        "culturally_appropriate",
+        "partially_culturally_appropriate",
+        "culturally_inappropriate",
+    }
