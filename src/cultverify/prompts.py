@@ -132,7 +132,6 @@ cultural score: explain material cultural relevance. Do not treat disagreement w
 practice as inherently wrong. Assess omitted explicit requirements from the full prompt and
 response. Do not invent evidence or rewrite frozen memos. Never adjust scoring to choose a
 winner or compensate for another dimension.""",
-,
     "contextual_fallback_v1": """A prior evidence-grounded scoring stage could not resolve one or more
 planned cultural dimensions. For EVERY supplied dimension, make a conservative contextual cultural
 judgment from the full prompt, full response, explicit context and D01-D10 rubric. You MUST return
