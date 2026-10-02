@@ -614,55 +614,43 @@ def test_numeric_score_gets_assessable_target_link_from_python(setup):
     assert all(score.target_ids for score in result.dimension_scores)
 
 
-def test_forced_abstention_dimension_is_omitted_from_scorer_payload(setup):
+def test_forced_insufficient_dimension_uses_contextual_fallback(setup):
     config, _, _, _ = setup
     retriever = FixtureRetriever(empty=True)
 
     def scorer(_payload):
-        raise AssertionError("Scorer must not run when every planned dimension is forced to abstain")
+        raise AssertionError("Evidence scorer must not run when every planned dimension lacks directional evidence")
 
     llm = FixtureLLM(config, overrides={"dimension_scorer_v1": scorer})
     result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
     assert result.status == "completed"
-    assert all(score.score == "abstain" for score in result.dimension_scores)
+    assert all(score.score in {0, 1, 2} for score in result.dimension_scores)
+    assert result.vericult_score is not None
+    assert result.cultural_appropriateness != "insufficient_evidence"
+    assert any(call["stage"] == "contextual_fallback_v1" for call in llm.calls)
 
 
-def test_all_external_insufficient_requires_dimension_abstention(setup):
+def test_all_external_insufficient_still_returns_clear_cultural_judgment(setup):
     config, _, _, _ = setup
     retriever = FixtureRetriever(empty=True)
-    attempts = {"n": 0}
 
-    def scorer(payload):
-        attempts["n"] += 1
-        return {
-            "scores": [
-                {
-                    "dimension_id": d["dimension_id"],
-                    "score": 2,
-                    "rationale": "The model incorrectly tries to score unavailable evidence.",
-                    "target_ids": [
-                        t["target_id"] for t in payload["targets"] if d["dimension_id"] in t["dimension_ids"]
-                    ],
-                }
-                for d in payload["dimension_plan"]["dimensions"]
-            ]
-        }
-
-    llm = FixtureLLM(config, overrides={"dimension_scorer_v1": scorer})
+    llm = FixtureLLM(config)
     result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+
     assert result.status == "completed"
-    assert attempts["n"] == 0
-    assert all(score.score == "abstain" for score in result.dimension_scores)
-    assert all(not score.response_quotes for score in result.dimension_scores)
-    assert all("abstained deterministically" in score.rationale for score in result.dimension_scores)
-    assert all(score.target_ids for score in result.dimension_scores)
-    assert all(score.memo_ids for score in result.dimension_scores)
-    assert result.overall_score is None
-    assert result.vericult_score is None
-    assert result.cultural_appropriateness == "insufficient_evidence"
-    assert result.abstention_reason is not None
-    assert "D03:" in result.abstention_reason
-    assert result.candidate_abstained
+    assert result.evidence_coverage == 0
+    assert result.verdicts[0].verdict == "insufficient"
+    assert all(score.score in {0, 1, 2} for score in result.dimension_scores)
+    assert result.overall_score is not None
+    assert result.vericult_score is not None
+    assert result.cultural_appropriateness in {
+        "culturally_appropriate",
+        "partially_culturally_appropriate",
+        "culturally_inappropriate",
+    }
+    assert result.abstention_reason is None
+    assert not result.candidate_abstained
+    assert any(call["stage"] == "contextual_fallback_v1" for call in llm.calls)
 
 
 def test_invalid_followup_output_keeps_current_memo(setup):
@@ -700,7 +688,14 @@ def test_initial_memo_timeout_becomes_explicit_insufficient_memo(setup):
     assert len(bundle.snapshots) == 2
     assert "Initial evidence synthesis unavailable" in bundle.followup_reason
     assert result.verdicts[0].verdict == "insufficient"
-    assert result.candidate_abstained
+    assert not result.candidate_abstained
+    assert result.vericult_score is not None
+    assert result.cultural_appropriateness in {
+        "culturally_appropriate",
+        "partially_culturally_appropriate",
+        "culturally_inappropriate",
+    }
+    assert any(call["stage"] == "contextual_fallback_v1" for call in llm.calls)
     assert not any(call["stage"] == "followup_v1" for call in llm.calls)
 
     trace = RunTrace.model_validate_json(Path(result.trace_path).read_text())
@@ -830,6 +825,8 @@ def test_scope_and_query_prompts_prefer_general_then_authoritative():
     assert "genuinely unscorable only" in PROMPTS["dimension_scorer_v1"]
     assert "relevant retrievable target is insufficient" in PROMPTS["dimension_scorer_v1"]
     assert "Do not return target IDs or memo IDs" in PROMPTS["dimension_scorer_v1"]
+    assert "You MUST return" in PROMPTS["contextual_fallback_v1"]
+    assert "Do not abstain" in PROMPTS["contextual_fallback_v1"]
     assert "explicitly named places belong in location" in PROMPTS["context_planner_v1"]
     assert "Prefer the smallest" in PROMPTS["dimension_planner_v1"]
     assert "sufficient set of dimensions" in PROMPTS["dimension_planner_v1"]
@@ -1375,3 +1372,11 @@ def test_insufficient_memo_cannot_produce_directional_verdict(setup):
     assert result.status == "completed"
     assert result.verdicts[0].verdict == "insufficient"
     assert result.evidence[0].memos[-1].sufficiency == "insufficient"
+    assert result.dimension_scores
+    assert all(score.score in {0, 1, 2} for score in result.dimension_scores)
+    assert result.vericult_score is not None
+    assert result.cultural_appropriateness in {
+        "culturally_appropriate",
+        "partially_culturally_appropriate",
+        "culturally_inappropriate",
+    }

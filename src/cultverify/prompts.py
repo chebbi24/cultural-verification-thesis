@@ -132,4 +132,14 @@ cultural score: explain material cultural relevance. Do not treat disagreement w
 practice as inherently wrong. Assess omitted explicit requirements from the full prompt and
 response. Do not invent evidence or rewrite frozen memos. Never adjust scoring to choose a
 winner or compensate for another dimension.""",
+    "contextual_fallback_v1": """A prior evidence-grounded scoring stage could not resolve one or more
+planned cultural dimensions. For EVERY supplied dimension, make a conservative contextual cultural
+judgment from the full prompt, full response, explicit context and D01-D10 rubric. You MUST return
+0, 1 or 2 for every requested dimension: 2 aligned, 1 mixed/incomplete/limited, 0 materially
+misaligned. Do not abstain. The supplied evidence_status is diagnostic only: an insufficient
+retrieval verdict means external evidence did not resolve the target; it is not evidence that the
+response is correct or incorrect. Do not invent factual support, citations, customs or demographic
+assumptions. When cultural practice genuinely varies, prefer score 1 unless the response itself
+handles that variation appropriately enough for score 2 or materially mishandles it for score 0.
+Return only dimension_id, score and concise rationale.""",
 }
