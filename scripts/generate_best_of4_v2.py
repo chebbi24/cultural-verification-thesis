@@ -1,13 +1,12 @@
-"""Generate Best-of-4 v2 from the same frozen PLT001-PLT030 prompts.
+"""Generate Best-of-4 v2 locally with Ollama from frozen PLT001-PLT030 prompts.
 
-v2 is a realistic strong-model candidate set. It does not use Vericult, human
+v2 is a realistic stronger-model candidate set. It does not use Vericult, human
 labels, D01-D10, or any cultural winner signal during generation.
 """
 
 from __future__ import annotations
 
 import argparse
-import concurrent.futures
 import csv
 import hashlib
 import json
@@ -18,7 +17,6 @@ from pathlib import Path
 
 import requests
 
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 LABELS = "ABCD"
 EXPECTED_IDS = tuple(f"PLT{i:03d}" for i in range(1, 31))
 
@@ -40,36 +38,51 @@ def read_prompts(path: Path) -> list[dict[str, str]]:
     return [{"prompt_id": r["prompt_id"], "prompt": r["prompt"]} for r in rows]
 
 
-def call_model(api_key: str, model: str, prompt: str, cfg: dict) -> str:
+def installed_models(tags_url: str, timeout: float) -> dict[str, str]:
+    r = requests.get(tags_url, timeout=timeout)
+    r.raise_for_status()
+    data = r.json()
+    result = {}
+    for model in data.get("models", []):
+        name = model.get("name")
+        digest = model.get("digest")
+        if name and digest:
+            result[name] = digest
+    return result
+
+
+def call_model(model: str, prompt: str, cfg: dict) -> str:
     body = {
         "model": model,
         "messages": [
             {"role": "system", "content": cfg["system_prompt"]},
             {"role": "user", "content": prompt},
         ],
-        "temperature": cfg["temperature"],
-        "max_tokens": cfg["max_tokens"],
+        "stream": False,
+        "think": False,
+        "options": {
+            "temperature": cfg["temperature"],
+            "num_predict": cfg["num_predict"],
+        },
     }
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     last_error = None
     for attempt in range(cfg["retry_count"] + 1):
         try:
             r = requests.post(
-                OPENROUTER_URL,
-                headers=headers,
+                cfg["ollama_url"],
                 json=body,
                 timeout=cfg["timeout_seconds"],
             )
             r.raise_for_status()
             data = r.json()
-            text = data["choices"][0]["message"]["content"]
+            text = data["message"]["content"]
             if not isinstance(text, str) or not text.strip():
                 raise ValueError("empty generation")
             return text.strip()
-        except (requests.RequestException, KeyError, IndexError, TypeError, ValueError) as exc:
+        except (requests.RequestException, KeyError, TypeError, ValueError) as exc:
             last_error = exc
             if attempt < cfg["retry_count"]:
-                time.sleep(2 ** attempt)
+                time.sleep(2**attempt)
     raise RuntimeError(f"{model} failed after bounded retry: {last_error}")
 
 
@@ -108,20 +121,26 @@ def main() -> int:
         type=Path,
         default=Path("experiments/best_of4_v2_generation.json"),
     )
-    parser.add_argument("--max-workers", type=int, default=4)
     parser.add_argument("--prompt-id", help="Optional single PLT id for smoke testing")
     args = parser.parse_args()
 
     cfg = json.loads(args.config.read_text(encoding="utf-8"))
-    api_key = os.getenv("OPENROUTER_API_KEY")
-    if not api_key:
-        raise RuntimeError("OPENROUTER_API_KEY is required")
-
     source = Path(cfg["source_dataset"])
     output = Path(cfg["output_dataset"])
     raw_path = Path(cfg["raw_output"])
     mapping_path = Path(cfg["mapping_output"])
     manifest_path = Path(cfg["manifest_output"])
+
+    local_models = installed_models(cfg["ollama_tags_url"], cfg["timeout_seconds"])
+    missing_installed = [m for m in cfg["models"] if m not in local_models]
+    if missing_installed:
+        commands = "\n".join(f"  ollama pull {m}" for m in missing_installed)
+        raise RuntimeError(
+            "Required Ollama models are not installed:\n"
+            + "\n".join(f"  - {m}" for m in missing_installed)
+            + "\nInstall them first:\n"
+            + commands
+        )
 
     prompts = read_prompts(source)
     if args.prompt_id:
@@ -132,37 +151,37 @@ def main() -> int:
     completed = load_raw(raw_path)
     models = cfg["models"]
 
+    # Local models are intentionally run sequentially to avoid loading several
+    # large models into unified memory at the same time.
     for row in prompts:
         prompt_id, prompt = row["prompt_id"], row["prompt"]
         missing = [m for m in models if (prompt_id, m) not in completed]
-        if missing:
-            print(f"[{prompt_id}] generating {len(missing)} model response(s)", flush=True)
-            with concurrent.futures.ThreadPoolExecutor(max_workers=min(args.max_workers, len(missing))) as pool:
-                futures = {pool.submit(call_model, api_key, m, prompt, cfg): m for m in missing}
-                for future in concurrent.futures.as_completed(futures):
-                    model = futures[future]
-                    try:
-                        response = future.result()
-                        rec = {
-                            "prompt_id": prompt_id,
-                            "model": model,
-                            "status": "completed",
-                            "response": response,
-                        }
-                        completed[(prompt_id, model)] = rec
-                        append_raw(raw_path, rec)
-                        print(f"  OK {model}", flush=True)
-                    except Exception as exc:
-                        rec = {
-                            "prompt_id": prompt_id,
-                            "model": model,
-                            "status": "failed",
-                            "error": f"{type(exc).__name__}: {exc}",
-                        }
-                        append_raw(raw_path, rec)
-                        print(f"  FAILED {model}: {exc}", flush=True)
+        for model in missing:
+            print(f"[{prompt_id}] {model} starting", flush=True)
+            try:
+                response = call_model(model, prompt, cfg)
+                rec = {
+                    "prompt_id": prompt_id,
+                    "model": model,
+                    "model_digest": local_models[model],
+                    "status": "completed",
+                    "response": response,
+                }
+                completed[(prompt_id, model)] = rec
+                append_raw(raw_path, rec)
+                print(f"  OK {model}", flush=True)
+            except Exception as exc:
+                rec = {
+                    "prompt_id": prompt_id,
+                    "model": model,
+                    "model_digest": local_models.get(model, ""),
+                    "status": "failed",
+                    "error": f"{type(exc).__name__}: {exc}",
+                }
+                append_raw(raw_path, rec)
+                print(f"  FAILED {model}: {exc}", flush=True)
 
-    # Only build the canonical dataset when all 30x4 generations exist.
+    # Build the canonical dataset only after all 30 x 4 generations exist.
     all_prompts = read_prompts(source)
     missing_pairs = [
         (row["prompt_id"], model)
@@ -185,7 +204,14 @@ def main() -> int:
             if len(response.strip()) < 20:
                 raise RuntimeError(f"{pid}/{model} failed minimal nonempty quality gate")
             candidate_values[f"response_{label.lower()}"] = response
-            mapping_rows.append({"prompt_id": pid, "candidate": label, "model": model})
+            mapping_rows.append(
+                {
+                    "prompt_id": pid,
+                    "candidate": label,
+                    "model": model,
+                    "model_digest": local_models[model],
+                }
+            )
         dataset_rows.append({"prompt_id": pid, "prompt": row["prompt"], **candidate_values})
 
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -199,28 +225,38 @@ def main() -> int:
 
     mapping_path.parent.mkdir(parents=True, exist_ok=True)
     with mapping_path.open("w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=["prompt_id", "candidate", "model"])
+        writer = csv.DictWriter(
+            f,
+            fieldnames=["prompt_id", "candidate", "model", "model_digest"],
+        )
         writer.writeheader()
         writer.writerows(mapping_rows)
 
     manifest = {
         "schema_version": "best-of4-v2-generation-v1",
-        "purpose": "realistic strong-model Best-of-4 candidate generation",
+        "purpose": "realistic stronger-model Best-of-4 candidate generation",
+        "provider": "ollama",
         "source_dataset": str(source),
         "source_sha256": sha256_file(source),
         "output_dataset": str(output),
         "output_sha256": sha256_file(output),
-        "models": models,
+        "models": [
+            {"model": model, "digest": local_models[model]}
+            for model in models
+        ],
         "assignment_seed": cfg["assignment_seed"],
         "temperature": cfg["temperature"],
-        "max_tokens": cfg["max_tokens"],
+        "num_predict": cfg["num_predict"],
         "system_prompt": cfg["system_prompt"],
         "human_labels_used": False,
         "vericult_outputs_used": False,
         "cultural_quality_filter_used": False,
     }
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
 
     print(f"\nCreated {output}")
     print(f"SHA256: {manifest['output_sha256']}")
