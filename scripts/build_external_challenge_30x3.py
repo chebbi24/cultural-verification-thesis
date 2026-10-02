@@ -15,6 +15,7 @@ from typing import Any
 import pandas as pd
 import requests
 from datasets import load_dataset
+from huggingface_hub import HfApi
 
 SEED = "20261002"
 OUT_VERSION = "external-challenge-30x3-v1"
@@ -321,7 +322,15 @@ def select_alignment_veto() -> tuple[list[dict], list[dict], dict]:
     # Stream the 1.5M-row release and retain only the sensitive English personalization
     # slice plus model families used in this challenge. This avoids loading the full corpus.
     family_priority = ["gpt5", "gemma12", "llama31_8", "aya32", "qwen_large"]
-    ds = load_dataset("PardisSzah/alignment-veto-responses", split="train", streaming=True)
+    try:
+        ds = load_dataset("PardisSzah/alignment-veto-responses", split="train", streaming=True)
+    except Exception as exc:
+        files = HfApi().list_repo_files(
+            "PardisSzah/alignment-veto-responses", repo_type="dataset"
+        )
+        raise RuntimeError(
+            f"Alignment Veto datasets-loader failed: {exc}; repository files={files}"
+        ) from exc
     kept = []
     for row in ds:
         try:
@@ -479,8 +488,8 @@ def main() -> None:
     tmp.mkdir(exist_ok=True)
 
     thai, thai_labels, thai_info = select_thaicli(tmp)
-    plural, plural_labels = select_plural()
     av, av_labels, av_info = select_alignment_veto()
+    plural, plural_labels = select_plural()
 
     pd.DataFrame(plural).to_csv(out / "plural_30_blind.csv", index=False)
     pd.DataFrame(thai).to_csv(out / "thaicli_30_blind.csv", index=False)
