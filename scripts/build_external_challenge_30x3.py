@@ -195,9 +195,10 @@ def select_thaicli(tmp: Path) -> tuple[list[dict], list[dict], dict]:
     qcol = find_col(cols, ["question", "prompt", "instruction", "query"])
     ccol = find_col(cols, ["chosen", "chosen_answer", "accepted", "preferred"])
     rcol = find_col(cols, ["rejected", "rejected_answer", "dispreferred"])
+    acol = "answers" if "answers" in cols else None
     theme_col = find_col(cols, ["theme", "category", "topic", "domain"])
     id_col = find_col(cols, ["id", "index", "qid", "question_id"])
-    if not (qcol and ccol and rcol):
+    if not qcol or (not acol and not (ccol and rcol)):
         sample_answers = repr(df["answers"].iloc[0]) if "answers" in df.columns and len(df) else "<none>"
         raise RuntimeError(
             f"ThaiCLI schema unsupported. columns={cols}; inferred q={qcol}, chosen={ccol}, rejected={rcol}; "
@@ -207,8 +208,22 @@ def select_thaicli(tmp: Path) -> tuple[list[dict], list[dict], dict]:
     items = []
     for idx, row in df.iterrows():
         q = normalize_cell(row[qcol])
-        chosen = normalize_cell(row[ccol])
-        rejected = normalize_cell(row[rcol])
+        if acol:
+            raw_answers = row[acol]
+            entries = list(raw_answers) if raw_answers is not None else []
+            chosen_entries = [
+                x for x in entries
+                if isinstance(x, dict) and int(x.get("score", -1)) == 1
+            ]
+            rejected_entries = [
+                x for x in entries
+                if isinstance(x, dict) and int(x.get("score", -1)) == 0
+            ]
+            chosen = normalize_cell(chosen_entries[0].get("content")) if chosen_entries else ""
+            rejected = normalize_cell(rejected_entries[0].get("content")) if rejected_entries else ""
+        else:
+            chosen = normalize_cell(row[ccol])
+            rejected = normalize_cell(row[rcol])
         if not q or len(chosen) < 20 or len(rejected) < 20:
             continue
         fmt = row["_format"]
@@ -279,7 +294,7 @@ def select_thaicli(tmp: Path) -> tuple[list[dict], list[dict], dict]:
             "theme": item["theme"],
         })
     schema_info["inferred"] = {
-        "question_col": qcol, "chosen_col": ccol, "rejected_col": rcol,
+        "question_col": qcol, "chosen_col": ccol, "rejected_col": rcol, "answers_col": acol,
         "theme_col": theme_col, "id_col": id_col,
         "selected_theme_counts": dict(theme_counts),
         "selected_format_counts": dict(format_counts),
