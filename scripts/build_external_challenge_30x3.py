@@ -447,8 +447,8 @@ def main() -> None:
     tmp = out / "_tmp"
     tmp.mkdir(exist_ok=True)
 
-    plural, plural_labels = select_plural()
     thai, thai_labels, thai_info = select_thaicli(tmp)
+    plural, plural_labels = select_plural()
     av, av_labels, av_info = select_alignment_veto()
 
     pd.DataFrame(plural).to_csv(out / "plural_30_blind.csv", index=False)
