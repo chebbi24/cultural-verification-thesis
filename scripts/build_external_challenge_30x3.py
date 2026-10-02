@@ -198,8 +198,10 @@ def select_thaicli(tmp: Path) -> tuple[list[dict], list[dict], dict]:
     theme_col = find_col(cols, ["theme", "category", "topic", "domain"])
     id_col = find_col(cols, ["id", "index", "qid", "question_id"])
     if not (qcol and ccol and rcol):
+        sample_answers = repr(df["answers"].iloc[0]) if "answers" in df.columns and len(df) else "<none>"
         raise RuntimeError(
-            f"ThaiCLI schema unsupported. columns={cols}; inferred q={qcol}, chosen={ccol}, rejected={rcol}"
+            f"ThaiCLI schema unsupported. columns={cols}; inferred q={qcol}, chosen={ccol}, rejected={rcol}; "
+            f"sample answers={sample_answers}"
         )
 
     items = []
