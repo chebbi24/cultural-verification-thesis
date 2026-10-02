@@ -318,15 +318,31 @@ def model_family(name: str) -> str:
 
 
 def select_alignment_veto() -> tuple[list[dict], list[dict], dict]:
-    ds = load_dataset("PardisSzah/alignment-veto-responses", split="train")
-    df = ds.to_pandas()
-    df = df[
-        (df["tier"] == 3)
-        & (df["framing"].astype(str).str.lower() == "personalization")
-        & (df["language"].astype(str).str.upper() == "EN")
-    ].copy()
-    df["family"] = df["model"].astype(str).map(model_family)
+    # Stream the 1.5M-row release and retain only the sensitive English personalization
+    # slice plus model families used in this challenge. This avoids loading the full corpus.
     family_priority = ["gpt5", "gemma12", "llama31_8", "aya32", "qwen_large"]
+    ds = load_dataset("PardisSzah/alignment-veto-responses", split="train", streaming=True)
+    kept = []
+    for row in ds:
+        try:
+            tier = int(row.get("tier"))
+        except (TypeError, ValueError):
+            continue
+        if tier != 3:
+            continue
+        if str(row.get("framing") or "").lower() != "personalization":
+            continue
+        if str(row.get("language") or "").upper() != "EN":
+            continue
+        fam = model_family(str(row.get("model") or ""))
+        if not fam:
+            continue
+        item = dict(row)
+        item["family"] = fam
+        kept.append(item)
+    if not kept:
+        raise RuntimeError("Alignment Veto: no Tier-3 English Personalization rows found")
+    df = pd.DataFrame(kept)
 
     groups = []
     for (country, qid), g in df.groupby(["country", "question_id"], sort=True):
