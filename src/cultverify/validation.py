@@ -53,10 +53,18 @@ def validate_score_decisions(batch, plan, targets, verdicts, ignored_dimensions=
     require(set(ids) == planned - ignored, "Score every non-forced planned dimension only")
     verdicts_by_target = {verdict.target_id: verdict for verdict in verdicts}
     for score in batch.scores:
-        require(
-            score.score != "abstain",
-            "Completed dimension scoring must return 0, 1 or 2; retrieval insufficiency uses contextual fallback",
-        )
+        relevant_targets = [target for target in targets if score.dimension_id in target.dimension_ids]
+        relevant_verdicts = [
+            verdicts_by_target[target.target_id]
+            for target in relevant_targets
+            if target.target_id in verdicts_by_target
+        ]
+        directional = any(verdict.verdict in {"supported", "mixed", "contradicted"} for verdict in relevant_verdicts)
+        if directional:
+            require(
+                score.score != "abstain",
+                "Directional evidence exists for this dimension; score 0, 1 or 2 instead of abstain",
+            )
 
 
 _SUPPORT_TRANSLATION = str.maketrans(
@@ -266,3 +274,11 @@ def validate_trace_links(trace):
             {link.memo_id for link in trace.target_evidence_links} == final_memos,
             "Target links must reference exactly the final frozen memos",
         )
+
+
+def validate_contextual_fallback(batch, dimension_ids):
+    ids = [score.dimension_id for score in batch.scores]
+    require(len(ids) == len(set(ids)), "Duplicate contextual fallback score")
+    require(set(ids) == set(dimension_ids), "Contextual fallback must score every requested dimension exactly once")
+    for score in batch.scores:
+        require(score.score != "abstain", "Contextual fallback must return 0, 1 or 2")
