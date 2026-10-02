@@ -53,18 +53,10 @@ def validate_score_decisions(batch, plan, targets, verdicts, ignored_dimensions=
     require(set(ids) == planned - ignored, "Score every non-forced planned dimension only")
     verdicts_by_target = {verdict.target_id: verdict for verdict in verdicts}
     for score in batch.scores:
-        relevant_targets = [target for target in targets if score.dimension_id in target.dimension_ids]
-        relevant_verdicts = [
-            verdicts_by_target[target.target_id]
-            for target in relevant_targets
-            if target.target_id in verdicts_by_target
-        ]
-        directional = any(verdict.verdict in {"supported", "mixed", "contradicted"} for verdict in relevant_verdicts)
-        if directional:
-            require(
-                score.score != "abstain",
-                "Directional evidence exists for this dimension; score 0, 1 or 2 instead of abstain",
-            )
+        require(
+            score.score != "abstain",
+            "Completed dimension scoring must return 0, 1 or 2; retrieval insufficiency uses contextual fallback",
+        )
 
 
 _SUPPORT_TRANSLATION = str.maketrans(
