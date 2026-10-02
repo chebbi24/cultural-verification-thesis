@@ -76,7 +76,19 @@ def select_plural() -> tuple[list[dict], list[dict]]:
         dispref = str(row.get("dispref") or "").strip()
         if not (100 <= len(prompt) <= 900 and len(pref) >= 80 and len(dispref) >= 80):
             continue
-        if word_count(pref) > 900 or word_count(dispref) > 900:
+        if word_count(pref) > 500 or word_count(dispref) > 500:
+            continue
+        length_ratio = min(word_count(pref), word_count(dispref)) / max(
+            word_count(pref), word_count(dispref), 1
+        )
+        if length_ratio < 0.30:
+            continue
+        political_terms = (
+            "next election", "vote for", "voting for", "political party",
+            "candidate who", "candidates who", "campaign", "prime minister",
+            "president should", "defense forces",
+        )
+        if any(term in prompt.lower() for term in political_terms):
             continue
 
         meta = _as_dict(row.get("survey_metadata"))
@@ -211,8 +223,24 @@ def select_thaicli(tmp: Path) -> tuple[list[dict], list[dict], dict]:
         )
 
     items = []
+    thai_norm_markers = (
+        "ควร", "เหมาะสม", "ยอมรับ", "ความคิดเห็น", "คิดว่า", "หรือไม่",
+        "ได้หรือไม่", "สมควร", "ถูกต้อง", "เคารพ", "มารยาท", "ค่านิยม",
+        "สังคมไทย", "ประเพณี", "ศาสนา", "ล้อเลียน", "เลือกปฏิบัติ",
+    )
+    thai_trivia_markers = (
+        "บอกชื่อ", "รายชื่อ", "สรุปประวัติ", "ประวัติความเป็นมา",
+        "เหตุการณ์ใด", "กี่คน", "วันที่", "ชื่อพระ", "อธิบายด้วยหลักฐานทางประวัติศาสตร์",
+    )
+    excluded_themes = {"Politics", "Royal Family"}
+
+    items = []
     for idx, row in df.iterrows():
-        q = normalize_cell(row[qcol])
+        raw_q = row[qcol]
+        if isinstance(raw_q, dict):
+            q = normalize_cell(raw_q.get("content"))
+        else:
+            q = normalize_cell(raw_q)
         if acol:
             raw_answers = row[acol]
             entries = list(raw_answers) if raw_answers is not None else []
@@ -233,9 +261,18 @@ def select_thaicli(tmp: Path) -> tuple[list[dict], list[dict], dict]:
             continue
         fmt = row["_format"]
         theme = normalize_cell(row[theme_col]) if theme_col else "unknown"
+        if theme in excluded_themes:
+            continue
         sid = normalize_cell(row[id_col]) if id_col else f"{fmt}_{idx}"
         ratio = min(len(chosen), len(rejected)) / max(len(chosen), len(rejected), 1)
-        score = challenge_score(q) + (4 if fmt == "instruction" else 1) + (2 if ratio >= 0.45 else 0)
+        norm_hits = sum(1 for marker in thai_norm_markers if marker in q)
+        trivia_hits = sum(1 for marker in thai_trivia_markers if marker in q)
+        # Prefer normative / culturally sensitive judgments over encyclopedic recall.
+        score = 3 * norm_hits - 4 * trivia_hits + (2 if ratio >= 0.45 else 0)
+        if fmt == "factoid":
+            score += 2
+        if score < 4:
+            continue
         items.append({
             "source_id": sid,
             "format": fmt,
@@ -252,11 +289,9 @@ def select_thaicli(tmp: Path) -> tuple[list[dict], list[dict], dict]:
     format_counts: dict[str, int] = defaultdict(int)
     for item in items:
         theme = item["theme"]
-        if theme_counts[theme] >= 6:
+        if theme_counts[theme] >= 8:
             continue
-        if item["format"] == "factoid" and format_counts["factoid"] >= 18:
-            continue
-        if item["format"] == "instruction" and format_counts["instruction"] >= 15:
+        if item["format"] == "instruction" and format_counts["instruction"] >= 10:
             continue
         selected.append(item)
         theme_counts[theme] += 1
@@ -307,167 +342,161 @@ def select_thaicli(tmp: Path) -> tuple[list[dict], list[dict], dict]:
     return blind, labels, schema_info
 
 
-def parse_json_object(value: Any) -> dict[str, Any]:
-    if isinstance(value, dict):
-        return value
-    text = str(value or "").strip()
-    if not text:
-        return {}
-    try:
-        obj = json.loads(text)
-        return obj if isinstance(obj, dict) else {}
-    except json.JSONDecodeError:
-        # The released CSV stores valid JSON in normal rows; fail closed if a row is malformed.
-        return {}
+PACT_TARGET_COUNTRIES = [
+    "egypt", "japan", "mexico", "india", "nigeria", "ethiopia",
+    "china", "south korea", "indonesia", "greece", "spain", "united kingdom",
+    "united states", "brazil", "south africa", "saudi arabia", "iran", "turkey",
+    "vietnam", "thailand", "germany", "france", "italy", "russia", "pakistan",
+    "canada", "kenya", "morocco", "argentina", "philippines",
+]
 
 
-def normalize_culture(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "_", (value or "").lower()).strip("_")
-
-
-def disco_score(question: str, options: dict[str, Any]) -> int:
-    q = (question or "").lower()
-    opts = " ".join(map(str, options.values())).lower()
+def pact_score(scenario: str, culture_action: str, preference_action: str) -> int:
+    s = (scenario or "").lower()
     social_terms = {
-        "family", "parent", "parents", "elder", "elders", "gift", "wedding",
-        "marriage", "birthday", "funeral", "friend", "friends", "celebrate",
-        "celebration", "holiday", "festival", "visit", "visiting", "guest",
-        "children", "school", "salary", "recreation", "weekend", "party",
-        "meal", "drink", "eat", "food", "leisure", "home",
+        "home", "family", "parent", "parents", "elder", "elders", "guest", "host",
+        "meal", "wedding", "marriage", "funeral", "religious", "religion", "temple",
+        "church", "mosque", "workplace", "coworker", "colleague", "school", "teacher",
+        "friend", "friends", "gift", "greeting", "visit", "visiting", "clothing",
+        "dress", "food", "eat", "drink", "ceremony", "festival", "holiday", "respect",
+        "privacy", "honesty", "feedback", "public", "conversation", "social",
     }
-    trivia_terms = {
-        "capital", "export", "corporation", "company", "population", "currency",
-        "largest", "famous public", "national animal", "flag",
-    }
-    score = 3 * sum(1 for t in social_terms if t in q)
-    score += sum(1 for t in social_terms if t in opts)
-    score -= 3 * sum(1 for t in trivia_terms if t in q)
-    if 25 <= len(question) <= 180:
+    score = 2 * sum(1 for t in social_terms if t in s)
+    # Pairs of similar verbosity are harder to distinguish using superficial cues.
+    a, b = len(culture_action or ""), len(preference_action or "")
+    ratio = min(a, b) / max(a, b, 1)
+    if ratio >= 0.55:
+        score += 4
+    elif ratio >= 0.35:
         score += 2
+    if 100 <= len(scenario) <= 360:
+        score += 3
     return score
 
 
-def select_disco() -> tuple[list[dict], list[dict], dict]:
-    url = (
-        "https://huggingface.co/datasets/DiSCo2026/DiSCo_Dataset_and_Benchmark/"
-        "resolve/main/DiSCo%20Bench.csv?download=true"
+def select_pact() -> tuple[list[dict], list[dict], dict]:
+    ds = load_dataset(
+        "Angana192/pact-culture-personalization",
+        "base_instances",
+        split="train",
+        streaming=True,
     )
-    resp = requests.get(url, timeout=180)
-    resp.raise_for_status()
-    from io import StringIO
-    df = pd.read_csv(StringIO(resp.text))
+    pools: dict[str, list[dict]] = defaultdict(list)
+    available = set()
 
-    required = {
-        "QID", "ID", "Question", "Options", "Metadata",
-        "User_Info", "User_Instruction",
-    }
-    if not required.issubset(df.columns):
-        raise RuntimeError(f"DiSCo schema mismatch: {list(df.columns)}")
-
-    items = []
-    for _, row in df.iterrows():
-        options = parse_json_object(row["Options"])
-        mapping = parse_json_object(row["Metadata"])
-        if set(options) != {"A", "B", "C", "D"} or set(mapping) != {"A", "B", "C", "D"}:
+    for row in ds:
+        scenario_type = str(row.get("scenario_type") or "").strip().lower()
+        if scenario_type != "same":
             continue
-        user_info = str(row["User_Info"] or "").strip()
-        m = re.search(r"located in\s+(.+?)[.]?$", user_info, flags=re.I)
-        if not m:
+        base_country = str(row.get("base_country") or "").strip()
+        country_key = base_country.lower()
+        available.add(country_key)
+        if country_key not in PACT_TARGET_COUNTRIES:
             continue
-        target = m.group(1).strip()
-        target_norm = normalize_culture(target)
-
-        correct = [
-            letter for letter, culture in mapping.items()
-            if normalize_culture(str(culture)) == target_norm
-        ]
-        if len(correct) != 1:
+        actor = str(row.get("actor_country") or "").strip().lower()
+        receiver = str(row.get("receiver_country") or "").strip().lower()
+        if actor != receiver:
             continue
 
-        question = str(row["Question"]).strip()
-        prompt = (
-            f"{user_info}\n"
-            f"{str(row['User_Instruction']).strip()}\n\n"
-            f"{question}"
-        )
-        items.append({
-            "source_id": str(row["ID"]),
-            "qid": str(row["QID"]),
-            "culture": target,
-            "question": question,
-            "prompt": prompt,
-            "options": {k: str(v) for k, v in options.items()},
-            "mapping": {k: str(v) for k, v in mapping.items()},
-            "correct": correct[0],
-            "challenge_score": disco_score(question, options),
+        scenario = str(row.get("scenario") or "").strip()
+        culture_action = str(row.get("culture_following") or "").strip()
+        pref_action = str(row.get("preference_allowing") or "").strip()
+        if not (scenario and culture_action and pref_action):
+            continue
+        if culture_action == pref_action:
+            continue
+
+        pools[country_key].append({
+            "source_id": str(row.get("pact_item_id")),
+            "dataset": str(row.get("dataset")),
+            "base_country": base_country,
+            "scenario": scenario,
+            "culture_following": culture_action,
+            "preference_allowing": pref_action,
+            "source_gold_label": row.get("source_gold_label"),
+            "challenge_score": pact_score(scenario, culture_action, pref_action),
         })
 
-    by_culture: dict[str, list[dict]] = defaultdict(list)
-    for item in items:
-        by_culture[item["culture"]].append(item)
-    cultures = sorted(by_culture)
-    if len(cultures) < 12:
-        raise RuntimeError(f"DiSCo: expected 12 cultures, found {cultures}")
-
-    for culture in cultures:
-        by_culture[culture].sort(
-            key=lambda x: (
-                -x["challenge_score"],
-                stable_hash(SEED, "disco", culture, x["source_id"]),
-            )
+    chosen_countries = [c for c in PACT_TARGET_COUNTRIES if pools.get(c)]
+    if len(chosen_countries) < 30:
+        # Fall back to any additional same-country contexts, deterministically.
+        extras = sorted(
+            [c for c in available if c not in chosen_countries and pools.get(c)],
+            key=lambda x: stable_hash(SEED, "pact-country", x),
+        )
+        chosen_countries.extend(extras[: 30 - len(chosen_countries)])
+    chosen_countries = chosen_countries[:30]
+    if len(chosen_countries) != 30:
+        raise RuntimeError(
+            f"PACT: expected 30 target countries, got {len(chosen_countries)}; "
+            f"available target pools={sorted(pools)}"
         )
 
-    # 2 per culture = 24, plus one extra for six cultures selected deterministically.
-    extras = set(
-        sorted(cultures, key=lambda x: stable_hash(SEED, "disco-extra", x))[:6]
-    )
     selected = []
-    for culture in cultures:
-        n = 3 if culture in extras else 2
-        selected.extend(by_culture[culture][:n])
-    if len(selected) != 30:
-        raise RuntimeError(f"DiSCo: expected 30 rows, got {len(selected)}")
-
-    # Global deterministic ID order after culture-balanced selection.
-    selected.sort(key=lambda x: (x["culture"], x["source_id"]))
+    for country in chosen_countries:
+        items = sorted(
+            pools[country],
+            key=lambda x: (
+                -x["challenge_score"],
+                stable_hash(SEED, "pact", country, x["source_id"]),
+            ),
+        )
+        if not items:
+            raise RuntimeError(f"PACT: no usable item for {country}")
+        selected.append(items[0])
 
     blind, labels = [], []
     for i, item in enumerate(selected, 1):
-        row = {
-            "challenge_id": f"DISCO{i:02d}",
-            "source": "DiSCo-Bench",
+        flip = int(stable_hash(SEED, "pact-order", item["source_id"])[0], 16) % 2
+        if flip == 0:
+            a, b = item["culture_following"], item["preference_allowing"]
+            culture_letter, pref_letter = "A", "B"
+        else:
+            a, b = item["preference_allowing"], item["culture_following"]
+            culture_letter, pref_letter = "B", "A"
+
+        prompt = (
+            f"{item['scenario']}\\n\\n"
+            "What would be an appropriate course of action for the actor in this situation?"
+        )
+        blind.append({
+            "challenge_id": f"PACT{i:02d}",
+            "source": "PACT",
             "source_id": item["source_id"],
-            "qid": item["qid"],
-            "country": item["culture"],
-            "prompt": item["prompt"],
-            "original_question": item["question"],
+            "country": item["base_country"],
+            "source_dataset": item["dataset"],
+            "prompt": prompt,
+            "original_scenario": item["scenario"],
+            "candidate_A": a,
+            "candidate_B": b,
             "selection_score": item["challenge_score"],
-        }
-        for letter in ("A", "B", "C", "D"):
-            row[f"candidate_{letter}"] = item["options"][letter]
-        blind.append(row)
+        })
         labels.append({
-            "challenge_id": f"DISCO{i:02d}",
+            "challenge_id": f"PACT{i:02d}",
             "source_id": item["source_id"],
-            "target_culture": item["culture"],
-            "locally_mapped_candidate": item["correct"],
-            "culture_mapping": item["mapping"],
+            "country": item["base_country"],
+            "culture_following_candidate": culture_letter,
+            "preference_allowing_candidate": pref_letter,
+            "source_gold_label": item["source_gold_label"],
+            "note": (
+                "PACT deliberately treats both directions as plausible; this is role metadata, "
+                "not a universal correctness label."
+            ),
         })
 
     info = {
-        "benchmark_rows_read": int(len(df)),
-        "eligible_rows": len(items),
-        "cultures": cultures,
-        "extra_item_cultures": sorted(extras),
+        "countries": [x["base_country"] for x in selected],
+        "count": len(selected),
+        "scenario_type": "same",
         "selection_note": (
-            "C2-style prompt: exact User_Info + exact User_Instruction + Question; "
-            "candidates are the four exact released option texts. Hidden Metadata mapping "
-            "is stored only in the reference-label file."
+            "One high-challenge same-country social dilemma per country. Candidate order is "
+            "deterministically blinded; roles are stored separately. PACT has no universal "
+            "winner by design."
         ),
     }
     return blind, labels, info
 
-def write_txt(path: Path, plural: list[dict], thai: list[dict], disco: list[dict]) -> None:
+def write_txt(path: Path, plural: list[dict], thai: list[dict], pact: list[dict]) -> None:
     lines = [
         "VERICULT EXTERNAL CULTURAL CHALLENGE SET — BLINDED",
         f"Version: {OUT_VERSION}",
@@ -476,14 +505,14 @@ def write_txt(path: Path, plural: list[dict], thai: list[dict], disco: list[dict
         "IMPORTANT:",
         "- Selected before any Vericult output is inspected.",
         "- Candidate order is deterministic and label-blinded.",
-        "- PLURAL and ThaiCLI contain two candidates; DiSCo-Bench contains four culturally grounded options.",
+        "- PLURAL and ThaiCLI contain preferred/rejected pairs; PACT contains two deliberately plausible culture-vs-preference actions.",
         "- Source preference/mapping labels are stored separately and MUST NOT be supplied to Vericult.",
         "",
     ]
     for title, rows in [
         ("SOURCE 1 — PLURAL (30)", plural),
         ("SOURCE 2 — ThaiCLI (30)", thai),
-        ("SOURCE 3 — DiSCo-Bench (30)", disco),
+        ("SOURCE 3 — PACT (30)", pact),
     ]:
         lines.extend(["=" * 88, title, "=" * 88, ""])
         for row in rows:
@@ -514,19 +543,19 @@ def main() -> None:
     tmp.mkdir(exist_ok=True)
 
     thai, thai_labels, thai_info = select_thaicli(tmp)
-    disco, disco_labels, disco_info = select_disco()
+    pact, pact_labels, pact_info = select_pact()
     plural, plural_labels = select_plural()
 
     pd.DataFrame(plural).to_csv(out / "plural_30_blind.csv", index=False)
     pd.DataFrame(thai).to_csv(out / "thaicli_30_blind.csv", index=False)
-    pd.DataFrame(disco).to_csv(out / "disco_30_blind.csv", index=False)
+    pd.DataFrame(pact).to_csv(out / "pact_30_blind.csv", index=False)
 
     labels = {
         "version": OUT_VERSION,
         "selection_seed": SEED,
         "plural": plural_labels,
         "thaicli": thai_labels,
-        "disco": disco_labels,
+        "pact": pact_labels,
     }
     (out / "reference_labels_DO_NOT_FEED_VERICULT.json").write_text(
         json.dumps(labels, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -538,21 +567,21 @@ def main() -> None:
             "no_vericult_outputs_used": True,
             "plural": "6 items per released country; maximize question-group diversity; rank prompt-only red-team score.",
             "thaicli": "theme/format-stratified; instruction cases prioritized; no Vericult use.",
-            "disco": "30 C2-style DiSCo-Bench items; balance all 12 cultures; rank prompt/options only; hidden culture mapping excluded from selection.",
+            "pact": "30 same-country PACT dilemmas across 30 countries; one high-challenge item per country; candidate roles hidden during Vericult evaluation.",
         },
         "source_releases": {
             "plural": "agdhruv/plural-alignment current HF default release at run time",
             "thaicli": "UpstageAI/ThaiCLI_H6 main",
-            "disco": "DiSCo2026/DiSCo_Dataset_and_Benchmark — DiSCo Bench.csv",
+            "pact": "Angana192/pact-culture-personalization — base_instances",
         },
-        "counts": {"plural": len(plural), "thaicli": len(thai), "disco": len(disco)},
+        "counts": {"plural": len(plural), "thaicli": len(thai), "pact": len(pact)},
         "thaicli_schema": thai_info,
-        "disco_info": disco_info,
+        "pact_info": pact_info,
     }
     (out / "selection_manifest.json").write_text(
         json.dumps(info, ensure_ascii=False, indent=2), encoding="utf-8"
     )
-    write_txt(out / "external_challenge_90_blind.txt", plural, thai, disco)
+    write_txt(out / "external_challenge_90_blind.txt", plural, thai, pact)
 
     for p in tmp.glob("*"):
         p.unlink()
