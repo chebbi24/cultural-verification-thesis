@@ -15,7 +15,6 @@ from typing import Any
 import pandas as pd
 import requests
 from datasets import load_dataset
-from huggingface_hub import HfApi, hf_hub_download
 
 SEED = "20261002"
 OUT_VERSION = "external-challenge-30x3-v1"
@@ -127,13 +126,18 @@ def select_plural() -> tuple[list[dict], list[dict]]:
         flip = int(stable_hash(SEED, item["source_id"])[0], 16) % 2
         a, b = ((item["preferred"], item["dispreferred"]) if flip == 0
                 else (item["dispreferred"], item["preferred"]))
+        evaluation_prompt = (
+            f"Benchmark context: The user is from {item['country']}.\n\n"
+            f"{item['prompt']}"
+        )
         blind.append({
             "challenge_id": f"PLURAL{i:02d}",
             "source": "PLURAL",
             "source_id": item["source_id"],
             "country": item["country"],
             "region": item["region"],
-            "prompt": item["prompt"],
+            "prompt": evaluation_prompt,
+            "original_prompt": item["prompt"],
             "candidate_A": a,
             "candidate_B": b,
             "selection_score": item["challenge_score"],
@@ -303,179 +307,167 @@ def select_thaicli(tmp: Path) -> tuple[list[dict], list[dict], dict]:
     return blind, labels, schema_info
 
 
-def model_family(name: str) -> str:
-    n = name.lower().replace("-", "_").replace(".", "_")
-    if "gpt_5" in n or n == "gpt5":
-        return "gpt5"
-    if "gemma" in n and "12" in n:
-        return "gemma12"
-    if "llama" in n and "3_1" in n and "8" in n:
-        return "llama31_8"
-    if "aya" in n and "32" in n:
-        return "aya32"
-    if "qwen" in n and ("30" in n or "32" in n):
-        return "qwen_large"
-    return ""
+def parse_json_object(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    text = str(value or "").strip()
+    if not text:
+        return {}
+    try:
+        obj = json.loads(text)
+        return obj if isinstance(obj, dict) else {}
+    except json.JSONDecodeError:
+        # The released CSV stores valid JSON in normal rows; fail closed if a row is malformed.
+        return {}
 
 
-def select_alignment_veto() -> tuple[list[dict], list[dict], dict]:
-    # Alignment Veto publishes one XLSX workbook per model rather than a
-    # datasets-library-native table. Read four fixed model families directly.
-    model_files = {
-        "gpt5": ("gpt_5", "data/gpt_5.xlsx"),
-        "gemma12": ("gemma_3_12b_it", "data/gemma_3_12b_it.xlsx"),
-        "llama31_8": ("llama_3.1_8b_instruct", "data/llama_3.1_8b_instruct.xlsx"),
-        "aya32": ("aya_expanse_32b", "data/aya_expanse_32b.xlsx"),
+def normalize_culture(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", (value or "").lower()).strip("_")
+
+
+def disco_score(question: str, options: dict[str, Any]) -> int:
+    q = (question or "").lower()
+    opts = " ".join(map(str, options.values())).lower()
+    social_terms = {
+        "family", "parent", "parents", "elder", "elders", "gift", "wedding",
+        "marriage", "birthday", "funeral", "friend", "friends", "celebrate",
+        "celebration", "holiday", "festival", "visit", "visiting", "guest",
+        "children", "school", "salary", "recreation", "weekend", "party",
+        "meal", "drink", "eat", "food", "leisure", "home",
     }
-    frames = []
-    workbook_info = {}
-    expected = {
-        "country", "framing", "language", "tier", "question_id",
-        "question_text", "response", "refused", "nvas", "human_mean",
+    trivia_terms = {
+        "capital", "export", "corporation", "company", "population", "currency",
+        "largest", "famous public", "national animal", "flag",
     }
-    for family, (model_name, filename) in model_files.items():
-        local = hf_hub_download(
-            repo_id="PardisSzah/alignment-veto-responses",
-            filename=filename,
-            repo_type="dataset",
-        )
-        sheets = pd.read_excel(local, sheet_name=None)
-        accepted = []
-        for sheet_name, sdf in sheets.items():
-            sdf.columns = [str(x).strip() for x in sdf.columns]
-            if expected.issubset(set(sdf.columns)):
-                part = sdf.copy()
-                part["model"] = model_name
-                part["family"] = family
-                part["_sheet"] = sheet_name
-                accepted.append(part)
-        if not accepted:
-            schemas = {name: list(sdf.columns) for name, sdf in sheets.items()}
-            raise RuntimeError(
-                f"Alignment Veto workbook {filename} has no expected data sheet; schemas={schemas}"
-            )
-        mdf = pd.concat(accepted, ignore_index=True)
-        frames.append(mdf)
-        workbook_info[family] = {
-            "filename": filename,
-            "model": model_name,
-            "rows": int(len(mdf)),
-            "sheets": sorted(set(mdf["_sheet"].astype(str))),
-        }
+    score = 3 * sum(1 for t in social_terms if t in q)
+    score += sum(1 for t in social_terms if t in opts)
+    score -= 3 * sum(1 for t in trivia_terms if t in q)
+    if 25 <= len(question) <= 180:
+        score += 2
+    return score
 
-    df = pd.concat(frames, ignore_index=True)
-    df = df[
-        (pd.to_numeric(df["tier"], errors="coerce") == 3)
-        & (df["framing"].astype(str).str.lower() == "personalization")
-        & (df["language"].astype(str).str.upper() == "EN")
-    ].copy()
-    if df.empty:
-        raise RuntimeError(
-            f"Alignment Veto: no Tier-3 English Personalization rows; "
-            f"workbooks={workbook_info}"
-        )
 
-    required_families = list(model_files)
-    groups = []
-    for (country, qid), g in df.groupby(["country", "question_id"], sort=True):
-        rows = {}
-        for fam in required_families:
-            gg = g[g["family"] == fam]
-            if not gg.empty:
-                rows[fam] = gg.iloc[0]
-        if len(rows) != len(required_families):
+def select_disco() -> tuple[list[dict], list[dict], dict]:
+    url = (
+        "https://huggingface.co/datasets/DiSCo2026/DiSCo_Dataset_and_Benchmark/"
+        "resolve/main/DiSCo%20Bench.csv?download=true"
+    )
+    resp = requests.get(url, timeout=180)
+    resp.raise_for_status()
+    from io import StringIO
+    df = pd.read_csv(StringIO(resp.text))
+
+    required = {
+        "QID", "ID", "Question", "Options", "Metadata",
+        "User_Info", "User_Instruction",
+    }
+    if not required.issubset(df.columns):
+        raise RuntimeError(f"DiSCo schema mismatch: {list(df.columns)}")
+
+    items = []
+    for _, row in df.iterrows():
+        options = parse_json_object(row["Options"])
+        mapping = parse_json_object(row["Metadata"])
+        if set(options) != {"A", "B", "C", "D"} or set(mapping) != {"A", "B", "C", "D"}:
             continue
-        rr0 = rows[required_families[0]]
-        groups.append({
-            "country": str(country),
-            "question_id": str(qid),
-            "question_text": str(rr0["question_text"]),
-            "human_mean": rr0.get("human_mean"),
-            "rows": [rows[f] for f in required_families],
-            "challenge_score": challenge_score(str(rr0["question_text"])) + 10,
+        user_info = str(row["User_Info"] or "").strip()
+        m = re.search(r"located in\s+(.+?)[.]?$", user_info, flags=re.I)
+        if not m:
+            continue
+        target = m.group(1).strip()
+        target_norm = normalize_culture(target)
+
+        correct = [
+            letter for letter, culture in mapping.items()
+            if normalize_culture(str(culture)) == target_norm
+        ]
+        if len(correct) != 1:
+            continue
+
+        question = str(row["Question"]).strip()
+        prompt = (
+            f"{user_info}\n"
+            f"{str(row['User_Instruction']).strip()}\n\n"
+            f"{question}"
+        )
+        items.append({
+            "source_id": str(row["ID"]),
+            "qid": str(row["QID"]),
+            "culture": target,
+            "question": question,
+            "prompt": prompt,
+            "options": {k: str(v) for k, v in options.items()},
+            "mapping": {k: str(v) for k, v in mapping.items()},
+            "correct": correct[0],
+            "challenge_score": disco_score(question, options),
         })
 
-    countries = sorted({g["country"] for g in groups})
-    by_country = defaultdict(list)
-    for g in groups:
-        by_country[g["country"]].append(g)
-    for country in by_country:
-        by_country[country].sort(
-            key=lambda x: (-x["challenge_score"], stable_hash(SEED, country, x["question_id"]))
+    by_culture: dict[str, list[dict]] = defaultdict(list)
+    for item in items:
+        by_culture[item["culture"]].append(item)
+    cultures = sorted(by_culture)
+    if len(cultures) < 12:
+        raise RuntimeError(f"DiSCo: expected 12 cultures, found {cultures}")
+
+    for culture in cultures:
+        by_culture[culture].sort(
+            key=lambda x: (
+                -x["challenge_score"],
+                stable_hash(SEED, "disco", culture, x["source_id"]),
+            )
         )
 
-    # First cover every available MENA country once. Fill to 30 with a second
-    # distinct sensitive question per country in deterministic order.
+    # 2 per culture = 24, plus one extra for six cultures selected deterministically.
+    extras = set(
+        sorted(cultures, key=lambda x: stable_hash(SEED, "disco-extra", x))[:6]
+    )
     selected = []
-    for country in countries:
-        if by_country[country]:
-            selected.append(by_country[country][0])
-    second_order = sorted(countries, key=lambda c: stable_hash(SEED, "second", c))
-    for country in second_order:
-        if len(selected) >= 30:
-            break
-        if len(by_country[country]) >= 2:
-            selected.append(by_country[country][1])
-    if len(selected) < 30:
-        used = {(x["country"], x["question_id"]) for x in selected}
-        rest = [g for g in groups if (g["country"], g["question_id"]) not in used]
-        rest.sort(
-            key=lambda x: (-x["challenge_score"], stable_hash(SEED, x["country"], x["question_id"]))
-        )
-        selected.extend(rest[: 30 - len(selected)])
-    selected = selected[:30]
+    for culture in cultures:
+        n = 3 if culture in extras else 2
+        selected.extend(by_culture[culture][:n])
     if len(selected) != 30:
-        raise RuntimeError(
-            f"Alignment Veto: expected 30 groups, got {len(selected)}; "
-            f"countries={countries}; groups={len(groups)}"
-        )
+        raise RuntimeError(f"DiSCo: expected 30 rows, got {len(selected)}")
+
+    # Global deterministic ID order after culture-balanced selection.
+    selected.sort(key=lambda x: (x["culture"], x["source_id"]))
 
     blind, labels = [], []
     for i, item in enumerate(selected, 1):
-        rows = list(item["rows"])
-        rows.sort(
-            key=lambda r: stable_hash(
-                SEED, "av", item["country"], item["question_id"], r["model"]
-            )
-        )
-        letters = ["A", "B", "C", "D"]
-        row_map = dict(zip(letters, rows))
-        blind_row = {
-            "challenge_id": f"AV{i:02d}",
-            "source": "Alignment Veto",
-            "source_id": f'{item["country"]}:{item["question_id"]}',
-            "country": item["country"],
-            "tier": 3,
-            "framing": "Personalization",
-            "language": "EN",
-            "prompt": item["question_text"],
+        row = {
+            "challenge_id": f"DISCO{i:02d}",
+            "source": "DiSCo-Bench",
+            "source_id": item["source_id"],
+            "qid": item["qid"],
+            "country": item["culture"],
+            "prompt": item["prompt"],
+            "original_question": item["question"],
+            "selection_score": item["challenge_score"],
         }
-        label_row = {
-            "challenge_id": f"AV{i:02d}",
-            "source_id": blind_row["source_id"],
-            "country": item["country"],
-            "human_mean": None if pd.isna(item["human_mean"]) else float(item["human_mean"]),
-        }
-        for letter in letters:
-            rr = row_map[letter]
-            blind_row[f"candidate_{letter}"] = str(rr["response"])
-            blind_row[f"model_{letter}"] = str(rr["model"])
-            label_row[f"nvas_{letter}"] = None if pd.isna(rr.get("nvas")) else float(rr.get("nvas"))
-            ev = rr.get("ev_nvas") if "ev_nvas" in rr.index else None
-            label_row[f"ev_nvas_{letter}"] = None if ev is None or pd.isna(ev) else float(ev)
-            label_row[f"refused_{letter}"] = bool(rr.get("refused"))
-        blind.append(blind_row)
-        labels.append(label_row)
+        for letter in ("A", "B", "C", "D"):
+            row[f"candidate_{letter}"] = item["options"][letter]
+        blind.append(row)
+        labels.append({
+            "challenge_id": f"DISCO{i:02d}",
+            "source_id": item["source_id"],
+            "target_culture": item["culture"],
+            "locally_mapped_candidate": item["correct"],
+            "culture_mapping": item["mapping"],
+        })
 
     info = {
-        "countries_available": countries,
-        "models": {fam: name for fam, (name, _) in model_files.items()},
-        "workbooks": workbook_info,
-        "groups_with_all_4_models": len(groups),
+        "benchmark_rows_read": int(len(df)),
+        "eligible_rows": len(items),
+        "cultures": cultures,
+        "extra_item_cultures": sorted(extras),
+        "selection_note": (
+            "C2-style prompt: exact User_Info + exact User_Instruction + Question; "
+            "candidates are the four exact released option texts. Hidden Metadata mapping "
+            "is stored only in the reference-label file."
+        ),
     }
     return blind, labels, info
 
-def write_txt(path: Path, plural: list[dict], thai: list[dict], av: list[dict]) -> None:
+def write_txt(path: Path, plural: list[dict], thai: list[dict], disco: list[dict]) -> None:
     lines = [
         "VERICULT EXTERNAL CULTURAL CHALLENGE SET — BLINDED",
         f"Version: {OUT_VERSION}",
@@ -484,14 +476,14 @@ def write_txt(path: Path, plural: list[dict], thai: list[dict], av: list[dict]) 
         "IMPORTANT:",
         "- Selected before any Vericult output is inspected.",
         "- Candidate order is deterministic and label-blinded.",
-        "- PLURAL and ThaiCLI contain two candidates; Alignment Veto contains four published model responses.",
-        "- Reference labels/NVAS are stored separately and MUST NOT be supplied to Vericult.",
+        "- PLURAL and ThaiCLI contain two candidates; DiSCo-Bench contains four culturally grounded options.",
+        "- Source preference/mapping labels are stored separately and MUST NOT be supplied to Vericult.",
         "",
     ]
     for title, rows in [
         ("SOURCE 1 — PLURAL (30)", plural),
         ("SOURCE 2 — ThaiCLI (30)", thai),
-        ("SOURCE 3 — Alignment Veto (30)", av),
+        ("SOURCE 3 — DiSCo-Bench (30)", disco),
     ]:
         lines.extend(["=" * 88, title, "=" * 88, ""])
         for row in rows:
@@ -522,19 +514,19 @@ def main() -> None:
     tmp.mkdir(exist_ok=True)
 
     thai, thai_labels, thai_info = select_thaicli(tmp)
-    av, av_labels, av_info = select_alignment_veto()
+    disco, disco_labels, disco_info = select_disco()
     plural, plural_labels = select_plural()
 
     pd.DataFrame(plural).to_csv(out / "plural_30_blind.csv", index=False)
     pd.DataFrame(thai).to_csv(out / "thaicli_30_blind.csv", index=False)
-    pd.DataFrame(av).to_csv(out / "alignment_veto_30_blind.csv", index=False)
+    pd.DataFrame(disco).to_csv(out / "disco_30_blind.csv", index=False)
 
     labels = {
         "version": OUT_VERSION,
         "selection_seed": SEED,
         "plural": plural_labels,
         "thaicli": thai_labels,
-        "alignment_veto": av_labels,
+        "disco": disco_labels,
     }
     (out / "reference_labels_DO_NOT_FEED_VERICULT.json").write_text(
         json.dumps(labels, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -546,21 +538,21 @@ def main() -> None:
             "no_vericult_outputs_used": True,
             "plural": "6 items per released country; maximize question-group diversity; rank prompt-only red-team score.",
             "thaicli": "theme/format-stratified; instruction cases prioritized; no Vericult use.",
-            "alignment_veto": "Tier 3 + English + Personalization; country coverage; fixed model-family responses independent of NVAS.",
+            "disco": "30 C2-style DiSCo-Bench items; balance all 12 cultures; rank prompt/options only; hidden culture mapping excluded from selection.",
         },
         "source_releases": {
             "plural": "agdhruv/plural-alignment current HF default release at run time",
             "thaicli": "UpstageAI/ThaiCLI_H6 main",
-            "alignment_veto": "PardisSzah/alignment-veto-responses current HF release at run time",
+            "disco": "DiSCo2026/DiSCo_Dataset_and_Benchmark — DiSCo Bench.csv",
         },
-        "counts": {"plural": len(plural), "thaicli": len(thai), "alignment_veto": len(av)},
+        "counts": {"plural": len(plural), "thaicli": len(thai), "disco": len(disco)},
         "thaicli_schema": thai_info,
-        "alignment_veto_info": av_info,
+        "disco_info": disco_info,
     }
     (out / "selection_manifest.json").write_text(
         json.dumps(info, ensure_ascii=False, indent=2), encoding="utf-8"
     )
-    write_txt(out / "external_challenge_90_blind.txt", plural, thai, av)
+    write_txt(out / "external_challenge_90_blind.txt", plural, thai, disco)
 
     for p in tmp.glob("*"):
         p.unlink()
