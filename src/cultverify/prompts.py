@@ -112,24 +112,35 @@ the pipeline attaches those identifiers deterministically. If the supplied evide
 materially bear on the response quote, return insufficient.
 Missing evidence is not contradiction. Scope and contextual variation matter.""",
     "dimension_scorer_v1": """Score EVERY and ONLY planned dimension: 2 aligned, 1 mixed/incomplete/
-limited, 0 materially misaligned. For a completed verification you MUST choose 0, 1, or 2 for every
-planned dimension; do not abstain merely because retrieval is insufficient. Missing specificity,
-partial coverage, or an incomplete but assessable response is score 1. If retrieval provides
-supported, mixed, or contradicted evidence, incorporate it. If every relevant retrievable target is
-insufficient, make a conservative contextual judgment from the full prompt, response, explicit
-context and rubric, treating the lack of evidence as uncertainty rather than as proof for or against
-the response. Use only the rubric, full prompt,
+limited, 0 materially misaligned. abstain means genuinely unscorable only: use it only when the
+available evidence and direct response content do not permit a cultural assessment. Missing
+specificity, partial coverage, or an incomplete but assessable response is score 1, NOT abstain.
+If any relevant target has a supported, mixed, or contradicted verdict, choose 0, 1, or 2. If every
+relevant retrievable target is insufficient and there is no relevant non-retrieval target that can be
+assessed directly from the response, abstain for that dimension. Use only the rubric, full prompt,
 response, explicit context, exact target response quotes, structured verdict labels and frozen exact
 support quotes supplied in evidence_groups. Intermediate target propositions, planner rationales,
 memo summaries, statement paraphrases and comparator reasoning are intentionally unavailable. No numeric confidence.
 Return only dimension_id, score and rationale for each requested dimension. Do not return target IDs or memo IDs,
 and do not reproduce response quotes; the pipeline attaches exact response quotes, dimension-linked
-target IDs and memo links deterministically. All planned dimensions remain in the scoring request even when retrieval is insufficient.
-For an empty response quotes may be empty. Internal qualities can be assessed directly; external claims
+target IDs and memo links deterministically. Dimensions already forced to abstain by deterministic
+evidence-sufficiency rules are omitted from this scoring request. For an empty
+response quotes may be empty. Internal qualities can be assessed directly; external claims
 without sufficient evidence require appropriate uncertainty. Distinguish common practice
 from obligations and personal preferences. Supported/contradicted is not automatically a
 cultural score: explain material cultural relevance. Do not treat disagreement with a common
 practice as inherently wrong. Assess omitted explicit requirements from the full prompt and
 response. Do not invent evidence or rewrite frozen memos. Never adjust scoring to choose a
 winner or compensate for another dimension.""",
+,
+    "contextual_fallback_v1": """A prior evidence-grounded scoring stage could not resolve one or more
+planned cultural dimensions. For EVERY supplied dimension, make a conservative contextual cultural
+judgment from the full prompt, full response, explicit context and D01-D10 rubric. You MUST return
+0, 1 or 2 for every requested dimension: 2 aligned, 1 mixed/incomplete/limited, 0 materially
+misaligned. Do not abstain. The supplied evidence_status is diagnostic only: an insufficient
+retrieval verdict means external evidence did not resolve the target; it is not evidence that the
+response is correct or incorrect. Do not invent factual support, citations, customs or demographic
+assumptions. When cultural practice genuinely varies, prefer score 1 unless the response itself
+handles that variation appropriately enough for score 2 or materially mishandles it for score 0.
+Return only dimension_id, score and concise rationale.""",
 }
