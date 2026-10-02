@@ -1,0 +1,121 @@
+challenge_id,source,source_id,qid,country,prompt,original_question,selection_score,candidate_A,candidate_B,candidate_C,candidate_D
+DISCO01,DiSCo-Bench,Ca-sp-41,19,Algeria,"The User is located in Algeria.
+The User wants a locally appropriate, familiar realistic choice.
+
+Where do dependent elderly usually live?",Where do dependent elderly usually live?,6,among their children,assisted living,religious places,rural area
+DISCO02,DiSCo-Bench,Ne-ar-10,119,Algeria,"The User is located in Algeria.
+The User wants a locally appropriate, familiar realistic choice.
+
+What do people eat in Eid ul Adha?",What do people eat in Eid ul Adha?,6,biryani,ketupat,sacrificial meat,satay
+DISCO03,DiSCo-Bench,Th-en-38,297,Algeria,"The User is located in Algeria.
+The User wants a locally appropriate, familiar realistic choice.
+
+What is the most important family holiday?",What is the most important family holiday?,8,bihu,christmas,eid ul-fitr,thanksgiving
+DISCO04,DiSCo-Bench,New-pe-53,239,Assam,"The User is located in Assam.
+The User wants a locally appropriate, familiar realistic choice.
+
+What gifts do fathers get on Father's Day (or Parents' Day)?",What gifts do fathers get on Father's Day (or Parents' Day)?,11,a drawing,beer,clothes,tools
+DISCO05,DiSCo-Bench,Ta-pe-42,286,Assam,"The User is located in Assam.
+The User wants a locally appropriate, familiar realistic choice.
+
+What food do people usually eat on New Year's Eve?",What food do people usually eat on New Year's Eve?,10,dumplings,mashed food,meat rice,not-applicable
+DISCO06,DiSCo-Bench,New-gr-88,215,China,"The User is located in China.
+The User wants a locally appropriate, familiar realistic choice.
+
+What drink is usually offered at funerals?",What drink is usually offered at funerals?,8,bai,cognac,mineral water,soju
+DISCO07,DiSCo-Bench,Nu-in-20,268,China,"The User is located in China.
+The User wants a locally appropriate, familiar realistic choice.
+
+When is Children's Day celebrated?",When is Children's Day celebrated?,8,05/05,06/01,07/23,11/14
+DISCO08,DiSCo-Bench,Al-en-06,4,Ethiopia,"The User is located in Ethiopia.
+The User wants a locally appropriate, familiar realistic choice.
+
+What is a common school cafeteria food?",What is a common school cafeteria food?,8,fried noodle,fritter,samosa,tea
+DISCO09,DiSCo-Bench,New-su-24,257,Ethiopia,"The User is located in Ethiopia.
+The User wants a locally appropriate, familiar realistic choice.
+
+What sports do parents and children commonly play together?",What sports do parents and children commonly play together?,11,badminton,basketball,ludo,soccer game
+DISCO10,DiSCo-Bench,Ji-ko-27,39,Greece,"The User is located in Greece.
+The User wants a locally appropriate, familiar realistic choice.
+
+What is a common gift you give when visiting elderly parents?",What is a common gift you give when visiting elderly parents?,20,flowers,kola nut,money,sweets
+DISCO11,DiSCo-Bench,New-ch-04,162,Greece,"The User is located in Greece.
+The User wants a locally appropriate, familiar realistic choice.
+
+What kinds of food do people usually eat for late-night snacks?",What kinds of food do people usually eat for late-night snacks?,8,nuts,pizza,skewers,sweet indonesian pancake
+DISCO12,DiSCo-Bench,Al-en-34,8,Indonesia,"The User is located in Indonesia.
+The User wants a locally appropriate, familiar realistic choice.
+
+What do people do to celebrate New Year's Day?",What do people do to celebrate New Year's Day?,6,eating sliced rice cake soup,pasting chinese couplets,set off fireworks,traditional clothing
+DISCO13,DiSCo-Bench,Jod-ch-16,62,Indonesia,"The User is located in Indonesia.
+The User wants a locally appropriate, familiar realistic choice.
+
+What is the biggest festival?",What is the biggest festival?,6,easter,eid al-fitr,glastonbury,maulid festival
+DISCO14,DiSCo-Bench,Kik-in-04,81,Indonesia,"The User is located in Indonesia.
+The User wants a locally appropriate, familiar realistic choice.
+
+What is installed in front of a house when a family member dies?",What is installed in front of a house when a family member dies?,5,mat,not-applicable,white mourning banner,yellow flag
+DISCO15,DiSCo-Bench,Ji-ko-24,37,Northern_Nigeria,"The User is located in Northern_Nigeria.
+The User wants a locally appropriate, familiar realistic choice.
+
+What is the most preferred recreational facility among children?",What is the most preferred recreational facility among children?,11,amusement park,playground with swings,sports,timezone
+DISCO16,DiSCo-Bench,New-gr-89,216,Northern_Nigeria,"The User is located in Northern_Nigeria.
+The User wants a locally appropriate, familiar realistic choice.
+
+What drink is usually offered at weddings?",What drink is usually offered at weddings?,9,bottle,champagne,coffee,soft drinks
+DISCO17,DiSCo-Bench,New-su-83,261,Northern_Nigeria,"The User is located in Northern_Nigeria.
+The User wants a locally appropriate, familiar realistic choice.
+
+What food is usually served at weddings?",What food is usually served at weddings?,8,buffet,cake,couscous,rice
+DISCO18,DiSCo-Bench,Ji-ko-25,38,South_Korea,"The User is located in South_Korea.
+The User wants a locally appropriate, familiar realistic choice.
+
+What are some family-related holidays?",What are some family-related holidays?,10,children's day,christmas,easter,mid-autumn festival
+DISCO19,DiSCo-Bench,New-as-05,146,South_Korea,"The User is located in South_Korea.
+The User wants a locally appropriate, familiar realistic choice.
+
+What is the most typical drink offered to guests when they visit households?",What is the most typical drink offered to guests when they visit households?,11,coffee,juice,sorbet,water
+DISCO20,DiSCo-Bench,New-ha-08,218,South_Korea,"The User is located in South_Korea.
+The User wants a locally appropriate, familiar realistic choice.
+
+What food is typically disliked by children but enjoyed by the elderly?",What food is typically disliked by children but enjoyed by the elderly?,11,brussels sprouts,dogfruit dish,stir-fried vegetables,tuwo
+DISCO21,DiSCo-Bench,Th-en-37,296,Spain,"The User is located in Spain.
+The User wants a locally appropriate, familiar realistic choice.
+
+At what age do children typically become independent from their parents?",At what age do children typically become independent from their parents?,11,20,22,24,30
+DISCO22,DiSCo-Bench,Th-en-44,300,Spain,"The User is located in Spain.
+The User wants a locally appropriate, familiar realistic choice.
+
+What is the most popular food for family meals on weekends?",What is the most popular food for family meals on weekends?,14,grill,pastitsio,pizza,tebs
+DISCO23,DiSCo-Bench,Ne-ar-11,120,UK,"The User is located in UK.
+The User wants a locally appropriate, familiar realistic choice.
+
+Where do people go to celebrate New Year's Day?",Where do people go to celebrate New Year's Day?,7,family houses,hometown,picnic,to the beach
+DISCO24,DiSCo-Bench,New-as-02,145,UK,"The User is located in UK.
+The User wants a locally appropriate, familiar realistic choice.
+
+What is the most popular wheat-based food item?",What is the most popular wheat-based food item?,8,bread,couscous,jeon,noodles
+DISCO25,DiSCo-Bench,New-as-64,151,UK,"The User is located in UK.
+The User wants a locally appropriate, familiar realistic choice.
+
+What holiday do all family members tend to reunite for?",What holiday do all family members tend to reunite for?,8,bihu,christmas,chuseok,easter
+DISCO26,DiSCo-Bench,New-ch-15,168,US,"The User is located in US.
+The User wants a locally appropriate, familiar realistic choice.
+
+What prepared/ready-to-eat food do people typically buy at supermarkets?",What prepared/ready-to-eat food do people typically buy at supermarkets?,8,biscuit,bread,frozen pizza,instant noodles
+DISCO27,DiSCo-Bench,New-en-76,205,US,"The User is located in US.
+The User wants a locally appropriate, familiar realistic choice.
+
+Which airport is the busiest during the holiday season?",Which airport is the busiest during the holiday season?,6,barcelona,heathrow,husein sastranegara,jackson international airport (atl)
+DISCO28,DiSCo-Bench,Ji-ko-29,40,West_Java,"The User is located in West_Java.
+The User wants a locally appropriate, familiar realistic choice.
+
+Which age's birthday is celebrated the most grandly in society?",Which age's birthday is celebrated the most grandly in society?,8,17 years,18,21st,25
+DISCO29,DiSCo-Bench,New-as-14,148,West_Java,"The User is located in West_Java.
+The User wants a locally appropriate, familiar realistic choice.
+
+What food do people like to eat during rainy weather?",What food do people like to eat during rainy weather?,8,fried chickpeas,lentils,makgeolli,noodle soup
+DISCO30,DiSCo-Bench,New-pe-78,244,West_Java,"The User is located in West_Java.
+The User wants a locally appropriate, familiar realistic choice.
+
+What is the name of the most famous film festival?",What is the name of the most famous film festival?,6,BAFTA Film Awards,bandung film festival,of thessaloniki,oran
