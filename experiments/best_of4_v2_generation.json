@@ -1,0 +1,21 @@
+{
+  "source_dataset": "data/evaluation/best_of4_v1.csv",
+  "output_dataset": "data/evaluation/best_of4_v2.csv",
+  "raw_output": "artifacts/best_of4_v2/raw_generations.jsonl",
+  "mapping_output": "artifacts/best_of4_v2/candidate_mapping.csv",
+  "manifest_output": "artifacts/best_of4_v2/generation_manifest.json",
+  "assignment_seed": 20261002,
+  "temperature": 0.3,
+  "num_predict": 700,
+  "timeout_seconds": 600,
+  "retry_count": 1,
+  "ollama_url": "http://localhost:11434/api/chat",
+  "ollama_tags_url": "http://localhost:11434/api/tags",
+  "models": [
+    "qwen3:8b",
+    "gemma3:12b",
+    "llama3.1:8b",
+    "mistral-nemo:12b"
+  ],
+  "system_prompt": "You are a helpful general-purpose assistant. Answer the user's request directly, naturally, accurately, and concisely. Follow all explicit constraints in the request. Do not mention evaluation, benchmarks, cultural alignment, candidate generation, or hidden criteria. Do not deliberately introduce mistakes, stereotypes, or adversarial behavior. Produce the answer you would normally give to a real user."
+}
