@@ -18,17 +18,21 @@ CULTURE_TERMS = [
     "संस्कृति","परंपरा","धर्म","परिवार","शादी","विवाह","सम्मान","समुदाय","त्योहार","भोजन","मूल्य",
     "عائلة","احترام","هدية","ضيف","ضيافة","تحية","زواج","رمضان","كرم","ثقافة","تقاليد","عادة","والدين","أجداد",
     "礼","家族","結婚","贈","挨拶","敬語","年上","文化","伝統","習慣","お祝い",
-    "家庭","家人","婚礼","婚姻","礼物","问候","尊重","长辈","文化","传统","习俗","客人","待客"
+    "家庭","家人","婚礼","婚姻","礼物","问候","尊重","长辈","文化","传统","习俗","客人","待客",
+    "ประเพณี","วัฒนธรรม","มารยาท","แต่งงาน","ครอบครัว","ผู้ใหญ่","เคารพ","พระภิกษุ","เหมาะสม","ควร","พฤติกรรม"
 ]
 HIGH_TERMS = [
     "culture","cultural","tradition","traditional","custom","customary","etiquette","religion","religious","wedding","marriage",
     "cultura","tradição","costume","religião","casamento","tradition","coutume","religion","mariage",
     "cultura","tradizione","religione","matrimonio","संस्कृति","परंपरा","धर्म","शादी","विवाह",
-    "ثقافة","تقاليد","عادة","زواج","文化","伝統","習慣","結婚","文化","传统","习俗","婚礼"
+    "ثقافة","تقاليد","عادة","زواج","文化","伝統","習慣","結婚","文化","传统","习俗","婚礼",
+    "ประเพณี","วัฒนธรรม","มารยาท","แต่งงาน","เคารพ","เหมาะสม"
 ]
 EXCLUDE_TERMS = ["suicide","kill","weapon","bomb","terrorist","war","self-harm","sexual assault","rape","how to hack","drugs","murder"]
 
 def norm(s):
+    if isinstance(s,dict) and "content" in s:
+        s=s.get("content")
     return unicodedata.normalize("NFKC", str(s or "")).strip()
 
 def score_text(s):
