@@ -1,4 +1,4 @@
-name: Build Vericult cultural prompt set
+name: Build Vericult cultural prompt set v4
 
 on:
   push:
