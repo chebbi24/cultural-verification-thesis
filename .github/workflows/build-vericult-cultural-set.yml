@@ -1,4 +1,4 @@
-name: Build Vericult cultural prompt set # v2
+name: Build Vericult cultural prompt set # v3
 
 on:
   push:
@@ -27,7 +27,125 @@ jobs:
         run: python scripts/build_vericult_cultural_set.py
       - name: Validate counts
         run: |
-          grep -c '^RECORD ' vericult_cultural_prompts_120_exact.txt | grep '^120$'
+          grep -Ec '^RECORD [0-9]{3}
+          grep -Ec '^RECORD [0-9]{3}
+      - name: Commit generated datasets
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add vericult_cultural_prompts_120_exact.txt vericult_cultural_prompts_140_all7_exact.txt
+          git commit -m "Generate exact cultural prompt-response evaluation sets"
+          git push origin HEAD:agent/final-experiment-ready
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vericult-cultural-prompt-sets
+          path: |
+            vericult_cultural_prompts_120_exact.txt
+            vericult_cultural_prompts_140_all7_exact.txt
+ vericult_cultural_prompts_120_exact.txt | grep '^120
+          grep -c '^RECORD ' vericult_cultural_prompts_140_all7_exact.txt | grep '^140$'
+      - name: Commit generated datasets
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add vericult_cultural_prompts_120_exact.txt vericult_cultural_prompts_140_all7_exact.txt
+          git commit -m "Generate exact cultural prompt-response evaluation sets"
+          git push origin HEAD:agent/final-experiment-ready
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vericult-cultural-prompt-sets
+          path: |
+            vericult_cultural_prompts_120_exact.txt
+            vericult_cultural_prompts_140_all7_exact.txt
+
+          grep -c '^RECORD ' vericult_cultural_prompts_140_all7_exact.txt | grep '^140$'
+      - name: Commit generated datasets
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add vericult_cultural_prompts_120_exact.txt vericult_cultural_prompts_140_all7_exact.txt
+          git commit -m "Generate exact cultural prompt-response evaluation sets"
+          git push origin HEAD:agent/final-experiment-ready
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vericult-cultural-prompt-sets
+          path: |
+            vericult_cultural_prompts_120_exact.txt
+            vericult_cultural_prompts_140_all7_exact.txt
+ vericult_cultural_prompts_140_all7_exact.txt | grep '^140
+      - name: Commit generated datasets
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add vericult_cultural_prompts_120_exact.txt vericult_cultural_prompts_140_all7_exact.txt
+          git commit -m "Generate exact cultural prompt-response evaluation sets"
+          git push origin HEAD:agent/final-experiment-ready
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vericult-cultural-prompt-sets
+          path: |
+            vericult_cultural_prompts_120_exact.txt
+            vericult_cultural_prompts_140_all7_exact.txt
+ vericult_cultural_prompts_120_exact.txt | grep '^120
+          grep -c '^RECORD ' vericult_cultural_prompts_140_all7_exact.txt | grep '^140$'
+      - name: Commit generated datasets
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add vericult_cultural_prompts_120_exact.txt vericult_cultural_prompts_140_all7_exact.txt
+          git commit -m "Generate exact cultural prompt-response evaluation sets"
+          git push origin HEAD:agent/final-experiment-ready
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vericult-cultural-prompt-sets
+          path: |
+            vericult_cultural_prompts_120_exact.txt
+            vericult_cultural_prompts_140_all7_exact.txt
+
+          grep -c '^RECORD ' vericult_cultural_prompts_140_all7_exact.txt | grep '^140$'
+      - name: Commit generated datasets
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add vericult_cultural_prompts_120_exact.txt vericult_cultural_prompts_140_all7_exact.txt
+          git commit -m "Generate exact cultural prompt-response evaluation sets"
+          git push origin HEAD:agent/final-experiment-ready
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vericult-cultural-prompt-sets
+          path: |
+            vericult_cultural_prompts_120_exact.txt
+            vericult_cultural_prompts_140_all7_exact.txt
+
+      - name: Commit generated datasets
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add vericult_cultural_prompts_120_exact.txt vericult_cultural_prompts_140_all7_exact.txt
+          git commit -m "Generate exact cultural prompt-response evaluation sets"
+          git push origin HEAD:agent/final-experiment-ready
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vericult-cultural-prompt-sets
+          path: |
+            vericult_cultural_prompts_120_exact.txt
+            vericult_cultural_prompts_140_all7_exact.txt
+ vericult_cultural_prompts_120_exact.txt | grep '^120
+          grep -c '^RECORD ' vericult_cultural_prompts_140_all7_exact.txt | grep '^140$'
+      - name: Commit generated datasets
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add vericult_cultural_prompts_120_exact.txt vericult_cultural_prompts_140_all7_exact.txt
+          git commit -m "Generate exact cultural prompt-response evaluation sets"
+          git push origin HEAD:agent/final-experiment-ready
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vericult-cultural-prompt-sets
+          path: |
+            vericult_cultural_prompts_120_exact.txt
+            vericult_cultural_prompts_140_all7_exact.txt
+
           grep -c '^RECORD ' vericult_cultural_prompts_140_all7_exact.txt | grep '^140$'
       - name: Commit generated datasets
         run: |
