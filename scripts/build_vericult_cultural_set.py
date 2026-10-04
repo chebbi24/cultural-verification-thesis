@@ -110,8 +110,9 @@ def community_records():
             {"preferred_response_label":pref,"annotator_country":country,"assigned_lang":lang,
              "feedback":norm(r.get("first_turn_feedback"))},s,order))
         order+=1
-    # 5 countries -> at most 4 each for diversity
-    return pick_diverse(c,20,group="annotator_country",max_per_group=4)
+        if len(c)>=600:
+            break
+    return pick_diverse(c,20,group="annotator_country",max_per_group=8)
 
 def plural_records():
     ds=load_dataset("agdhruv/plural-alignment",split="train",streaming=True)
@@ -127,8 +128,9 @@ def plural_records():
             "survey-derived preferred response",prompt,response,
             {"dispreferred_response":norm(r.get("dispref")),"sex":r.get("sex"),"age":r.get("age"),"education":r.get("education"),"region_iso":r.get("region_iso")},s,order))
         order+=1
-    # current v0.1 has five countries; balance them
-    return pick_diverse(c,20,group="culture",max_per_group=4)
+        if len(c)>=600:
+            break
+    return pick_diverse(c,20,group="culture",max_per_group=8)
 
 def pact_records():
     ds=load_dataset("Angana192/pact-culture-personalization","base_instances",split="train",streaming=True)
@@ -153,29 +155,57 @@ def thaicli_records():
       ("factoid","https://raw.githubusercontent.com/UpstageAI/ThaiCLI_H6/main/cli/CLI_factoid.parquet")
     ]
     c=[]; order=0
+    def unpack_answers(v):
+        if v is None: return "",""
+        if hasattr(v,"tolist") and not isinstance(v,(str,dict,list,tuple)):
+            v=v.tolist()
+        if isinstance(v,str):
+            vv=v.strip()
+            try: v=json.loads(vv)
+            except Exception: return vv,""
+        if isinstance(v,dict):
+            low={str(k).lower():val for k,val in v.items()}
+            chosen=low.get("chosen") or low.get("accepted") or low.get("good") or low.get("preferred") or ""
+            rejected=low.get("rejected") or low.get("bad") or low.get("dispreferred") or ""
+            return norm(chosen),norm(rejected)
+        if isinstance(v,(list,tuple)):
+            vals=list(v); chosen=""; rejected=""
+            for item in vals:
+                if isinstance(item,dict):
+                    low={str(k).lower():val for k,val in item.items()}
+                    label=norm(low.get("label") or low.get("type") or low.get("preference")).lower()
+                    text=low.get("answer") or low.get("text") or low.get("response") or low.get("content")
+                    if label in {"chosen","preferred","good","accepted"}: chosen=norm(text)
+                    elif label in {"rejected","dispreferred","bad"}: rejected=norm(text)
+                    if not chosen and low.get("chosen") is not None: chosen=norm(low.get("chosen"))
+                    if not rejected and low.get("rejected") is not None: rejected=norm(low.get("rejected"))
+            if chosen: return chosen,rejected
+            flat=[norm(x) for x in vals if norm(x)]
+            return (flat[0] if flat else ""), (flat[1] if len(flat)>1 else "")
+        return norm(v),""
+
     for typ,url in urls:
         df=pd.read_parquet(url)
         cols={str(x).lower():x for x in df.columns}
-        def findcol(keys):
-            for low,orig in cols.items():
-                if any(k==low or k in low for k in keys): return orig
-            return None
-        qcol=findcol(["question","prompt","instruction"])
-        chcol=findcol(["chosen","accepted","good_answer","good"])
-        rejcol=findcol(["rejected","bad_answer","bad"])
-        themecol=findcol(["theme","category","domain","topic"])
-        if qcol is None or chcol is None:
-            raise RuntimeError(f"ThaiCLI columns unsupported: {list(df.columns)}")
+        qcol=cols.get("question") or cols.get("prompt")
+        themecol=cols.get("theme") or cols.get("category")
+        if qcol is None:
+            raise RuntimeError(f"ThaiCLI question column unsupported: {list(df.columns)}")
         for i,row in df.iterrows():
-            prompt=norm(row[qcol]); response=norm(row[chcol])
-            if not prompt or not response: continue
+            if "answers" in cols:
+                chosen,rejected=unpack_answers(row[cols["answers"]])
+            else:
+                chosen=norm(row[cols["chosen"]]) if "chosen" in cols else ""
+                rejected=norm(row[cols["rejected"]]) if "rejected" in cols else ""
+            prompt=norm(row[qcol])
+            if not prompt or not chosen: continue
             theme=norm(row[themecol]) if themecol is not None else ""
-            s=score_text(prompt)+ (8 if typ=="instruction" else 3)
+            s=score_text(prompt)+(8 if typ=="instruction" else 3)
             if theme.lower() in {"culture","religion","lifestyle","humanity"}: s+=5
-            c.append(rec("ThaiCLI","Thailand","Thai",typ,i,
+            c.append(rec("ThaiCLI","Thailand","Thai",typ,row.get("id",i),
                 f"https://github.com/UpstageAI/ThaiCLI_H6/blob/main/cli/CLI_{typ}.parquet",
-                "human-reviewed chosen answer",prompt,response,
-                {"rejected_response":norm(row[rejcol]) if rejcol is not None else "","theme":theme},s,order))
+                "human-reviewed chosen answer",prompt,chosen,
+                {"rejected_response":rejected,"theme":theme},s,order))
             order+=1
     return pick_diverse(c,20)
 
