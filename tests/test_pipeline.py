@@ -1,3 +1,4 @@
+from fractions import Fraction
 import inspect
 import json
 from pathlib import Path
@@ -28,7 +29,7 @@ from cultverify.schemas import (
     VerificationQuestion,
 )
 from cultverify.prompts import PROMPTS
-from cultverify.scoring import aggregate, rank_results
+from cultverify.scoring import aggregate, cultural_appropriateness, rank_results, vericult_score
 from cultverify.trace import digest
 from cultverify.validation import (
     matching_support_documents,
@@ -934,6 +935,27 @@ def test_equal_aggregation_and_abstention():
         score(True)
     with pytest.raises(ValidationError):
         score(1.5)
+
+
+def test_partial_abstention_suppresses_public_score_without_swallowing_labels():
+    partial = (score(2), score("abstain", "D01"))
+    assert aggregate(partial) == 1.0
+    assert vericult_score(partial) is None
+    assert cultural_appropriateness(partial) == "partially_culturally_appropriate"
+
+    decisive_negative = (score(0), score("abstain", "D01"))
+    assert vericult_score(decisive_negative) is None
+    assert cultural_appropriateness(decisive_negative) == "culturally_inappropriate"
+
+    fully_unresolved = (score("abstain"), score("abstain", "D01"))
+    assert vericult_score(fully_unresolved) is None
+    assert cultural_appropriateness(fully_unresolved) == "insufficient_evidence"
+
+
+def test_fractional_vericult_score_uses_exact_rational_scaling():
+    scores = (score(2), score(2, "D01"), score(1, "D02"))
+    assert aggregate(scores) == float(Fraction(5, 6))
+    assert vericult_score(scores) == float(Fraction(5, 6) * 100)
 
 
 def test_rank_shared_planning_and_exact_tie(setup):
