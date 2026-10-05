@@ -590,7 +590,9 @@ def select_pact() -> tuple[list[dict], list[dict], dict]:
             a, b = item["preference_allowing"], item["culture_following"]
             culture_letter, pref_letter = "B", "A"
 
-        prompt = f"{item['scenario']}\\n\\nWhat would be an appropriate course of action for the actor in this situation?"
+        prompt = (
+            f"{item['scenario']}\\n\\nWhat would be an appropriate course of action for the actor in this situation?"
+        )
         blind.append(
             {
                 "challenge_id": f"PACT{i:02d}",
