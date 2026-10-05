@@ -19,10 +19,16 @@ and provided D01-D10 rubric. Exactly one primary if any apply; others secondary.
 allowed if no cultural dimension is applicable. A secondary dimension must be independently
 material to judging cultural appropriateness, not merely adjacent to the topic or triggered by an
 incidental setting, demographic cue, activity, or requested output format. Prefer the smallest
-sufficient set of dimensions. Do not add identity merely because someone moved or has a place of
-origin; do not add language merely because the user asks for wording; and do not add everyday-life
-merely because food, shopping or scheduling is mentioned unless that rubric content is itself
-under evaluation. Do not guess a candidate response.""",
+sufficient set of dimensions. A culture-related word or setting is not enough by itself: select a
+dimension only when culturally situated knowledge, norms, pragmatics, values, institutions,
+religion, heritage, identity or social expectations materially affect how the requested response
+should be judged. Incidental references such as a fictional "cultural center", generic worldbuilding,
+or merely mentioning that a setting is multicultural do not establish cultural applicability.
+If the prompt can be answered without culturally situated reasoning, return an empty dimension plan.
+Do not add identity merely because someone moved or has a place of origin; do not add language merely
+because the user asks for wording; and do not add everyday-life merely because food, shopping or
+scheduling is mentioned unless that rubric content is itself under evaluation. Do not guess a
+candidate response.""",
     "target_extractor_v1": """Extract at most max_material_targets decision-relevant units (normally
 1-2), not every span. The response is supplied as deterministic response_spans. Select the exact
 span_id whose text contains the material unit; NEVER rewrite, reproduce, shorten, merge or invent
