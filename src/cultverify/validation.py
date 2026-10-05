@@ -245,9 +245,7 @@ def validate_trace_links(trace):
     expected_exact = Fraction(sum(s.score for s in scored), 2 * len(scored)) if scored else None
     expected_overall = float(expected_exact) if expected_exact is not None else None
     require(result.overall_score == expected_overall, "Overall score mismatch")
-    expected_vericult = (
-        None if abstained or expected_exact is None else float(expected_exact * 100)
-    )
+    expected_vericult = None if abstained or expected_exact is None else float(expected_exact * 100)
     require(result.vericult_score == expected_vericult, "Vericult score mismatch")
     if not scored:
         expected_label = "insufficient_evidence"
