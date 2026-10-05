@@ -181,16 +181,20 @@ complete trace per candidate and reuses the exact prompt-level plan across all f
 
 Dimensions receive 0, 1, 2 or `abstain`. If every retrievable target relevant to a
 dimension ends `insufficient` and there is no relevant non-retrieval target that can be
-assessed directly, that dimension must abstain. The overall score is the mean of scored
-dimensions divided by two; if none can be scored it is `null`. There are no caps or
-primary/secondary weighting differences. Ranking uses exact rational comparison,
-so floating-point rounding cannot break a mathematical tie. No tie margin or
-primary-dimension tie-break is used.
+assessed directly, that dimension must abstain. Equal deterministic aggregation is retained
+internally for comparison and ranking. The public 0–100 `vericult_score` is emitted only
+when every applicable dimension is scored; if any applicable dimension abstains, the numeric
+summary is `null` rather than implying a complete assessment. There are no caps or
+primary/secondary weighting differences. Ranking uses exact rational comparison, so
+floating-point rounding cannot break a mathematical tie. No tie margin or primary-dimension
+tie-break is used.
 
-Candidate-level appropriateness is derived deterministically from the same frozen
-scores: no scored dimensions → `insufficient_evidence`; any scored 0 →
-`culturally_inappropriate`; all applicable dimensions scored 2 with no abstention →
-`culturally_appropriate`; otherwise → `partially_culturally_appropriate`.
+Candidate-level appropriateness is the primary verification output and is derived
+deterministically from the frozen dimension judgments: no scored dimensions →
+`insufficient_evidence`; any scored 0 → `culturally_inappropriate`; all applicable
+dimensions scored 2 with no abstention → `culturally_appropriate`; otherwise →
+`partially_culturally_appropriate`. Thus partial abstention cannot be presented as a
+perfect public score, while decisive scored evidence still determines the cultural label.
 Best-of-4 first applies this absolute gate. Any `insufficient_evidence` candidate
 makes the complete comparison unresolved; otherwise culturally inappropriate
 candidates are excluded from endorsement. If all four are excluded, the outcome is
