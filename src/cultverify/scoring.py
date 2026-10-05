@@ -1,9 +1,14 @@
 from fractions import Fraction
+
+from .llm import StageError
 from .schemas import (
     DimensionScore,
+    DimensionScoreDecision,
+    EpistemicType,
     RankingResult,
     ScoreBatch,
     ScoreDecisionBatch,
+    SingleScoreDecision,
     TargetVerdict,
     TargetVerdictDraft,
 )
@@ -90,6 +95,40 @@ def _forced_abstain_dimensions(plan, targets, verdicts):
     return forced
 
 
+def _single_dimension_decision(session, stage, payload, dimension_id, relevant_targets, verdicts):
+    decision = session.call(stage, payload, SingleScoreDecision)
+    verdicts_by_target = {verdict.target_id: verdict for verdict in verdicts}
+    directional = any(
+        target.target_id in verdicts_by_target
+        and verdicts_by_target[target.target_id].verdict in {"supported", "mixed", "contradicted"}
+        for target in relevant_targets
+    )
+    if directional and decision.score == "abstain":
+        raise ValueError("Directional evidence exists for this dimension; score 0, 1 or 2 instead of abstain")
+    return DimensionScoreDecision(
+        dimension_id=dimension_id,
+        score=decision.score,
+        rationale=decision.rationale,
+    )
+
+
+def _dimension_payload(prompt, response, context, dimension, targets, verdicts, memos, rubric):
+    target_ids = {target.target_id for target in targets}
+    relevant_verdicts = tuple(verdict for verdict in verdicts if verdict.target_id in target_ids)
+    memo_ids = {verdict.memo_id for verdict in relevant_verdicts}
+    relevant_memos = tuple(memo for memo in memos if memo.memo_id in memo_ids)
+    return {
+        "prompt": prompt,
+        "response": response,
+        "context": context.model_dump(mode="json"),
+        "dimension_plan": {"dimensions": [{"dimension_id": dimension.dimension_id}]},
+        "targets": [_target_scoring_view(target) for target in targets],
+        "verdicts": [_verdict_scoring_view(verdict) for verdict in relevant_verdicts],
+        "memos": [_memo_evidence_view(memo) for memo in relevant_memos],
+        "rubric": rubric,
+    }
+
+
 def score_dimensions(session, prompt, response, context, plan, targets, verdicts, memos, rubric):
     forced_abstentions = _forced_abstain_dimensions(plan, targets, verdicts)
     active_dimensions = tuple(
@@ -102,33 +141,94 @@ def score_dimensions(session, prompt, response, context, plan, targets, verdicts
     active_memo_ids = {verdict.memo_id for verdict in active_verdicts}
     active_memos = tuple(memo for memo in memos if memo.memo_id in active_memo_ids)
 
+    drafts_by_dimension = {}
     if active_dimensions:
-        result = session.call(
-            "dimension_scorer_v1",
+        try:
+            result = session.call(
+                "dimension_scorer_v1",
+                {
+                    "prompt": prompt,
+                    "response": response,
+                    "context": context.model_dump(mode="json"),
+                    "dimension_plan": {
+                        "dimensions": [{"dimension_id": dimension.dimension_id} for dimension in active_dimensions]
+                    },
+                    "targets": [_target_scoring_view(target) for target in active_targets],
+                    "verdicts": [_verdict_scoring_view(verdict) for verdict in active_verdicts],
+                    "memos": [_memo_evidence_view(memo) for memo in active_memos],
+                    "rubric": rubric,
+                },
+                ScoreDecisionBatch,
+                lambda batch: validate_score_decisions(
+                    batch,
+                    plan,
+                    targets,
+                    verdicts,
+                    ignored_dimensions=forced_abstentions,
+                ),
+            )
+            drafts_by_dimension = {score.dimension_id: score for score in result.scores}
+        except StageError:
+            # Structural fallback only: the same semantic decision is requested one
+            # dimension at a time, while Python attaches the known dimension ID.
+            for dimension in active_dimensions:
+                relevant_targets = tuple(
+                    target for target in targets if dimension.dimension_id in target.dimension_ids
+                )
+                drafts_by_dimension[dimension.dimension_id] = _single_dimension_decision(
+                    session,
+                    "dimension_scorer_single_v1",
+                    _dimension_payload(
+                        prompt,
+                        response,
+                        context,
+                        dimension,
+                        relevant_targets,
+                        verdicts,
+                        memos,
+                        rubric,
+                    ),
+                    dimension.dimension_id,
+                    relevant_targets,
+                    verdicts,
+                )
+
+    # Selective contextual fallback is deliberately narrower than general scoring:
+    # only context-dependent recommendations may be judged from their observable
+    # cultural handling when external evidence remains unresolved. External facts
+    # and descriptive norms remain abstentions if retrieval cannot establish them.
+    fallback_by_dimension = {}
+    for dimension in plan.dimensions:
+        if dimension.dimension_id not in forced_abstentions:
+            continue
+        relevant_targets = tuple(
+            target for target in targets if dimension.dimension_id in target.dimension_ids
+        )
+        recommendation_targets = tuple(
+            target for target in relevant_targets if target.epistemic_type == EpistemicType.RECOMMENDATION
+        )
+        if not recommendation_targets:
+            continue
+        fallback_by_dimension[dimension.dimension_id] = _single_dimension_decision(
+            session,
+            "contextual_fallback_v1",
             {
                 "prompt": prompt,
                 "response": response,
                 "context": context.model_dump(mode="json"),
-                "dimension_plan": {
-                    "dimensions": [{"dimension_id": dimension.dimension_id} for dimension in active_dimensions]
-                },
-                "targets": [_target_scoring_view(t) for t in active_targets],
-                "verdicts": [_verdict_scoring_view(v) for v in active_verdicts],
-                "memos": [_memo_evidence_view(m) for m in active_memos],
+                "dimension": {"dimension_id": dimension.dimension_id},
+                "targets": [_target_scoring_view(target) for target in recommendation_targets],
+                "verdicts": [
+                    _verdict_scoring_view(verdict)
+                    for verdict in verdicts
+                    if verdict.target_id in {target.target_id for target in recommendation_targets}
+                ],
                 "rubric": rubric,
             },
-            ScoreDecisionBatch,
-            lambda b: validate_score_decisions(
-                b,
-                plan,
-                targets,
-                verdicts,
-                ignored_dimensions=forced_abstentions,
-            ),
+            dimension.dimension_id,
+            recommendation_targets,
+            (),
         )
-        drafts_by_dimension = {score.dimension_id: score for score in result.scores}
-    else:
-        drafts_by_dimension = {}
 
     verdicts_by_target = {verdict.target_id: verdict for verdict in verdicts}
     memo_by_target = {verdict.target_id: verdict.memo_id for verdict in verdicts}
@@ -136,12 +236,26 @@ def score_dimensions(session, prompt, response, context, plan, targets, verdicts
     for dimension in plan.dimensions:
         dimension_id = dimension.dimension_id
         relevant_targets = [target for target in targets if dimension_id in target.dimension_ids]
-        if dimension_id in forced_abstentions:
+        fallback = fallback_by_dimension.get(dimension_id)
+        if fallback is not None and fallback.score != "abstain":
+            recommendation_targets = [
+                target for target in relevant_targets if target.epistemic_type == EpistemicType.RECOMMENDATION
+            ]
+            response_quotes = tuple(target.response_quote for target in recommendation_targets)
+            if response and not response_quotes:
+                response_quotes = (response,)
+            score = DimensionScore(
+                **fallback.model_dump(mode="json"),
+                response_quotes=response_quotes,
+                target_ids=tuple(target.target_id for target in recommendation_targets),
+                memo_ids=(),
+            )
+        elif dimension_id in forced_abstentions:
             linked_target_ids = tuple(target.target_id for target in relevant_targets if target.retrieval_appropriate)
             score = DimensionScore(
                 dimension_id=dimension_id,
                 score="abstain",
-                rationale="All relevant retrievable targets are insufficient; dimension abstained deterministically.",
+                rationale="All relevant retrievable targets are insufficient; dimension remains unresolved.",
                 response_quotes=(),
                 target_ids=linked_target_ids,
                 memo_ids=tuple(
@@ -265,6 +379,24 @@ def rank_results(candidates):
         )
 
     labels = [candidate.cultural_appropriateness for candidate in candidates]
+    if any(label == "not_culturally_applicable" for label in labels):
+        indices = tuple(i for i, label in enumerate(labels) if label == "not_culturally_applicable")
+        return RankingResult(
+            candidates=tuple(candidates),
+            winner="not_culturally_applicable",
+            tied_indices=indices,
+            coverage_comparable=comparable,
+            tie_break_reason="The shared prompt does not require a cultural appropriateness judgment.",
+        )
+    if any(label == "not_assessable" for label in labels):
+        indices = tuple(i for i, label in enumerate(labels) if label == "not_assessable")
+        return RankingResult(
+            candidates=tuple(candidates),
+            winner="not_assessable",
+            tied_indices=indices,
+            coverage_comparable=comparable,
+            tie_break_reason="At least one response contains no substantive culturally assessable answer content.",
+        )
     if any(label == "insufficient_evidence" for label in labels):
         unresolved = tuple(i for i, label in enumerate(labels) if label == "insufficient_evidence")
         return RankingResult(
