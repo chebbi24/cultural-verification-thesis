@@ -22,11 +22,8 @@ def test_target_extractor_selects_span_id_and_python_restores_exact_quote(setup)
             "targets": [
                 {
                     "span_id": selected["span_id"],
-                    "proposition": "The response recommends alternatives.",
                     "epistemic_type": "context_dependent_recommendation",
                     "dimension_ids": ["D03"],
-                    "materiality": "high",
-                    "retrieval_appropriate": True,
                 }
             ]
         }
