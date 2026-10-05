@@ -6,7 +6,14 @@ from .llm import SemanticSession, StageError
 from .planner import load_rubric, plan_prompt
 from .prompts import COMMON, PROMPTS
 from .retrieval import RetrievalError, SnapshotStore
-from .schemas import CandidateResult, ContextFrame, DimensionPlan, RunTrace, TargetEvidenceLink
+from .schemas import (
+    CandidateResult,
+    ContextFrame,
+    DimensionPlan,
+    ResponseAssessability,
+    RunTrace,
+    TargetEvidenceLink,
+)
 from .scoring import (
     abstain_scores,
     abstention_reason,
@@ -69,52 +76,83 @@ class CulturalVerifier:
         targets, bundles, verdicts, links, events, evidence_calls = (), [], [], [], [], []
         errors, truncated, partial_evidence = [], False, None
         status = "completed"
+        special_outcome = None
         engine = BlindEvidenceEngine(self.llm, self.config, self.store)
         try:
             if planning_error:
                 raise StageError(planning_error)
-            if plan.dimensions:
-                targets, truncated = extract_targets(session, prompt, response, context, plan)
-                for target in targets:
-                    if not target.retrieval_appropriate:
-                        continue  # assessed directly by the dimension scorer
-                    questions = neutral_questions(session, target, context)
-                    events.append(f"questions_ready:{target.target_id}")
-                    try:
-                        bundle = engine.evaluate(questions, context)
-                    except (StageError, RetrievalError, ValueError, OSError):
-                        partial_evidence = canonical(engine.last_checkpoint)
-                        raise
-                    finally:
-                        evidence_calls.extend(engine.last_calls)
-                    bundles.append(bundle)
-                    memo = bundle.memos[-1]
-                    events.append(f"memo_frozen:{memo.memo_id}")
-                    links.append(
-                        TargetEvidenceLink(
-                            target_id=target.target_id,
-                            question_ids=tuple(q.question_id for q in bundle.questions),
-                            memo_id=memo.memo_id,
-                        )
-                    )
-                    before = digest(memo)
-                    verdicts.append(compare_target(session, target, memo))
-                    if digest(memo) != before:
-                        raise ValueError("Frozen memo changed")
-                    events.append(f"target_compared:{target.target_id}")
-                scores = score_dimensions(
-                    session,
-                    prompt,
-                    response,
-                    context,
-                    plan,
-                    targets,
-                    verdicts,
-                    [b.memos[-1] for b in bundles],
-                    self.rubric,
-                )
-            else:
+            if not plan.dimensions:
                 scores = ()
+                special_outcome = "not_culturally_applicable"
+                events.append("not_culturally_applicable")
+            else:
+                if response.strip():
+                    assessability = session.call(
+                        "response_assessability_v1",
+                        {
+                            "prompt": prompt,
+                            "response": response,
+                            "context": context.model_dump(mode="json"),
+                            "dimension_plan": {
+                                "dimensions": [
+                                    {"dimension_id": dimension.dimension_id} for dimension in plan.dimensions
+                                ]
+                            },
+                        },
+                        ResponseAssessability,
+                    )
+                else:
+                    assessability = ResponseAssessability(
+                        assessable=False,
+                        reason="The response is empty and contains no substantive answer content.",
+                    )
+                if not assessability.assessable:
+                    scores = abstain_scores(
+                        plan,
+                        f"Response is not culturally assessable: {assessability.reason}",
+                    )
+                    special_outcome = "not_assessable"
+                    events.append("not_assessable")
+                else:
+                    targets, truncated = extract_targets(session, prompt, response, context, plan)
+                    for target in targets:
+                        if not target.retrieval_appropriate:
+                            continue  # assessed directly by the dimension scorer
+                        questions = neutral_questions(session, target, context)
+                        events.append(f"questions_ready:{target.target_id}")
+                        try:
+                            bundle = engine.evaluate(questions, context)
+                        except (StageError, RetrievalError, ValueError, OSError):
+                            partial_evidence = canonical(engine.last_checkpoint)
+                            raise
+                        finally:
+                            evidence_calls.extend(engine.last_calls)
+                        bundles.append(bundle)
+                        memo = bundle.memos[-1]
+                        events.append(f"memo_frozen:{memo.memo_id}")
+                        links.append(
+                            TargetEvidenceLink(
+                                target_id=target.target_id,
+                                question_ids=tuple(q.question_id for q in bundle.questions),
+                                memo_id=memo.memo_id,
+                            )
+                        )
+                        before = digest(memo)
+                        verdicts.append(compare_target(session, target, memo))
+                        if digest(memo) != before:
+                            raise ValueError("Frozen memo changed")
+                        events.append(f"target_compared:{target.target_id}")
+                    scores = score_dimensions(
+                        session,
+                        prompt,
+                        response,
+                        context,
+                        plan,
+                        targets,
+                        verdicts,
+                        [b.memos[-1] for b in bundles],
+                        self.rubric,
+                    )
         except (StageError, RetrievalError, ValidationError, ValueError, OSError) as exc:
             status = "failed"
             # Our own error messages contain no credentials or raw HTTP body.
@@ -133,7 +171,7 @@ class CulturalVerifier:
             dimension_scores=scores,
             overall_score=overall,
             vericult_score=vericult_score(scores),
-            cultural_appropriateness=cultural_appropriateness(scores),
+            cultural_appropriateness=special_outcome or cultural_appropriateness(scores),
             abstention_reason=abstention_reason(scores),
             applicable_count=len(plan.dimensions),
             scored_count=sum(s.score != "abstain" for s in scores),
