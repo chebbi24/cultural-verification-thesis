@@ -1,5 +1,6 @@
 """Structural validation only. Scores and cultural conclusions belong to the LLM."""
 
+from fractions import Fraction
 import re
 import unicodedata
 
@@ -241,9 +242,12 @@ def validate_trace_links(trace):
     require(result.scored_count == len(scored), "Scored count mismatch")
     require(result.applicable_count == len(result.dimension_plan.dimensions), "Applicable count mismatch")
     require(result.abstained_dimensions == abstained, "Abstained dimension summary mismatch")
-    expected_overall = sum(s.score for s in scored) / (2 * len(scored)) if scored else None
+    expected_exact = Fraction(sum(s.score for s in scored), 2 * len(scored)) if scored else None
+    expected_overall = float(expected_exact) if expected_exact is not None else None
     require(result.overall_score == expected_overall, "Overall score mismatch")
-    expected_vericult = expected_overall * 100 if expected_overall is not None else None
+    expected_vericult = (
+        None if abstained or expected_exact is None else float(expected_exact * 100)
+    )
     require(result.vericult_score == expected_vericult, "Vericult score mismatch")
     if not scored:
         expected_label = "insufficient_evidence"
