@@ -29,6 +29,11 @@ class ContextFrame(Record):
     user_goal: ContextFact | None = None
 
 
+class CulturalApplicability(Record):
+    applicable: Annotated[bool, Field(strict=True)]
+    reason: Text
+
+
 class DimensionApplicability(Record):
     dimension_id: DimensionID
     role: Literal["primary", "secondary"]
