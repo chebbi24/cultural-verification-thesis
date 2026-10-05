@@ -10,7 +10,7 @@ from .schemas import (
     VerificationQuestion,
 )
 from .trace import stable_id
-from .validation import validate_targets
+from .validation import validate_target_selections, validate_targets
 
 
 _SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?])\s+(?=\S)")
@@ -63,6 +63,12 @@ def extract_targets(session, prompt, response, context, plan):
             "max_material_targets": session.config.max_material_targets,
         },
         TargetSelectionBatch,
+        lambda batch: validate_target_selections(
+            batch,
+            spans,
+            plan,
+            session.config.max_material_targets,
+        ),
     )
     span_text = {span["span_id"]: span["text"] for span in spans}
     allowed_span_ids = set(span_text)
