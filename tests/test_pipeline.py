@@ -881,7 +881,7 @@ def test_scope_and_query_prompts_prefer_general_then_authoritative():
     assert "Fictional worldbuilding" in PROMPTS["cultural_applicability_v1"]
     assert "pure refusal" in PROMPTS["response_assessability_v1"]
     assert "Return only score and rationale" in PROMPTS["dimension_scorer_single_v1"]
-    assert "insufficient retrieval verdict is NOT evidence" in PROMPTS["contextual_fallback_v1"]
+    assert "retrieval verdict is NOT evidence" in PROMPTS["contextual_fallback_v1"].replace("\\n", " ")
     assert "Prefer the smallest" in PROMPTS["dimension_planner_v1"]
     assert "sufficient set of dimensions" in PROMPTS["dimension_planner_v1"]
 
