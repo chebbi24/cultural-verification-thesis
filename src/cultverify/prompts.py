@@ -14,6 +14,16 @@ context in setting, and the requested outcome in user_goal. Use explicit_constra
 remaining explicit requirements that do not belong in one of those fields; do not use it as a
 catch-all or duplicate dedicated facts there. Do not infer religion, nationality, ethnicity,
 preferences or a location from names.""",
+    "cultural_applicability_v1": """Decide whether culturally situated reasoning is materially
+required to judge a response to this prompt. applicable=true only when norms, practices,
+pragmatics, values, institutions, religion, heritage, identity, intergroup relations, or another
+D01-D10 cultural consideration could change what counts as an appropriate response. Do not mark a
+prompt culturally applicable merely because it contains words such as culture, cultural,
+multicultural, tradition, nationality, country, community, or heritage when those words are
+incidental to the actual task. Fictional worldbuilding, generic game choices, or references to
+"cultural centers" are not culturally applicable unless real culturally situated reasoning is
+material to the requested answer. When the task can be answered without cultural reasoning,
+return applicable=false. Judge applicability only, not response quality.""",
     "dimension_planner_v1": """Select applicable dimensions using only the prompt, extracted context,
 and provided D01-D10 rubric. Exactly one primary if any apply; others secondary. Empty is
 allowed if no cultural dimension is applicable. A secondary dimension must be independently
@@ -29,14 +39,23 @@ Do not add identity merely because someone moved or has a place of origin; do no
 because the user asks for wording; and do not add everyday-life merely because food, shopping or
 scheduling is mentioned unless that rubric content is itself under evaluation. Do not guess a
 candidate response.""",
-    "target_extractor_v1": """Extract at most max_material_targets decision-relevant units (normally
-1-2), not every span. The response is supplied as deterministic response_spans. Select the exact
-span_id whose text contains the material unit; NEVER rewrite, reproduce, shorten, merge or invent
-response text. Each proposition must faithfully represent the selected span in context. Use only
-planned dimensions. Mark retrieval appropriate for external_fact, descriptive_cultural_norm and
-context_dependent_recommendation targets; these always require retrieval. Never retrieve for
-response_internal_quality or non_verifiable_value_statement. If other material units cannot fit
-the budget, set truncated=true. Do not confuse caution with failure.""",
+    "response_assessability_v1": """Decide only whether the response contains substantive material
+that can be culturally assessed for the culturally applicable prompt. assessable=false only for a
+pure refusal, non-answer, empty/meaningless reply, or deflection that supplies no substantive answer
+content. A very short answer can still be assessable if it directly answers the prompt. Do not mark
+an answer unassessable merely because it is incomplete, cautious, factually wrong, culturally wrong,
+or generally unhelpful; those belong to later verification. This gate is about whether there is
+actual answer content to assess, not whether that content is good.""",
+    "target_extractor_v1": """Select at most max_material_targets decision-relevant response spans
+(normally 1-2), not every span. The response is supplied as deterministic response_spans. For each
+target return ONLY its existing span_id, epistemic_type, and the planned dimension_ids it materially
+bears on. NEVER reproduce, rewrite, shorten, merge or invent response text. Use only planned
+dimensions. Classify epistemic_type as external_fact, descriptive_cultural_norm,
+context_dependent_recommendation, response_internal_quality, or non_verifiable_value_statement.
+Python deterministically derives the exact response quote, proposition text, materiality marker, and
+whether retrieval is required from these selections. If other material units cannot fit the budget,
+set truncated=true. Do not select a span merely because it contains culture-related vocabulary; it
+must be decision-relevant to the planned cultural assessment.""",
     "verification_question_v1": """Produce exactly two neutral questions: baseline/descriptive then
 scope/variation. The baseline should start at the broadest justified cultural or institutional
 scope needed to assess the proposition. Do not make a named city or region a hard evidence
@@ -130,12 +149,28 @@ memo summaries, statement paraphrases and comparator reasoning are intentionally
 Return only dimension_id, score and rationale for each requested dimension. Do not return target IDs or memo IDs,
 and do not reproduce response quotes; the pipeline attaches exact response quotes, dimension-linked
 target IDs and memo links deterministically. Dimensions already forced to abstain by deterministic
-evidence-sufficiency rules are omitted from this scoring request. For an empty
-response quotes may be empty. Internal qualities can be assessed directly; external claims
-without sufficient evidence require appropriate uncertainty. Distinguish common practice
-from obligations and personal preferences. Supported/contradicted is not automatically a
-cultural score: explain material cultural relevance. Do not treat disagreement with a common
-practice as inherently wrong. Assess omitted explicit requirements from the full prompt and
-response. Do not invent evidence or rewrite frozen memos. Never adjust scoring to choose a
+evidence-sufficiency rules are omitted from this scoring request. Internal qualities can be assessed
+directly; external claims without sufficient evidence require appropriate uncertainty. Distinguish
+common practice from obligations and personal preferences. Supported/contradicted is not
+automatically a cultural score: explain material cultural relevance. Do not treat disagreement with
+a common practice as inherently wrong. Assess omitted explicit requirements from the full prompt
+and response. Do not invent evidence or rewrite frozen memos. Never adjust scoring to choose a
 winner or compensate for another dimension.""",
+    "dimension_scorer_single_v1": """Score the ONE supplied cultural dimension using the same
+0/1/2/abstain semantics as dimension_scorer_v1. Return only score and rationale; Python owns the
+dimension identifier. Use 2 for aligned, 1 for mixed/incomplete/limited, 0 for materially
+misaligned, and abstain only when genuinely unscorable. Any directional relevant evidence requires
+0, 1 or 2 rather than abstain. Use only the supplied prompt, response, explicit context, target
+quotes, structured verdicts, frozen support quotes and rubric. Do not invent evidence.""",
+    "contextual_fallback_v1": """A context-dependent recommendation target remains externally
+unresolved after bounded retrieval. Assess ONLY the cultural handling that is directly observable
+from the prompt and response for the ONE supplied dimension. You may score 2 aligned, 1
+mixed/incomplete/limited, 0 materially misaligned, or abstain. Consider whether the response
+respects explicit user context, acknowledges relevant plurality or variation, avoids stereotyping
+or essentializing groups, calibrates claims and advice appropriately, and avoids imposing a single
+cultural norm when the prompt itself permits multiple legitimate choices. An insufficient
+retrieval verdict is NOT evidence that the external cultural claim is true or false. Never invent a
+custom, factual norm, law, demographic assumption or citation. If deciding cultural alignment would
+still require the unresolved external fact or norm, return abstain. Return only score and concise
+rationale; Python owns the dimension identifier.""",
 }
