@@ -1,7 +1,7 @@
 import csv
 from importlib.resources import files
 from .llm import StageError
-from .schemas import ContextFrame, DimensionPlan
+from .schemas import ContextFrame, CulturalApplicability, DimensionPlan
 from .validation import validate_context
 
 
@@ -23,6 +23,13 @@ def plan_prompt(session, prompt, rubric):
     except StageError:
         # Explicit conservative fallback: do not carry unsupported facts forward.
         context = ContextFrame()
+    applicability = session.call(
+        "cultural_applicability_v1",
+        {"prompt": prompt, "context": context.model_dump(mode="json")},
+        CulturalApplicability,
+    )
+    if not applicability.applicable:
+        return context, DimensionPlan(dimensions=(), reasoning=applicability.reason)
     plan = session.call(
         "dimension_planner_v1",
         {"prompt": prompt, "context": context.model_dump(mode="json"), "rubric": rubric},
