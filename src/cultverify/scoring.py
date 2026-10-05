@@ -211,7 +211,15 @@ def aggregate(scores):
 
 
 def vericult_score(scores):
-    """Human-readable 0-100 view of the unchanged normalized aggregate."""
+    """Human-readable 0-100 summary for fully scored assessments only.
+
+    Selective abstention is not a cultural penalty. When any applicable dimension
+    abstains, suppress the public numeric summary rather than presenting a
+    misleading perfect/partial score combination. Internal aggregation and
+    Best-of-4 ranking remain unchanged.
+    """
+    if any(s.score == "abstain" for s in scores):
+        return None
     score = exact_score(scores)
     return float(score * 100) if score is not None else None
 
