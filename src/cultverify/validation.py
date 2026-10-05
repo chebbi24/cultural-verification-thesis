@@ -255,13 +255,19 @@ def validate_trace_links(trace):
     require(result.vericult_score == expected_vericult, "Vericult score mismatch")
     if result.status == "completed" and not result.dimension_plan.dimensions:
         expected_label = "not_culturally_applicable"
-        require(not result.targets and not result.evidence and not result.verdicts, "Non-applicable result must stop before verification")
+        require(
+            not result.targets and not result.evidence and not result.verdicts,
+            "Non-applicable result must stop before verification",
+        )
     elif result.cultural_appropriateness == "not_assessable":
         expected_label = "not_assessable"
         require(result.status == "completed", "Not-assessable is not a technical failure")
         require(bool(result.dimension_plan.dimensions), "Not-assessable requires a culturally applicable prompt")
         require(not scored, "Not-assessable response must not receive cultural dimension scores")
-        require(not result.targets and not result.evidence and not result.verdicts, "Not-assessable result must stop before target extraction")
+        require(
+            not result.targets and not result.evidence and not result.verdicts,
+            "Not-assessable result must stop before target extraction",
+        )
     elif not scored:
         expected_label = "insufficient_evidence"
     elif any(s.score == 0 for s in scored):
