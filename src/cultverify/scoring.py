@@ -172,9 +172,7 @@ def score_dimensions(session, prompt, response, context, plan, targets, verdicts
             # Structural fallback only: the same semantic decision is requested one
             # dimension at a time, while Python attaches the known dimension ID.
             for dimension in active_dimensions:
-                relevant_targets = tuple(
-                    target for target in targets if dimension.dimension_id in target.dimension_ids
-                )
+                relevant_targets = tuple(target for target in targets if dimension.dimension_id in target.dimension_ids)
                 drafts_by_dimension[dimension.dimension_id] = _single_dimension_decision(
                     session,
                     "dimension_scorer_single_v1",
@@ -201,9 +199,7 @@ def score_dimensions(session, prompt, response, context, plan, targets, verdicts
     for dimension in plan.dimensions:
         if dimension.dimension_id not in forced_abstentions:
             continue
-        relevant_targets = tuple(
-            target for target in targets if dimension.dimension_id in target.dimension_ids
-        )
+        relevant_targets = tuple(target for target in targets if dimension.dimension_id in target.dimension_ids)
         recommendation_targets = tuple(
             target for target in relevant_targets if target.epistemic_type == EpistemicType.RECOMMENDATION
         )
