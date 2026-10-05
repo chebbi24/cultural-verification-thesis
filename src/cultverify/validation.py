@@ -43,7 +43,7 @@ def validate_target_selections(batch, spans, plan, limit):
     allowed_dimensions = {d.dimension_id for d in plan.dimensions}
     for target in batch.targets:
         raw = target.span_id.strip().upper()
-        match = re.fullmatch(r"S?0*(\\d+)", raw)
+        match = re.fullmatch(r"S?0*(\d+)", raw)
         canonical = f"S{int(match.group(1)):03d}" if match else raw
         require(canonical in allowed_spans, "Target span must reference supplied response text")
         require(
