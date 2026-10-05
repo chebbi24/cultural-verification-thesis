@@ -360,13 +360,16 @@ class CandidateResult(Record):
 
 class RankingResult(Record):
     candidates: tuple[CandidateResult, ...]
-    winner: int | Literal[
-        "no_clear_winner",
-        "no_acceptable_candidate",
-        "insufficient_evidence",
-        "not_culturally_applicable",
-        "not_assessable",
-    ]
+    winner: (
+        int
+        | Literal[
+            "no_clear_winner",
+            "no_acceptable_candidate",
+            "insufficient_evidence",
+            "not_culturally_applicable",
+            "not_assessable",
+        ]
+    )
     tied_indices: tuple[int, ...]
     coverage_comparable: bool
     tie_break_reason: str | None
