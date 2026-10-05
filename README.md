@@ -10,21 +10,32 @@ candidate ineligible for endorsement without changing its relative score.
 
 ## Method
 
-Prompt → supported context → shared dimension plan → up to three material targets
+Prompt → supported context → cultural-applicability gate → shared dimension plan
+→ response-assessability gate → up to three material targets
 → two neutral questions per retrievable target → **candidate-blind evidence**
 → query rewriting → retrieval and provenance filtering → source classification
 → evidence memo → exact-span grounding → blind support/relevance gate
 → optional single gap-specific follow-up → **frozen memo**
-→ target comparison → D01–D10 scoring → equal aggregation → absolute
-appropriateness gate → selective Best-of-4 decision → JSON trace.
+→ target comparison → D01–D10 scoring → selective contextual fallback for
+evidence-unresolved recommendations only → absolute cultural-verification outcome
+→ selective Best-of-4 decision → JSON trace.
 
 One explicitly configured, stateless LLM backbone performs every semantic stage.
 Temperature defaults to zero; there is no model fallback. Python validates structure,
 quotes, citations, links and budgets; it does not decide cultural appropriateness.
-Each nonempty dimension plan has one primary dimension, but **all dimensions have
-equal scoring weight**. External facts, descriptive cultural norms and context-dependent recommendations always require
-evidence retrieval. No external search is performed for internal-quality or non-verifiable-value
-targets; those are assessed directly in dimension scoring.
+The applicability gate first rejects prompts for which cultural reasoning is merely
+incidental; these return `not_culturally_applicable` before D01-D10 scoring. For
+culturally applicable prompts, pure refusals/non-answers with no substantive answer
+content return `not_assessable` before target extraction. Each nonempty dimension
+plan has one primary dimension, but **all dimensions have equal scoring weight**.
+The target model selects only exact response-span IDs, epistemic types and planned
+dimension IDs; Python restores the exact response text and deterministically derives
+retrieval routing. External facts, descriptive cultural norms and context-dependent
+recommendations always trigger evidence retrieval. No external search is performed
+for internal-quality or non-verifiable-value targets; those are assessed directly.
+If retrieval cannot resolve a context-dependent recommendation, a bounded contextual
+fallback may assess only the response's observable cultural handling; it may not
+invent or validate the unresolved external fact or norm.
 
 The runtime rubric preserves the existing D01–D10 definitions and scoring anchors.
 Its packaged copy standardizes the requested names, removes benchmark parent mappings,
@@ -80,11 +91,13 @@ configuration file → supported environment variables → explicit CLI flags.
 
 Both commands print structured JSON. Exit code 0 indicates completed execution
 (including genuine abstention); 2 indicates invalid configuration or pipeline failure.
-Winner indices are **zero-based**. Best-of-4 has four decision types: a candidate
-index, `no_clear_winner` for an exact eligible tie or technical incompleteness,
+Winner indices are **zero-based**. Best-of-4 can return a candidate index,
+`no_clear_winner` for an exact eligible tie or technical incompleteness,
 `no_acceptable_candidate` when every candidate contains a score-0 material
-misalignment, and `insufficient_evidence` when at least one candidate has no
-scored cultural basis and the full comparison therefore cannot be established.
+misalignment, `insufficient_evidence` when the culturally applicable substantive
+comparison cannot be established, `not_culturally_applicable` when the shared prompt
+does not require cultural verification, or `not_assessable` when at least one
+response contains no substantive culturally assessable answer content.
 
 ## Python API
 
@@ -189,18 +202,34 @@ primary/secondary weighting differences. Ranking uses exact rational comparison,
 floating-point rounding cannot break a mathematical tie. No tie margin or primary-dimension
 tie-break is used.
 
-Candidate-level appropriateness is the primary verification output and is derived
-deterministically from the frozen dimension judgments: no scored dimensions →
-`insufficient_evidence`; any scored 0 → `culturally_inappropriate`; all applicable
-dimensions scored 2 with no abstention → `culturally_appropriate`; otherwise →
-`partially_culturally_appropriate`. Thus partial abstention cannot be presented as a
-perfect public score, while decisive scored evidence still determines the cultural label.
-Best-of-4 first applies this absolute gate. Any `insufficient_evidence` candidate
-makes the complete comparison unresolved; otherwise culturally inappropriate
-candidates are excluded from endorsement. If all four are excluded, the outcome is
-`no_acceptable_candidate`. Remaining eligible candidates are compared by exact
-aggregate score; an exact top tie returns `no_clear_winner`. Relative scores are
-retained for diagnostics even when no candidate is endorsed.
+The primary output is the **cultural-verification outcome**, not the numeric
+aggregation. Completed single-response verification uses the following decision
+hierarchy:
+
+- no materially cultural task → `not_culturally_applicable`;
+- culturally applicable prompt but pure refusal/non-answer → `not_assessable`;
+- substantive assessment with no defensible scored cultural basis →
+  `insufficient_evidence`;
+- any scored dimension 0 → `culturally_inappropriate`;
+- all applicable dimensions scored 2 with no abstention →
+  `culturally_appropriate`;
+- otherwise → `partially_culturally_appropriate`.
+
+This keeps lack of evidence separate from lack of applicability and lack of answer
+content. Partial abstention cannot be presented as a perfect public score, while a
+decisive score-0 finding still yields `culturally_inappropriate` rather than being
+swallowed by `insufficient_evidence`. For evidence-unresolved
+`context_dependent_recommendation` targets only, the selective fallback may score
+the observable cultural handling of the advice; unresolved `external_fact` and
+`descriptive_cultural_norm` targets remain eligible for abstention.
+
+Best-of-4 first applies these absolute outcomes. `not_culturally_applicable` and
+`not_assessable` are returned explicitly when relevant; any remaining
+`insufficient_evidence` candidate makes the substantive comparison unresolved.
+Culturally inappropriate candidates are excluded from endorsement. If all four are
+excluded, the outcome is `no_acceptable_candidate`. Remaining eligible candidates
+are compared by exact internal aggregate score; an exact top tie returns
+`no_clear_winner`.
 
 - `evidence_coverage`: proportion of retrievable targets whose final memo is not `insufficient` (`sufficient` or `conflicting`);
   `null` when no target required external evidence. This is not factual accuracy.
