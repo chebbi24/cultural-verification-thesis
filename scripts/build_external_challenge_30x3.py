@@ -20,13 +20,54 @@ SEED = "20261002"
 OUT_VERSION = "external-challenge-30x3-v1"
 
 VALUE_TERMS = {
-    "family", "parent", "parents", "elder", "elders", "tradition", "traditional",
-    "authority", "community", "religion", "religious", "marriage", "divorce",
-    "gender", "women", "men", "education", "school", "work", "duty", "obligation",
-    "equality", "inequality", "government", "leader", "leadership", "inheritance",
-    "respect", "autonomy", "freedom", "social", "society", "moral", "values",
-    "culture", "cultural", "ritual", "custom", "norm", "sexual", "lgbt", "violence",
-    "children", "child", "youth", "care", "support", "responsibility",
+    "family",
+    "parent",
+    "parents",
+    "elder",
+    "elders",
+    "tradition",
+    "traditional",
+    "authority",
+    "community",
+    "religion",
+    "religious",
+    "marriage",
+    "divorce",
+    "gender",
+    "women",
+    "men",
+    "education",
+    "school",
+    "work",
+    "duty",
+    "obligation",
+    "equality",
+    "inequality",
+    "government",
+    "leader",
+    "leadership",
+    "inheritance",
+    "respect",
+    "autonomy",
+    "freedom",
+    "social",
+    "society",
+    "moral",
+    "values",
+    "culture",
+    "cultural",
+    "ritual",
+    "custom",
+    "norm",
+    "sexual",
+    "lgbt",
+    "violence",
+    "children",
+    "child",
+    "youth",
+    "care",
+    "support",
+    "responsibility",
 }
 
 PLURAL_COUNTRIES = ["Brazil", "India", "Japan", "Malaysia", "Zimbabwe"]
@@ -78,32 +119,39 @@ def select_plural() -> tuple[list[dict], list[dict]]:
             continue
         if word_count(pref) > 500 or word_count(dispref) > 500:
             continue
-        length_ratio = min(word_count(pref), word_count(dispref)) / max(
-            word_count(pref), word_count(dispref), 1
-        )
+        length_ratio = min(word_count(pref), word_count(dispref)) / max(word_count(pref), word_count(dispref), 1)
         if length_ratio < 0.30:
             continue
         political_terms = (
-            "next election", "vote for", "voting for", "political party",
-            "candidate who", "candidates who", "campaign", "prime minister",
-            "president should", "defense forces",
+            "next election",
+            "vote for",
+            "voting for",
+            "political party",
+            "candidate who",
+            "candidates who",
+            "campaign",
+            "prime minister",
+            "president should",
+            "defense forces",
         )
         if any(term in prompt.lower() for term in political_terms):
             continue
 
         meta = _as_dict(row.get("survey_metadata"))
-        pools[country].append({
-            "source": "PLURAL",
-            "source_id": row.get("id"),
-            "country": country,
-            "region": row.get("region_iso"),
-            "prompt": prompt,
-            "preferred": pref,
-            "dispreferred": dispref,
-            "question_group_id": meta.get("question_group_id"),
-            "question_group_codes": meta.get("question_group_codes"),
-            "challenge_score": challenge_score(prompt),
-        })
+        pools[country].append(
+            {
+                "source": "PLURAL",
+                "source_id": row.get("id"),
+                "country": country,
+                "region": row.get("region_iso"),
+                "prompt": prompt,
+                "preferred": pref,
+                "dispreferred": dispref,
+                "question_group_id": meta.get("question_group_id"),
+                "question_group_codes": meta.get("question_group_codes"),
+                "challenge_score": challenge_score(prompt),
+            }
+        )
 
     selected: list[dict] = []
     for country in PLURAL_COUNTRIES:
@@ -136,32 +184,32 @@ def select_plural() -> tuple[list[dict], list[dict]]:
     blind, labels = [], []
     for i, item in enumerate(selected, 1):
         flip = int(stable_hash(SEED, item["source_id"])[0], 16) % 2
-        a, b = ((item["preferred"], item["dispreferred"]) if flip == 0
-                else (item["dispreferred"], item["preferred"]))
-        evaluation_prompt = (
-            f"Benchmark context: The user is from {item['country']}.\n\n"
-            f"{item['prompt']}"
+        a, b = (item["preferred"], item["dispreferred"]) if flip == 0 else (item["dispreferred"], item["preferred"])
+        evaluation_prompt = f"Benchmark context: The user is from {item['country']}.\n\n{item['prompt']}"
+        blind.append(
+            {
+                "challenge_id": f"PLURAL{i:02d}",
+                "source": "PLURAL",
+                "source_id": item["source_id"],
+                "country": item["country"],
+                "region": item["region"],
+                "prompt": evaluation_prompt,
+                "original_prompt": item["prompt"],
+                "candidate_A": a,
+                "candidate_B": b,
+                "selection_score": item["challenge_score"],
+                "question_group_id": item["question_group_id"],
+                "question_group_codes": json.dumps(item["question_group_codes"], ensure_ascii=False),
+            }
         )
-        blind.append({
-            "challenge_id": f"PLURAL{i:02d}",
-            "source": "PLURAL",
-            "source_id": item["source_id"],
-            "country": item["country"],
-            "region": item["region"],
-            "prompt": evaluation_prompt,
-            "original_prompt": item["prompt"],
-            "candidate_A": a,
-            "candidate_B": b,
-            "selection_score": item["challenge_score"],
-            "question_group_id": item["question_group_id"],
-            "question_group_codes": json.dumps(item["question_group_codes"], ensure_ascii=False),
-        })
-        labels.append({
-            "challenge_id": f"PLURAL{i:02d}",
-            "source_id": item["source_id"],
-            "preferred_candidate": "A" if flip == 0 else "B",
-            "country": item["country"],
-        })
+        labels.append(
+            {
+                "challenge_id": f"PLURAL{i:02d}",
+                "source_id": item["source_id"],
+                "preferred_candidate": "A" if flip == 0 else "B",
+                "country": item["country"],
+            }
+        )
     return blind, labels
 
 
@@ -224,13 +272,34 @@ def select_thaicli(tmp: Path) -> tuple[list[dict], list[dict], dict]:
 
     items = []
     thai_norm_markers = (
-        "ควร", "เหมาะสม", "ยอมรับ", "ความคิดเห็น", "คิดว่า", "หรือไม่",
-        "ได้หรือไม่", "สมควร", "ถูกต้อง", "เคารพ", "มารยาท", "ค่านิยม",
-        "สังคมไทย", "ประเพณี", "ศาสนา", "ล้อเลียน", "เลือกปฏิบัติ",
+        "ควร",
+        "เหมาะสม",
+        "ยอมรับ",
+        "ความคิดเห็น",
+        "คิดว่า",
+        "หรือไม่",
+        "ได้หรือไม่",
+        "สมควร",
+        "ถูกต้อง",
+        "เคารพ",
+        "มารยาท",
+        "ค่านิยม",
+        "สังคมไทย",
+        "ประเพณี",
+        "ศาสนา",
+        "ล้อเลียน",
+        "เลือกปฏิบัติ",
     )
     thai_trivia_markers = (
-        "บอกชื่อ", "รายชื่อ", "สรุปประวัติ", "ประวัติความเป็นมา",
-        "เหตุการณ์ใด", "กี่คน", "วันที่", "ชื่อพระ", "อธิบายด้วยหลักฐานทางประวัติศาสตร์",
+        "บอกชื่อ",
+        "รายชื่อ",
+        "สรุปประวัติ",
+        "ประวัติความเป็นมา",
+        "เหตุการณ์ใด",
+        "กี่คน",
+        "วันที่",
+        "ชื่อพระ",
+        "อธิบายด้วยหลักฐานทางประวัติศาสตร์",
     )
     excluded_themes = {"Politics", "Royal Family"}
 
@@ -244,14 +313,8 @@ def select_thaicli(tmp: Path) -> tuple[list[dict], list[dict], dict]:
         if acol:
             raw_answers = row[acol]
             entries = list(raw_answers) if raw_answers is not None else []
-            chosen_entries = [
-                x for x in entries
-                if isinstance(x, dict) and int(x.get("score", -1)) == 1
-            ]
-            rejected_entries = [
-                x for x in entries
-                if isinstance(x, dict) and int(x.get("score", -1)) == 0
-            ]
+            chosen_entries = [x for x in entries if isinstance(x, dict) and int(x.get("score", -1)) == 1]
+            rejected_entries = [x for x in entries if isinstance(x, dict) and int(x.get("score", -1)) == 0]
             chosen = normalize_cell(chosen_entries[0].get("content")) if chosen_entries else ""
             rejected = normalize_cell(rejected_entries[0].get("content")) if rejected_entries else ""
         else:
@@ -273,15 +336,17 @@ def select_thaicli(tmp: Path) -> tuple[list[dict], list[dict], dict]:
             score += 2
         if score < 4:
             continue
-        items.append({
-            "source_id": sid,
-            "format": fmt,
-            "theme": theme or "unknown",
-            "prompt": q,
-            "chosen": chosen,
-            "rejected": rejected,
-            "challenge_score": score,
-        })
+        items.append(
+            {
+                "source_id": sid,
+                "format": fmt,
+                "theme": theme or "unknown",
+                "prompt": q,
+                "chosen": chosen,
+                "rejected": rejected,
+                "challenge_score": score,
+            }
+        )
 
     items = sorted(items, key=lambda x: (-x["challenge_score"], stable_hash(SEED, x["source_id"])))
     selected = []
@@ -312,30 +377,37 @@ def select_thaicli(tmp: Path) -> tuple[list[dict], list[dict], dict]:
     blind, labels = [], []
     for i, item in enumerate(selected, 1):
         flip = int(stable_hash(SEED, "thai", item["source_id"])[0], 16) % 2
-        a, b = ((item["chosen"], item["rejected"]) if flip == 0
-                else (item["rejected"], item["chosen"]))
-        blind.append({
-            "challenge_id": f"THAI{i:02d}",
-            "source": "ThaiCLI",
-            "source_id": item["source_id"],
-            "country": "Thailand",
-            "format": item["format"],
-            "theme": item["theme"],
-            "prompt": item["prompt"],
-            "candidate_A": a,
-            "candidate_B": b,
-            "selection_score": item["challenge_score"],
-        })
-        labels.append({
-            "challenge_id": f"THAI{i:02d}",
-            "source_id": item["source_id"],
-            "chosen_candidate": "A" if flip == 0 else "B",
-            "format": item["format"],
-            "theme": item["theme"],
-        })
+        a, b = (item["chosen"], item["rejected"]) if flip == 0 else (item["rejected"], item["chosen"])
+        blind.append(
+            {
+                "challenge_id": f"THAI{i:02d}",
+                "source": "ThaiCLI",
+                "source_id": item["source_id"],
+                "country": "Thailand",
+                "format": item["format"],
+                "theme": item["theme"],
+                "prompt": item["prompt"],
+                "candidate_A": a,
+                "candidate_B": b,
+                "selection_score": item["challenge_score"],
+            }
+        )
+        labels.append(
+            {
+                "challenge_id": f"THAI{i:02d}",
+                "source_id": item["source_id"],
+                "chosen_candidate": "A" if flip == 0 else "B",
+                "format": item["format"],
+                "theme": item["theme"],
+            }
+        )
     schema_info["inferred"] = {
-        "question_col": qcol, "chosen_col": ccol, "rejected_col": rcol, "answers_col": acol,
-        "theme_col": theme_col, "id_col": id_col,
+        "question_col": qcol,
+        "chosen_col": ccol,
+        "rejected_col": rcol,
+        "answers_col": acol,
+        "theme_col": theme_col,
+        "id_col": id_col,
         "selected_theme_counts": dict(theme_counts),
         "selected_format_counts": dict(format_counts),
     }
@@ -343,23 +415,85 @@ def select_thaicli(tmp: Path) -> tuple[list[dict], list[dict], dict]:
 
 
 PACT_TARGET_COUNTRIES = [
-    "egypt", "japan", "mexico", "india", "nigeria", "ethiopia",
-    "china", "south korea", "indonesia", "greece", "spain", "united kingdom",
-    "united states", "brazil", "south africa", "saudi arabia", "iran", "turkey",
-    "vietnam", "thailand", "germany", "france", "italy", "russia", "pakistan",
-    "canada", "kenya", "morocco", "argentina", "philippines",
+    "egypt",
+    "japan",
+    "mexico",
+    "india",
+    "nigeria",
+    "ethiopia",
+    "china",
+    "south korea",
+    "indonesia",
+    "greece",
+    "spain",
+    "united kingdom",
+    "united states",
+    "brazil",
+    "south africa",
+    "saudi arabia",
+    "iran",
+    "turkey",
+    "vietnam",
+    "thailand",
+    "germany",
+    "france",
+    "italy",
+    "russia",
+    "pakistan",
+    "canada",
+    "kenya",
+    "morocco",
+    "argentina",
+    "philippines",
 ]
 
 
 def pact_score(scenario: str, culture_action: str, preference_action: str) -> int:
     s = (scenario or "").lower()
     social_terms = {
-        "home", "family", "parent", "parents", "elder", "elders", "guest", "host",
-        "meal", "wedding", "marriage", "funeral", "religious", "religion", "temple",
-        "church", "mosque", "workplace", "coworker", "colleague", "school", "teacher",
-        "friend", "friends", "gift", "greeting", "visit", "visiting", "clothing",
-        "dress", "food", "eat", "drink", "ceremony", "festival", "holiday", "respect",
-        "privacy", "honesty", "feedback", "public", "conversation", "social",
+        "home",
+        "family",
+        "parent",
+        "parents",
+        "elder",
+        "elders",
+        "guest",
+        "host",
+        "meal",
+        "wedding",
+        "marriage",
+        "funeral",
+        "religious",
+        "religion",
+        "temple",
+        "church",
+        "mosque",
+        "workplace",
+        "coworker",
+        "colleague",
+        "school",
+        "teacher",
+        "friend",
+        "friends",
+        "gift",
+        "greeting",
+        "visit",
+        "visiting",
+        "clothing",
+        "dress",
+        "food",
+        "eat",
+        "drink",
+        "ceremony",
+        "festival",
+        "holiday",
+        "respect",
+        "privacy",
+        "honesty",
+        "feedback",
+        "public",
+        "conversation",
+        "social",
     }
     score = 2 * sum(1 for t in social_terms if t in s)
     # Pairs of similar verbosity are harder to distinguish using superficial cues.
@@ -406,16 +540,18 @@ def select_pact() -> tuple[list[dict], list[dict], dict]:
         if culture_action == pref_action:
             continue
 
-        pools[country_key].append({
-            "source_id": str(row.get("pact_item_id")),
-            "dataset": str(row.get("dataset")),
-            "base_country": base_country,
-            "scenario": scenario,
-            "culture_following": culture_action,
-            "preference_allowing": pref_action,
-            "source_gold_label": row.get("source_gold_label"),
-            "challenge_score": pact_score(scenario, culture_action, pref_action),
-        })
+        pools[country_key].append(
+            {
+                "source_id": str(row.get("pact_item_id")),
+                "dataset": str(row.get("dataset")),
+                "base_country": base_country,
+                "scenario": scenario,
+                "culture_following": culture_action,
+                "preference_allowing": pref_action,
+                "source_gold_label": row.get("source_gold_label"),
+                "challenge_score": pact_score(scenario, culture_action, pref_action),
+            }
+        )
 
     chosen_countries = [c for c in PACT_TARGET_COUNTRIES if pools.get(c)]
     if len(chosen_countries) < 30:
@@ -428,8 +564,7 @@ def select_pact() -> tuple[list[dict], list[dict], dict]:
     chosen_countries = chosen_countries[:30]
     if len(chosen_countries) != 30:
         raise RuntimeError(
-            f"PACT: expected 30 target countries, got {len(chosen_countries)}; "
-            f"available target pools={sorted(pools)}"
+            f"PACT: expected 30 target countries, got {len(chosen_countries)}; available target pools={sorted(pools)}"
         )
 
     selected = []
@@ -455,34 +590,35 @@ def select_pact() -> tuple[list[dict], list[dict], dict]:
             a, b = item["preference_allowing"], item["culture_following"]
             culture_letter, pref_letter = "B", "A"
 
-        prompt = (
-            f"{item['scenario']}\\n\\n"
-            "What would be an appropriate course of action for the actor in this situation?"
+        prompt = f"{item['scenario']}\\n\\nWhat would be an appropriate course of action for the actor in this situation?"
+        blind.append(
+            {
+                "challenge_id": f"PACT{i:02d}",
+                "source": "PACT",
+                "source_id": item["source_id"],
+                "country": item["base_country"],
+                "source_dataset": item["dataset"],
+                "prompt": prompt,
+                "original_scenario": item["scenario"],
+                "candidate_A": a,
+                "candidate_B": b,
+                "selection_score": item["challenge_score"],
+            }
         )
-        blind.append({
-            "challenge_id": f"PACT{i:02d}",
-            "source": "PACT",
-            "source_id": item["source_id"],
-            "country": item["base_country"],
-            "source_dataset": item["dataset"],
-            "prompt": prompt,
-            "original_scenario": item["scenario"],
-            "candidate_A": a,
-            "candidate_B": b,
-            "selection_score": item["challenge_score"],
-        })
-        labels.append({
-            "challenge_id": f"PACT{i:02d}",
-            "source_id": item["source_id"],
-            "country": item["base_country"],
-            "culture_following_candidate": culture_letter,
-            "preference_allowing_candidate": pref_letter,
-            "source_gold_label": item["source_gold_label"],
-            "note": (
-                "PACT deliberately treats both directions as plausible; this is role metadata, "
-                "not a universal correctness label."
-            ),
-        })
+        labels.append(
+            {
+                "challenge_id": f"PACT{i:02d}",
+                "source_id": item["source_id"],
+                "country": item["base_country"],
+                "culture_following_candidate": culture_letter,
+                "preference_allowing_candidate": pref_letter,
+                "source_gold_label": item["source_gold_label"],
+                "note": (
+                    "PACT deliberately treats both directions as plausible; this is role metadata, "
+                    "not a universal correctness label."
+                ),
+            }
+        )
 
     info = {
         "countries": [x["base_country"] for x in selected],
@@ -495,6 +631,7 @@ def select_pact() -> tuple[list[dict], list[dict], dict]:
         ),
     }
     return blind, labels, info
+
 
 def write_txt(path: Path, plural: list[dict], thai: list[dict], pact: list[dict]) -> None:
     lines = [
@@ -578,9 +715,7 @@ def main() -> None:
         "thaicli_schema": thai_info,
         "pact_info": pact_info,
     }
-    (out / "selection_manifest.json").write_text(
-        json.dumps(info, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    (out / "selection_manifest.json").write_text(json.dumps(info, ensure_ascii=False, indent=2), encoding="utf-8")
     write_txt(out / "external_challenge_90_blind.txt", plural, thai, pact)
 
     for p in tmp.glob("*"):
