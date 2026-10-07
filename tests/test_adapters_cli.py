@@ -191,6 +191,7 @@ def test_cli_verify_and_rank(setup, tmp_path, capsys, monkeypatch):
 
 
 def test_cli_requires_model(monkeypatch, capsys):
+    monkeypatch.setattr("cultverify.cli.load_dotenv", lambda: False)
     monkeypatch.delenv("CULTVERIFY_MODEL", raising=False)
     assert main(["verify", "--prompt", PROMPT, "--response", RESPONSE]) == 2
     assert "verifier_model_id" in capsys.readouterr().err
@@ -208,21 +209,30 @@ def test_model_prompt_does_not_execute_document_instructions(setup):
     os.getenv("CULTVERIFY_RUN_LIVE") != "1", reason="Requires explicit live-test opt-in, model and Tavily credentials"
 )
 def test_real_live_then_replay(tmp_path):
+    provider = os.getenv("CULTVERIFY_PROVIDER", "ollama")
     config = Config(
-        verifier_model_provider=os.getenv("CULTVERIFY_PROVIDER", "ollama"),
+        verifier_model_provider=provider,
         verifier_model_id=os.environ["CULTVERIFY_MODEL"],
+        l3s_api_url=os.getenv("L3S_API_URL", "https://YOUR_L3S_HOST/v1/chat/completions"),
         cache_directory=tmp_path / "evidence",
         trace_directory=tmp_path / "traces",
     )
-    llm = HTTPModel(config, os.getenv("OPENROUTER_API_KEY"))
+    api_key = (
+        os.getenv("OPENROUTER_API_KEY")
+        if provider == "openrouter"
+        else os.getenv("L3S_API_KEY")
+        if provider == "l3s"
+        else None
+    )
+    llm = HTTPModel(config, api_key)
     retriever = TavilyRetriever(os.environ["TAVILY_API_KEY"])
-    prompt = "Explain the formal opening hours and visiting arrangements for the British Museum in London."
-    response = "Check the British Museum’s official visitor information for current opening hours and arrangements."
+    prompt = "A colleague told me they are fasting during Ramadan. I am scheduling a team lunch and do not know what they prefer. What is a considerate way to handle it?"
+    response = "Ask the colleague privately what arrangement works for them instead of assuming one response to fasting. If needed, offer a flexible option that does not pressure them to eat or explain their practice."
     live = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(prompt, response)
     assert live.status == "completed" and live.evidence
     replay_config = config.model_copy(update={"mode": "REPLAY"})
     replay = CulturalVerifier(
-        llm=HTTPModel(replay_config, os.getenv("OPENROUTER_API_KEY")), retriever=None, config=replay_config
+        llm=HTTPModel(replay_config, api_key), retriever=None, config=replay_config
     ).verify(prompt, response)
     assert replay.status == "completed"
     assert [s for b in live.evidence for s in b.snapshots] == [s for b in replay.evidence for s in b.snapshots]
