@@ -1,6 +1,6 @@
 {
-  "verifier_model_provider": "ollama",
-  "verifier_model_id": "qwen3:4b",
+  "verifier_model_provider": "l3s",
+  "verifier_model_id": "vllm/qwen3.6:35b-a3b-fp8",
   "temperature": 0,
   "retry_count": 1,
   "transport_retry_count": 1,
@@ -23,5 +23,6 @@
     "*human_label*",
     "*silver_label*",
     "*provisional_annotations*"
-  ]
+  ],
+  "l3s_api_url": "https://inference.kbs.uni-hannover.de/v1/chat/completions"
 }
