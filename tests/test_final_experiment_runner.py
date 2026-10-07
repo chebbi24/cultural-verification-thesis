@@ -158,7 +158,7 @@ def test_runtime_manifest_must_match_config_and_all_dataset_hashes(tmp_path):
     verify_runtime_manifest(runtime, manifest, config)
 
     config.write_text('{"model": "changed"}\n', encoding="utf-8")
-    with pytest.raises(RuntimeError, match="Verifier config hash"):
+    with pytest.raises(RuntimeError, match="different verifier config"):
         verify_runtime_manifest(runtime, manifest, config)
 
 
