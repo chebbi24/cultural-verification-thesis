@@ -29,12 +29,12 @@
       "format": "vericult_prompt_response_txt",
       "output": "data/generated/gpt_oss_120b/external120_generated_bestof4.csv"
     },
-    "redteam90": {
-      "input": "data/final/vericult_redteam_90_final_selection.csv",
-      "expected_prompts": 90,
+    "redteam120": {
+      "input": "data/final/vericult_redteam_120_prompts.csv",
+      "expected_prompts": 120,
       "prompt_field": "prompt",
       "id_field": "final_id",
-      "output": "data/generated/gpt_oss_120b/redteam90_generated_bestof4.csv",
+      "output": "data/generated/gpt_oss_120b/redteam120_generated_bestof4.csv",
       "require_all_prompts_materialized": true
     }
   },
