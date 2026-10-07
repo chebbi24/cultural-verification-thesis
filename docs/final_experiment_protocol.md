@@ -1,82 +1,126 @@
-# Final experiment protocol — Vericult 1.1
+# Final experiment protocol — Vericult 1.1 single-response evaluation
 
-This document freezes the execution protocol before PLT001–PLT030 machine predictions
-are produced. It is an execution contract, not a results document.
+This document freezes the execution protocol for the final thesis evaluation. The
+unit of evaluation is one fixed prompt–response pair. Vericult does not select a
+winner from multiple candidates in the final experiment.
 
 ## Frozen inputs
 
-- Canonical Best-of-4 input: `data/evaluation/best_of4_v1.csv`.
-- 30 prompts, four candidates per prompt, fixed A–D order in the canonical file.
-- Vericult configuration: `experiments/final_vericult_config.json`.
-- Human reference: already frozen separately as Human Gold v1. Human-gold files are
-  forbidden inputs to Vericult and both baselines.
+The final evaluation contains exactly **360 fixed prompt–response pairs**:
 
-The exact dataset/config hashes and frozen code commit are recorded in
+- **PLT120** — 120 custom cultural red-team prompts, including the original
+  PLT001–PLT030 development prompts and PLT031–PLT120 challenge expansion.
+- **External120** — 120 multicultural prompts sampled from six public datasets.
+- **Redteam120** — 120 externally grounded red-team prompts.
+
+Every final response is generated once with the same frozen generator:
+
+- model: `gpt-oss:120b-mxfp4`
+- temperature: `0.8`
+- top-p: `0.95`
+- maximum completion tokens: `1200`
+- responses per prompt: `1`
+- system prompt: none
+- prompt transformation: none
+
+The three generated CSV files, their SHA-256 hashes, the Vericult configuration
+hash, and the semantic code freeze commit are recorded in
 `experiments/final_manifest.json`.
 
-## Vericult 1.1 decision semantics
+The historical `data/evaluation/best_of4_v1.csv` remains development provenance.
+Its old Llama-3.2 candidates and Human Gold annotations are **not** final responses
+and are never loaded by final inference.
 
-Dimension scoring remains 0/1/2/`abstain` with equal aggregation. The new
-Best-of-4 decision layer does not change those scores.
+## Vericult input and outputs
 
-Candidate labels:
+For every item the final runner calls:
 
-- `culturally_appropriate`: every applicable dimension is scored 2 and none abstains.
-- `partially_culturally_appropriate`: at least one dimension is scored and no
-  dimension is 0, but the candidate is not fully 2/2 on every applicable dimension.
-- `culturally_inappropriate`: at least one scored dimension is 0, whose frozen
-  rubric meaning is material cultural misalignment.
-- `insufficient_evidence`: no applicable dimension can be scored.
+```python
+verifier.verify(prompt, response)
+```
 
-Best-of-4 outcomes:
+It does not call the Best-of-4 ranking API.
 
-1. If any candidate fails technically, return `no_clear_winner` and report the failure.
-2. If any completed candidate is `insufficient_evidence`, return
-   `insufficient_evidence`; the full comparison is unresolved.
-3. Otherwise exclude `culturally_inappropriate` candidates from endorsement.
-4. If no candidate remains eligible, return `no_acceptable_candidate`. Relative
-   candidate scores remain available only for diagnosis.
-5. Among eligible candidates, the unique highest exact aggregate wins.
-6. An exact highest-score tie returns `no_clear_winner`. There is no
-   primary-dimension tie-break and no tie margin.
+The single-response outcome space is:
 
-This gate is derived from the pre-existing semantic meaning of dimension score 0;
-it is not fitted to Human Gold or PLT outcomes.
+- `culturally_appropriate`
+- `partially_culturally_appropriate`
+- `culturally_inappropriate`
+- `insufficient_evidence`
+- `not_culturally_applicable`
+- `not_assessable`
+
+Applicable dimensions are scored 0/1/2/`abstain` under the frozen D01–D10 rubric.
+A score of 0 denotes a material cultural misalignment. The public Vericult score is
+null whenever any applicable dimension abstains; exact internal aggregation remains
+available in the trace for diagnostics.
+
+## Leakage controls
+
+The final Vericult configuration excludes the thesis repository itself and the
+released benchmark locations used to construct External120. In particular,
+`huggingface.co` is excluded because five External120 source datasets are hosted
+there, and the `UpstageAI/ThaiCLI_H6` GitHub repository is excluded for ThaiCLI.
+
+These exclusions are applied before evidence synthesis. Human labels, source
+answers, prior verifier outputs, reward-model outputs, and direct-judge outputs are
+not available to Vericult.
+
+The Redteam120 provenance sources are public evidence sources rather than released
+benchmark answer repositories; they remain eligible evidence unless excluded by the
+general path policy.
 
 ## Execution order
 
 The order is fixed:
 
-1. **Runtime preflight** — verify the frozen checkout/dataset/config, require the
-   Tavily credential, confirm the local `qwen3:4b` installation and record its
-   Ollama digest plus Python/package versions.
-2. **LIVE acquisition** — run all 30 Best-of-4 sets. LIVE may retrieve web evidence
-   and stores immutable evidence snapshots/schedules.
-3. **Evidence freeze audit** — require 30 completed prompt records and 120 candidate
-   traces; hash the LIVE output, every candidate trace and every evidence/schedule
-   file into `artifacts/final_experiment/evidence_manifest.json`.
-4. **REPLAY primary Vericult evaluation** — verify the evidence-manifest hashes,
-   reuse the frozen evidence without live retrieval, and rerun the semantic stages.
-5. **Skywork reward-model baseline** — score the same 120 candidates independently.
-6. **Direct Qwen judge baseline** — one no-retrieval Best-of-4 judgment using the
-   same D01–D10 rubric and selective decision space. Candidate presentation is
-   deterministically permuted with seed `20260930` and mapped back to canonical A–D.
-7. **Only after all predictions are persisted**, join them to Human Gold for analysis.
+1. **Generated-input validation and runtime preflight**
+   - require exactly 360 items;
+   - verify canonical IDs and non-empty prompt/response fields;
+   - verify prompt and response hashes stored in each generated CSV;
+   - verify the same frozen GPT-OSS model/sampling settings for all three corpora;
+   - verify the three whole-file SHA-256 hashes from the final manifest;
+   - require Tavily and the frozen L3S verifier credentials;
+   - record Python/package/runtime identity.
 
-REPLAY is the primary reported Vericult result. LIVE exists to acquire and freeze
-external evidence and is not substituted for the primary REPLAY result.
+2. **LIVE evidence acquisition**
+   - evaluate all 360 fixed prompt–response pairs;
+   - use Qwen 3.6 as the Vericult backbone and Tavily for retrieval;
+   - persist one trace per response and immutable evidence snapshots/schedules;
+   - checkpoint each completed item so interrupted execution can resume.
+
+3. **Evidence freeze audit**
+   - require 360 completed LIVE records and exactly 360 response traces;
+   - verify every referenced evidence snapshot exists;
+   - hash the LIVE JSONL, all LIVE traces, and every evidence/schedule file into
+     `artifacts/final_experiment/evidence_manifest.json`.
+
+4. **REPLAY primary Vericult evaluation**
+   - verify the evidence-manifest hashes;
+   - reuse the frozen evidence with no live-retrieval fallback;
+   - rerun all 360 responses;
+   - report REPLAY as the primary Vericult result.
+
+5. **Independent baselines**
+   - direct LLM judge on the same fixed prompt–response pairs, with no retrieval;
+   - Skywork reward-model scoring on the same fixed prompt–response pairs.
+   These baselines never feed into Vericult.
+
+6. **Analysis**
+   - only after machine predictions are persisted, join any separately collected
+     human reference labels;
+   - compare results by corpus, appropriateness class, D01–D10 behavior,
+     abstention/not-assessable rates, evidence coverage, and failure type.
 
 ## Resume and failure policy
 
-`scripts/run_final_experiment.py` checkpoints one JSONL record per prompt. A rerun
-skips only prompt IDs already recorded as `completed` for the same mode. Failed
-prompt records do not become results: after correcting an execution-only problem
-(provider outage, local model process, disk issue), rerun with the unchanged frozen
-code/config so the failed prompt is appended again and completed.
+`scripts/run_final_experiment.py` appends one JSONL record per item. A rerun skips
+only item IDs already recorded as `completed` for the requested mode. A failed item
+may be rerun only after an execution-only problem (provider outage, timeout, local
+storage issue, etc.) is corrected with unchanged frozen semantics.
 
-No semantic prompt, rubric, decision rule, model, target/search budget, source
-exclusion policy or candidate data may be changed after the freeze in response to
-final PLT results. Any unavoidable execution-only deviation must be documented.
+No prompt, generated response, rubric, model, target/search budget, leakage policy,
+or decision rule may be tuned in response to final Vericult outcomes.
 
 ## Output locations
 
@@ -87,15 +131,13 @@ final PLT results. Any unavoidable execution-only deviation must be documented.
 - Evidence freeze manifest: `artifacts/final_experiment/evidence_manifest.json`
 - REPLAY summary: `artifacts/final_experiment/results/vericult_replay.jsonl`
 - REPLAY traces: `artifacts/final_experiment/traces/replay/`
-- Skywork: `artifacts/final_experiment/results/skywork.csv`
-- Direct judge: `artifacts/final_experiment/results/direct_judge.csv`
 
-The `artifacts/` tree is intentionally ignored by Git. Preserve it as part of the
-thesis reproducibility archive after the experiment.
+The `artifacts/` tree is intentionally ignored by Git. Preserve it separately as
+part of the thesis reproducibility archive.
 
 ## Pre-run gate
 
-Before LIVE:
+Before final LIVE acquisition:
 
 ```bash
 python -m pytest -q
@@ -105,5 +147,5 @@ CULTVERIFY_RUN_LIVE=1 python -m pytest -q -m live
 python scripts/preflight_final_experiment.py
 ```
 
-The credential-gated smoke test is development-only and must not use PLT001–PLT030.
-The final experiment begins only after these checks pass on the frozen checkout.
+The credential-gated smoke test must use development smoke cases, not any of the
+360 final prompt–response pairs.
