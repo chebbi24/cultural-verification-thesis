@@ -7,7 +7,7 @@ from .schemas import (
     TargetVerdict,
     TargetVerdictDraft,
 )
-from .validation import validate_score_decisions, validate_scores, validate_verdict
+from .validation import validate_contextual_fallback, validate_score_decisions, validate_scores, validate_verdict
 
 
 def _memo_evidence_view(memo):
@@ -130,23 +130,76 @@ def score_dimensions(session, prompt, response, context, plan, targets, verdicts
     else:
         drafts_by_dimension = {}
 
+    fallback_ids = set(forced_abstentions)
+    fallback_ids.update(
+        dimension_id
+        for dimension_id, draft in drafts_by_dimension.items()
+        if draft.score == "abstain"
+    )
+    fallback_by_dimension = {}
+    if fallback_ids:
+        fallback_plan = {
+            "dimensions": [
+                {"dimension_id": dimension.dimension_id}
+                for dimension in plan.dimensions
+                if dimension.dimension_id in fallback_ids
+            ]
+        }
+        fallback = session.call(
+            "contextual_fallback_v1",
+            {
+                "prompt": prompt,
+                "response": response,
+                "context": context.model_dump(mode="json"),
+                "dimension_plan": fallback_plan,
+                "rubric": rubric,
+                "evidence_status": [
+                    {
+                        "target_id": target.target_id,
+                        "dimension_ids": target.dimension_ids,
+                        "retrieval_appropriate": target.retrieval_appropriate,
+                        "verdict": next(
+                            (
+                                verdict.verdict
+                                for verdict in verdicts
+                                if verdict.target_id == target.target_id
+                            ),
+                            None,
+                        ),
+                    }
+                    for target in targets
+                    if fallback_ids.intersection(target.dimension_ids)
+                ],
+            },
+            ScoreDecisionBatch,
+            lambda b: validate_contextual_fallback(b, fallback_ids),
+        )
+        fallback_by_dimension = {score.dimension_id: score for score in fallback.scores}
+
     verdicts_by_target = {verdict.target_id: verdict for verdict in verdicts}
     memo_by_target = {verdict.target_id: verdict.memo_id for verdict in verdicts}
     scores = []
     for dimension in plan.dimensions:
         dimension_id = dimension.dimension_id
         relevant_targets = [target for target in targets if dimension_id in target.dimension_ids]
-        if dimension_id in forced_abstentions:
-            linked_target_ids = tuple(target.target_id for target in relevant_targets if target.retrieval_appropriate)
+        if dimension_id in fallback_by_dimension:
+            draft = fallback_by_dimension[dimension_id]
+            linked_target_ids = tuple(
+                target.target_id
+                for target in relevant_targets
+                if target.target_id in verdicts_by_target
+                and verdicts_by_target[target.target_id].verdict in {"supported", "mixed", "contradicted"}
+            )
+            response_quotes = (response,) if response else ()
             score = DimensionScore(
-                dimension_id=dimension_id,
-                score="abstain",
-                rationale="All relevant retrievable targets are insufficient; dimension abstained deterministically.",
-                response_quotes=(),
+                **draft.model_dump(mode="json"),
+                response_quotes=response_quotes,
                 target_ids=linked_target_ids,
                 memo_ids=tuple(
                     dict.fromkeys(
-                        memo_by_target[target_id] for target_id in linked_target_ids if target_id in memo_by_target
+                        memo_by_target[target_id]
+                        for target_id in linked_target_ids
+                        if target_id in memo_by_target
                     )
                 ),
             )

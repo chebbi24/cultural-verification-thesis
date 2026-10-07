@@ -106,6 +106,17 @@ class FixtureLLM:
                 "verdict": "supported",
                 "reasoning": "The source establishes that arrangements are published",
             }
+        elif stage == "contextual_fallback_v1":
+            out = {
+                "scores": [
+                    {
+                        "dimension_id": d["dimension_id"],
+                        "score": 1,
+                        "rationale": "Contextual fallback under unresolved external evidence.",
+                    }
+                    for d in payload["dimension_plan"]["dimensions"]
+                ]
+            }
         elif stage == "dimension_scorer_v1":
             verdicts = {v["target_id"]: v for v in payload["verdicts"]}
             scores = []
