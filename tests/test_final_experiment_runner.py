@@ -1,3 +1,5 @@
+import csv
+import hashlib
 import json
 from pathlib import Path
 
@@ -5,80 +7,171 @@ import pytest
 
 from scripts.preflight_final_experiment import find_ollama_model, tags_url
 from scripts.run_final_experiment import (
-    EXPECTED_PROMPT_IDS,
+    expected_item_ids,
     load_completed,
-    read_rows,
+    read_generated_rows,
     sha256_file,
     verify_evidence_manifest,
     verify_runtime_manifest,
-    winner_label,
 )
 
-ROOT = Path(__file__).resolve().parents[1]
+
+def _sha(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def test_final_runner_accepts_only_canonical_plts():
-    rows = read_rows(ROOT / "data" / "evaluation" / "best_of4_v1.csv")
-    assert tuple(row["prompt_id"] for row in rows) == EXPECTED_PROMPT_IDS
-    assert len(rows) == 30
+def _generator():
+    return {
+        "model_id": "gpt-oss:120b-mxfp4",
+        "sampling": {"temperature": 0.8, "top_p": 0.95, "max_tokens": 1200},
+    }
 
 
-def test_final_runner_winner_labels_cover_selective_outcomes():
-    assert [winner_label(i) for i in range(4)] == list("ABCD")
-    for outcome in (
-        "no_clear_winner",
-        "no_acceptable_candidate",
-        "insufficient_evidence",
-        "not_culturally_applicable",
-        "not_assessable",
-    ):
-        assert winner_label(outcome) == outcome
-    with pytest.raises(ValueError):
-        winner_label(4)
+def _write_generated(path: Path, corpus: str, prefix: str, count: int = 2) -> None:
+    fields = [
+        "corpus",
+        "item_id",
+        "source_dataset",
+        "source_record_id",
+        "language",
+        "culture",
+        "prompt",
+        "prompt_sha256",
+        "generator_model",
+        "temperature",
+        "top_p",
+        "max_tokens",
+        "response",
+        "response_sha256",
+        "generated_at",
+        "prompt_tokens",
+        "completion_tokens",
+        "total_tokens",
+    ]
+    rows = []
+    for i in range(1, count + 1):
+        prompt = f"prompt {i}"
+        response = f"response {i}"
+        rows.append(
+            {
+                "corpus": corpus,
+                "item_id": f"{prefix}{i:03d}",
+                "source_dataset": "fixture",
+                "source_record_id": str(i),
+                "language": "English",
+                "culture": "fixture",
+                "prompt": prompt,
+                "prompt_sha256": _sha(prompt),
+                "generator_model": "gpt-oss:120b-mxfp4",
+                "temperature": "0.8",
+                "top_p": "0.95",
+                "max_tokens": "1200",
+                "response": response,
+                "response_sha256": _sha(response),
+                "generated_at": "2026-10-08T00:00:00+00:00",
+                "prompt_tokens": "10",
+                "completion_tokens": "20",
+                "total_tokens": "30",
+            }
+        )
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def test_generated_single_response_reader_validates_canonical_ids_and_hashes(tmp_path):
+    path = tmp_path / "generated.csv"
+    _write_generated(path, "plt120", "PLT")
+    spec = {
+        "items": 2,
+        "id_prefix": "PLT",
+        "generator_corpus": "plt120",
+    }
+    rows = read_generated_rows(path, "plt120", spec, _generator())
+    assert [row["item_id"] for row in rows] == ["PLT001", "PLT002"]
+    assert rows[0]["response"] == "response 1"
+    assert expected_item_ids(spec) == ("PLT001", "PLT002")
+
+
+def test_generated_single_response_reader_rejects_mutated_response(tmp_path):
+    path = tmp_path / "generated.csv"
+    _write_generated(path, "plt120", "PLT")
+    text = path.read_text(encoding="utf-8").replace("response 2", "mutated", 1)
+    path.write_text(text, encoding="utf-8")
+    spec = {"items": 2, "id_prefix": "PLT", "generator_corpus": "plt120"}
+    with pytest.raises(ValueError, match="response SHA-256 mismatch"):
+        read_generated_rows(path, "plt120", spec, _generator())
 
 
 def test_final_runner_resume_only_skips_completed_matching_mode(tmp_path):
     output = tmp_path / "results.jsonl"
     records = [
-        {"mode": "LIVE", "status": "completed", "prompt_id": "PLT001"},
-        {"mode": "LIVE", "status": "failed", "prompt_id": "PLT002"},
-        {"mode": "REPLAY", "status": "completed", "prompt_id": "PLT003"},
+        {"mode": "LIVE", "status": "completed", "item_id": "PLT001"},
+        {"mode": "LIVE", "status": "failed", "item_id": "PLT002"},
+        {"mode": "REPLAY", "status": "completed", "item_id": "EXT003"},
     ]
     output.write_text("\n".join(json.dumps(record) for record in records) + "\n", encoding="utf-8")
     assert load_completed(output, "LIVE") == {"PLT001"}
-    assert load_completed(output, "REPLAY") == {"PLT003"}
+    assert load_completed(output, "REPLAY") == {"EXT003"}
 
 
-def test_runtime_manifest_must_match_config_and_model_digest(tmp_path):
+def test_runtime_manifest_must_match_config_and_all_dataset_hashes(tmp_path):
     config = tmp_path / "config.json"
     config.write_text('{"model": "fixture"}\n', encoding="utf-8")
+
+    corpora = {}
+    runtime_hashes = {}
+    for name, prefix in (("plt120", "PLT"), ("external120", "EXT"), ("redteam120", "RT")):
+        path = tmp_path / f"{name}.csv"
+        _write_generated(path, name, prefix)
+        digest = sha256_file(path)
+        corpora[name] = {
+            "path": str(path),
+            "items": 2,
+            "id_prefix": prefix,
+            "sha256": digest,
+        }
+        runtime_hashes[name] = digest
+
+    manifest = {"dataset": {"corpora": corpora}}
     runtime = tmp_path / "runtime.json"
     runtime.write_text(
         json.dumps(
             {
                 "config_sha256": sha256_file(config),
-                "verifier_model": {"digest": "sha256:fixture"},
+                "dataset_sha256": runtime_hashes,
+                "verifier_model": {"digest": "remote:fixture"},
             }
         ),
         encoding="utf-8",
     )
-    verify_runtime_manifest(runtime, config)
+    verify_runtime_manifest(runtime, manifest, config)
+
     config.write_text('{"model": "changed"}\n', encoding="utf-8")
     with pytest.raises(RuntimeError, match="different verifier config"):
-        verify_runtime_manifest(runtime, config)
+        verify_runtime_manifest(runtime, manifest, config)
 
 
-def test_replay_evidence_manifest_detects_mutation(tmp_path):
+def test_replay_evidence_manifest_detects_evidence_or_trace_mutation(tmp_path):
     evidence = tmp_path / "snapshot.json"
     evidence.write_text('{"frozen": true}\n', encoding="utf-8")
+    trace = tmp_path / "trace.json"
+    trace.write_text('{"frozen": true}\n', encoding="utf-8")
     manifest = tmp_path / "manifest.json"
     manifest.write_text(
-        json.dumps({"evidence_files": [{"path": str(evidence), "sha256": sha256_file(evidence)}]}),
+        json.dumps(
+            {
+                "evidence_files": [{"path": str(evidence), "sha256": sha256_file(evidence)}],
+                "trace_files": [{"path": str(trace), "sha256": sha256_file(trace)}],
+            }
+        ),
         encoding="utf-8",
     )
     verify_evidence_manifest(manifest)
-    evidence.write_text('{"frozen": false}\n', encoding="utf-8")
-    with pytest.raises(RuntimeError, match="Frozen evidence changed"):
+
+    trace.write_text('{"frozen": false}\n', encoding="utf-8")
+    with pytest.raises(RuntimeError, match="Frozen LIVE trace changed"):
         verify_evidence_manifest(manifest)
 
 
