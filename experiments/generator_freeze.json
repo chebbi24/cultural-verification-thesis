@@ -15,12 +15,14 @@
     "prompt_transformation": "none"
   },
   "corpora": {
-    "plt30": {
-      "input": "data/evaluation/best_of4_v1.csv",
-      "expected_prompts": 30,
+    "plt120": {
+      "input": "data/evaluation/plt120_prompts.csv",
+      "expected_prompts": 120,
       "prompt_field": "prompt",
       "id_field": "prompt_id",
-      "output": "data/generated/gpt_oss_120b/plt30_generated.csv"
+      "output": "data/generated/gpt_oss_120b/plt120_generated.csv",
+      "legacy_generated_input": "data/generated/gpt_oss_120b/plt30_generated.csv",
+      "legacy_completed_prefix": 30
     },
     "external120": {
       "input": "data/final/external_120/multicultural_120_prompts.csv",
