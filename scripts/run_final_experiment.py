@@ -13,6 +13,7 @@ import json
 import os
 import subprocess
 import sys
+from dotenv import load_dotenv
 from pathlib import Path
 
 from cultverify import Config, CulturalVerifier
@@ -159,7 +160,11 @@ def summarize(prompt_id: str, mode: str, ranking) -> dict:
 
 
 def build_verifier(config: Config) -> CulturalVerifier:
-    api_key = os.getenv("OPENROUTER_API_KEY") if config.verifier_model_provider == "openrouter" else None
+    api_key = (
+        os.getenv("OPENROUTER_API_KEY")
+        if config.verifier_model_provider == "openrouter"
+        else os.getenv("L3S_API_KEY") if config.verifier_model_provider == "l3s" else None
+    )
     llm = HTTPModel(config, api_key)
     if config.mode == "LIVE":
         tavily_key = os.getenv("TAVILY_API_KEY")
@@ -172,6 +177,7 @@ def build_verifier(config: Config) -> CulturalVerifier:
 
 
 def main(argv: list[str] | None = None) -> int:
+    load_dotenv()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mode", required=True, choices=("LIVE", "REPLAY"))
     parser.add_argument("--input", type=Path, default=Path("data/evaluation/best_of4_v1.csv"))
@@ -200,6 +206,13 @@ def main(argv: list[str] | None = None) -> int:
         verify_evidence_manifest(args.evidence_manifest)
 
     values = json.loads(args.config.read_text(encoding="utf-8"))
+    env_overrides = {
+        "verifier_model_provider": os.getenv("CULTVERIFY_PROVIDER"),
+        "verifier_model_id": os.getenv("CULTVERIFY_MODEL"),
+        "ollama_url": os.getenv("OLLAMA_URL"),
+        "l3s_api_url": os.getenv("L3S_API_URL"),
+    }
+    values.update({key: value for key, value in env_overrides.items() if value})
     values["mode"] = args.mode
     trace_root = Path(values["trace_directory"]).parent
     values["trace_directory"] = str(trace_root / args.mode.lower())
