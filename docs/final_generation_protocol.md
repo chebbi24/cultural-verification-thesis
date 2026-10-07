@@ -17,13 +17,13 @@ GPT-OSS 120B is the globally strongest available model.
 
 ## Inputs
 
-The runner supports the three frozen prompt pools:
+The runner supports the three frozen prompt pools (270 prompts total):
 
 1. `plt30`: 30 prompts from `data/evaluation/best_of4_v1.csv`
 2. `external120`: 120 prompts parsed from
    `data/final/external_120/prompt_response_pairs_120.txt`
-3. `redteam90`: 90 prompts from
-   `data/final/vericult_redteam_90_final_selection.csv`
+3. `redteam120`: 120 prompts from
+   `data/final/vericult_redteam_120_prompts.csv`
 
 Existing responses in those datasets are preserved and never overwritten.
 Human-gold files are not read by the generator.
@@ -54,7 +54,7 @@ Generate one full corpus:
 ```bash
 python scripts/generate_final_candidates.py --corpus plt30
 python scripts/generate_final_candidates.py --corpus external120
-python scripts/generate_final_candidates.py --corpus redteam90
+python scripts/generate_final_candidates.py --corpus redteam120
 ```
 
 Generate every ready corpus in one run:
@@ -70,7 +70,7 @@ without regenerating completed candidates.
 
 - `data/generated/gpt_oss_120b/plt30_generated_bestof4.csv`
 - `data/generated/gpt_oss_120b/external120_generated_bestof4.csv`
-- `data/generated/gpt_oss_120b/redteam90_generated_bestof4.csv`
+- `data/generated/gpt_oss_120b/redteam120_generated_bestof4.csv`
 
 Each output records the original prompt, response hashes, generation timestamps,
 and API token usage per candidate. After generation, these CSVs must be hashed
