@@ -1,0 +1,145 @@
+{
+  "schema_version": "vericult-external120-archive-v1",
+  "experiment_role": "pre-freeze cross-dataset positive-control / sanity validation; not the final frozen Vericult 1.1 external benchmark",
+  "corpus": {
+    "total_records": 120,
+    "composition": {
+      "CARE": 20,
+      "Community Alignment": 20,
+      "PLURAL": 20,
+      "PACT": 20,
+      "ThaiCLI": 20,
+      "PRISM": 20
+    },
+    "historical_source_commit": "0ab76f650b1bde1fbaa539a7515c980e15eb6459",
+    "archived_source_path": "data/evaluation/external_120_pre_freeze/prompt_response_pairs_120.txt"
+  },
+  "execution": {
+    "final_merged_results_source": "Project Library file created 2026-10-05: Eingefügter Text(20261005-195423).txt",
+    "exact_runtime_code_commit": "not captured in exported result rows",
+    "architecture_note": "Results predate the final Vericult 1.1 semantics and include cultural_applicability_v1 / not_culturally_applicable. Do not pool these labels with final Vericult 1.1 results.",
+    "final_completed": 116,
+    "final_failed": 4,
+    "completion_rate": 0.9666666666666667,
+    "unresolved": [
+      {
+        "record_id": "028",
+        "dataset": "Community Alignment",
+        "reason": "cultural_applicability_v1 transport ReadTimeout"
+      },
+      {
+        "record_id": "034",
+        "dataset": "Community Alignment",
+        "reason": "cultural_applicability_v1 transport ReadTimeout"
+      },
+      {
+        "record_id": "076",
+        "dataset": "PACT",
+        "reason": "target_extractor_v1 invalid output after bounded retry; later diagnosis: malformed S0:01 span ID"
+      },
+      {
+        "record_id": "084",
+        "dataset": "ThaiCLI",
+        "reason": "cultural_applicability_v1 transport ReadTimeout"
+      }
+    ]
+  },
+  "overall_completed": {
+    "labels": {
+      "insufficient_evidence": 6,
+      "partially_culturally_appropriate": 80,
+      "culturally_appropriate": 22,
+      "not_culturally_applicable": 8
+    },
+    "numeric_score_count": 102,
+    "mean_numeric_score": 87.23583877995642,
+    "mean_evidence_coverage": 0.7149532710280373
+  },
+  "datasets": {
+    "CARE": {
+      "total": 20,
+      "completed": 20,
+      "failed": 0,
+      "completed_labels": {
+        "insufficient_evidence": 1,
+        "partially_culturally_appropriate": 17,
+        "not_culturally_applicable": 2
+      },
+      "numeric_score_count": 17,
+      "mean_numeric_score": 83.82352941176471,
+      "mean_evidence_coverage": 0.8235294117647058
+    },
+    "Community Alignment": {
+      "total": 20,
+      "completed": 18,
+      "failed": 2,
+      "completed_labels": {
+        "partially_culturally_appropriate": 9,
+        "culturally_appropriate": 8,
+        "not_culturally_applicable": 1
+      },
+      "numeric_score_count": 17,
+      "mean_numeric_score": 91.47058823529412,
+      "mean_evidence_coverage": 0.7549019607843137
+    },
+    "PLURAL": {
+      "total": 20,
+      "completed": 20,
+      "failed": 0,
+      "completed_labels": {
+        "partially_culturally_appropriate": 12,
+        "culturally_appropriate": 5,
+        "insufficient_evidence": 3
+      },
+      "numeric_score_count": 17,
+      "mean_numeric_score": 89.70588235294117,
+      "mean_evidence_coverage": 0.5666666666666667
+    },
+    "PACT": {
+      "total": 20,
+      "completed": 19,
+      "failed": 1,
+      "completed_labels": {
+        "partially_culturally_appropriate": 17,
+        "culturally_appropriate": 1,
+        "not_culturally_applicable": 1
+      },
+      "numeric_score_count": 18,
+      "mean_numeric_score": 87.5,
+      "mean_evidence_coverage": 0.7777777777777778
+    },
+    "ThaiCLI": {
+      "total": 20,
+      "completed": 19,
+      "failed": 1,
+      "completed_labels": {
+        "partially_culturally_appropriate": 13,
+        "culturally_appropriate": 3,
+        "insufficient_evidence": 1,
+        "not_culturally_applicable": 2
+      },
+      "numeric_score_count": 16,
+      "mean_numeric_score": 84.375,
+      "mean_evidence_coverage": 0.6666666666666666
+    },
+    "PRISM": {
+      "total": 20,
+      "completed": 20,
+      "failed": 0,
+      "completed_labels": {
+        "partially_culturally_appropriate": 12,
+        "culturally_appropriate": 5,
+        "insufficient_evidence": 1,
+        "not_culturally_applicable": 2
+      },
+      "numeric_score_count": 17,
+      "mean_numeric_score": 86.3562091503268,
+      "mean_evidence_coverage": 0.7222222222222222
+    }
+  },
+  "interpretation": {
+    "source_signal": "The corpus deliberately selected source reference, human-preferred, survey-preferred, culture-following, human-reviewed-chosen, or highest-rated responses.",
+    "positive_control_result": "Among 102 completed cases with a substantive cultural score, 22 were culturally_appropriate and 80 partially_culturally_appropriate; none were culturally_inappropriate.",
+    "caution": "This supports coarse source-consistency/feasibility, not accuracy, because source signals are heterogeneous and the corpus is positively selected."
+  }
+}
