@@ -13,9 +13,12 @@
   "cache_directory": "artifacts/final_experiment/evidence",
   "trace_directory": "artifacts/final_experiment/traces/live",
   "search_depth": "advanced",
-  "excluded_domains": [],
+  "excluded_domains": [
+    "huggingface.co"
+  ],
   "excluded_repos": [
-    "chebbi24/cultural-verification-thesis"
+    "chebbi24/cultural-verification-thesis",
+    "UpstageAI/ThaiCLI_H6"
   ],
   "excluded_paths": [
     "*/annotations/*",
