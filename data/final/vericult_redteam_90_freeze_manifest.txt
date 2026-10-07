@@ -1,0 +1,30 @@
+VERICULT RED-TEAM 90 — FREEZE MANIFEST
+============================================================
+STATUS: FROZEN SELECTION MANIFEST — PASS
+Records: 90
+Final CSV SHA-256: 309f9a8bb18e77262bf4a892f0ef112779e65f91f689bee86fa852b5f906d1ef
+
+Freeze criterion:
+- direct_pair: exact local prompt + response + provenance + unique source key/hash + source-native negative signal.
+- source_addressed_pair / source_addressed_interactive_dialogue: immutable source locator/version + unique source key/hash + source-native negative signal; local text may be materialized later.
+
+Audit results:
+- 90/90 unique source record keys
+- 90/90 unique record hashes
+- 0 duplicate normalized materialized prompts
+- 90/90 provenance locators present
+- 90/90 source-native negative/error signals present
+- 46/90 locally materialized complete prompt-response pairs
+- 44/90 source-addressed records with immutable source version/blob/LFS hash
+
+Source composition:
+- ScopeBench: 31
+- SocialCC: 31
+- JuICE: 13
+- CARE: 5
+- CDial-Bias: 4
+- CultureLLM: 3
+- DIWALI: 3
+
+Operational limitation:
+The selection is provenance-frozen, but 44 source-addressed records (31 SocialCC + 13 JuICE) still require source-text materialization before they can be passed directly into Vericult as prompt-response inputs.
