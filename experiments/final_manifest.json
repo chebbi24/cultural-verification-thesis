@@ -1,51 +1,80 @@
 {
-  "schema_version": "thesis-final-v3",
-  "experiment_id": "thesis-final-v3",
+  "schema_version": "thesis-final-v4-single-response",
+  "experiment_id": "thesis-final-v4-360x1",
   "pipeline_version": "cultverify-1.1.0",
-  "freeze_code_commit": "975749196e264211d878be8765b06b7c9cd320d4",
+  "freeze_code_commit": "4740e4dc1fa555d4eb97e3b03d24ee6fa97d575c",
   "validation": {
-    "github_actions_run_id": 37608290712,
-    "required_status": "success",
+    "status": "pending_post_migration_validation",
     "local_live_smoke_required": true,
     "ci_workflow": "Verifier tests",
-    "post_freeze_metadata_allowlist": [
-      "experiments/final_manifest.json",
-      "docs/final_validation.md"
-    ]
+    "note": "The semantic freeze commit records the 360x1 runner, preflight, evidence audit, leakage config, tests, and protocol. Final LIVE must not start until tests, lint, formatting, smoke, and preflight pass."
   },
   "dataset": {
-    "path": "data/evaluation/best_of4_v1.csv",
-    "git_blob_sha": "9eaf58122dc93600853808cf14cfd7b1a713f5b5",
-    "sha256": "bb1f096dfbc74913a80219c983edeadb2b26f9b64ce912313d8cad29501a7587",
-    "prompts": 30,
-    "candidates_per_prompt": 4
+    "design": "single_prompt_response",
+    "items": 360,
+    "responses_per_prompt": 1,
+    "corpus_order": [
+      "plt120",
+      "external120",
+      "redteam120"
+    ],
+    "corpora": {
+      "plt120": {
+        "path": "data/generated/gpt_oss_120b/plt120_generated.csv",
+        "items": 120,
+        "id_prefix": "PLT",
+        "generator_corpus": "plt120",
+        "sha256": "a5f6dac8eb3f67ff2eb30835d3bc5b57ee145eedb3a8771852e3c421b63a62a2",
+        "role": "custom cultural red-team challenge; PLT001-PLT030 retained as development-origin cases and PLT031-PLT120 as the expanded challenge set"
+      },
+      "external120": {
+        "path": "data/generated/gpt_oss_120b/external120_generated.csv",
+        "items": 120,
+        "id_prefix": "EXT",
+        "generator_corpus": "external120",
+        "sha256": "2be2c31c7fbf01c7b4b9625087f4257e2b98325d83c98988c934b80b00f1fd2a",
+        "role": "external multicultural/mostly appropriate evaluation set regenerated under the common generator"
+      },
+      "redteam120": {
+        "path": "data/generated/gpt_oss_120b/redteam120_generated.csv",
+        "items": 120,
+        "id_prefix": "RT",
+        "generator_corpus": "redteam120",
+        "sha256": "ebb200a7448e4cf860a229bc4b5ea747d59998a5a1b3622047982ea7935e9b50",
+        "role": "externally grounded cultural red-team evaluation set regenerated under the common generator"
+      }
+    }
+  },
+  "generator": {
+    "provider": "l3s",
+    "model_id": "gpt-oss:120b-mxfp4",
+    "sampling": {
+      "temperature": 0.8,
+      "top_p": 0.95,
+      "max_tokens": 1200,
+      "system_prompt": null,
+      "prompt_transformation": "none"
+    },
+    "policy": {
+      "one_response_per_prompt": true,
+      "same_model_for_all_three_corpora": true,
+      "generated_responses_frozen_before_vericult": true
+    }
   },
   "human_reference": {
-    "manifest": "data/evaluation/human_gold_manifest.json",
-    "role": "comparison only after all machine predictions are persisted"
+    "legacy_manifest": "data/evaluation/human_gold_manifest.json",
+    "legacy_role": "development provenance only; labels refer to the old Llama-3.2 Best-of-4 candidates and are not ground truth for the final GPT-OSS responses",
+    "final_human_reference": "separate annotation required if human-ground-truth accuracy is reported for the final 360 responses"
   },
   "vericult": {
     "backbone": "vllm/qwen3.6:35b-a3b-fp8",
     "provider": "l3s",
     "temperature": 0,
     "config": "experiments/final_vericult_config.json",
-    "config_sha256": "a6115043ec7d4f0fd83f07e75f03910603d2d8c130a2694fcdd1f0c1fb55866d",
+    "config_sha256": "decc0fb6f9ec271b96371449201c2389481fc262779fc37aa3be516c1e2a89fb",
     "runtime_digest_manifest": "artifacts/final_experiment/runtime_manifest.json",
+    "evaluation_api": "verify(prompt, response)",
     "decision_space": [
-      "A",
-      "B",
-      "C",
-      "D",
-      "no_clear_winner",
-      "no_acceptable_candidate",
-      "insufficient_evidence",
-      "not_culturally_applicable",
-      "not_assessable"
-    ],
-    "acceptability_gate": "any scored dimension 0 -> culturally_inappropriate -> ineligible for endorsement",
-    "tie_policy": "exact top-score tie among eligible candidates -> no_clear_winner",
-    "insufficient_policy": "for a culturally applicable and assessable response, no defensible scored cultural basis -> insufficient_evidence; in Best-of-4 any remaining insufficient_evidence candidate makes the substantive comparison unresolved",
-    "single_response_outcomes": [
       "culturally_appropriate",
       "partially_culturally_appropriate",
       "culturally_inappropriate",
@@ -56,71 +85,43 @@
     "applicability_policy": "prompt-level cultural applicability gate runs before D01-D10 planning; materially non-cultural tasks -> not_culturally_applicable",
     "assessability_policy": "for culturally applicable prompts, pure refusals/non-answers with no substantive culturally assessable content -> not_assessable before target extraction",
     "contextual_fallback_policy": "only evidence-unresolved context_dependent_recommendation targets may use contextual fallback to judge observable cultural handling; unresolved external facts/descriptive norms may abstain",
-    "public_score_policy": "vericult_score is null whenever any applicable dimension abstains; exact internal aggregation remains available for deterministic ranking",
+    "public_score_policy": "vericult_score is null whenever any applicable dimension abstains; exact internal aggregation remains available in traces",
     "api_endpoint": "https://inference.kbs.uni-hannover.de/v1/chat/completions",
     "credentials": "L3S_API_KEY from local .env; never committed"
+  },
+  "leakage_controls": {
+    "thesis_repository": "chebbi24/cultural-verification-thesis",
+    "external_benchmark_domains": [
+      "huggingface.co"
+    ],
+    "external_benchmark_repositories": [
+      "UpstageAI/ThaiCLI_H6"
+    ],
+    "rationale": "External120 benchmark hosting locations are excluded from Tavily evidence before synthesis so Vericult cannot retrieve released benchmark material or reference answers.",
+    "redteam_provenance_policy": "Redteam120 citations are public evidence sources used to ground newly synthesized prompts, not benchmark answer repositories; they remain eligible evidence subject to the general exclusion path policy."
   },
   "reward_model_baseline": {
     "model": "Skywork/Skywork-Reward-V2-Qwen3-4B",
     "revision": "fd958fe",
     "script": "src/baseline_rm.py",
-    "transformers": "4.52.3",
-    "tie_policy": "exact top-score tie -> no_clear_winner"
+    "status": "pending_single_response_adapter",
+    "role": "independent comparison only; scores never enter Vericult"
   },
   "direct_llm_judge_baseline": {
-    "model": "qwen3:4b",
-    "script": "src/baseline_direct_judge.py",
-    "temperature": 0,
-    "retrieval": false,
-    "permutation_seed": 20260930,
-    "decision_space": [
-      "A",
-      "B",
-      "C",
-      "D",
-      "no_clear_winner",
-      "no_acceptable_candidate",
-      "insufficient_evidence",
-      "not_culturally_applicable",
-      "not_assessable"
-    ]
+    "status": "pending_single_response_adapter",
+    "role": "independent no-retrieval cultural judge on the same fixed prompt-response pairs"
   },
   "execution_order": [
     "runtime_preflight",
-    "vericult_live",
-    "evidence_freeze_audit",
-    "vericult_replay_primary",
-    "skywork_reward_model",
-    "direct_llm_judge",
-    "human_gold_join_and_analysis"
+    "vericult_live_360",
+    "evidence_freeze_audit_360",
+    "vericult_replay_primary_360",
+    "single_response_baselines",
+    "post_prediction_analysis"
   ],
-  "external_validation_protocol": "experiments/external_validation_protocol.json",
-  "freeze_policy": "No semantic tuning after this L3S Qwen3.6 backbone freeze. Human Gold is excluded from all inference. Only documented execution fixes that do not use final labels are permitted.",
-  "restoration_provenance": {
-    "source_branch": "fix/cultural120-result-semantics",
-    "validated_source_commit": "c1944bb1df47a8668689c316e62563bdc700fbf3",
-    "validated_source_ci_run": 37336670390,
-    "reason": "October 5 cultural-120 reliability/result-semantics repair was validated and used for the final failed-item rerun but was never merged into main; its verifier semantics were restored onto the cleaned thesis tree before the definitive freeze."
-  },
-  "frozen_inputs": {
-    "plt_best_of4": {
-      "path": "data/evaluation/best_of4_v1.csv",
-      "items": 30,
-      "sha256": "bb1f096dfbc74913a80219c983edeadb2b26f9b64ce912313d8cad29501a7587"
-    },
-    "external_120": {
-      "path": "data/final/external_120/prompt_response_pairs_120.txt",
-      "results": "data/final/external_120/results_final_merged.jsonl",
-      "summary": "data/final/external_120/summary.json",
-      "items": 120,
-      "provenance_branch": "archive/external-120-pre-freeze"
-    },
-    "redteam_90": {
-      "path": "data/final/vericult_redteam_90_final_selection.csv",
-      "manifest": "data/final/vericult_redteam_90_freeze_manifest.txt",
-      "items": 90,
-      "selection_sha256": "309f9a8bb18e77262bf4a892f0ef112779e65f91f689bee86fa852b5f906d1ef"
-    },
-    "planned_total_items": 240
+  "freeze_policy": "No semantic tuning after the recorded 360x1 code/config freeze. Generated responses, model choice, rubric, budgets, leakage rules, and decision semantics may not be changed in response to final Vericult outcomes. Human labels are excluded from inference.",
+  "provenance": {
+    "old_best_of4_dataset": "data/evaluation/best_of4_v1.csv",
+    "note": "The 30x4 Best-of-4 setup is retained only as development provenance and is not the final evaluation protocol."
   }
 }
