@@ -6,7 +6,7 @@ source/native responses. The original prompt is sent verbatim.
 
 Examples:
     python scripts/generate_final_candidates.py --dry-run --corpus all
-    python scripts/generate_final_candidates.py --corpus redteam120 --limit 3
+    python scripts/generate_final_candidates.py --corpus plt120
     python scripts/generate_final_candidates.py --corpus all
 """
 
@@ -39,7 +39,7 @@ def load_config(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def load_plt30(spec: dict[str, Any]) -> list[dict[str, str]]:
+def load_plt120(spec: dict[str, Any]) -> list[dict[str, str]]:
     path = ROOT / spec["input"]
     with path.open(encoding="utf-8-sig", newline="") as handle:
         rows = list(csv.DictReader(handle))
@@ -48,8 +48,8 @@ def load_plt30(spec: dict[str, Any]) -> list[dict[str, str]]:
             "item_id": row[spec["id_field"]].strip(),
             "prompt": row[spec["prompt_field"]].strip(),
             "source_dataset": "PLT",
-            "source_record_id": row.get("legacy_prompt_id", "").strip(),
-            "language": "",
+            "source_record_id": (row.get("legacy_prompt_id") or row.get("prompt_id") or "").strip(),
+            "language": "English",
             "culture": "",
         }
         for row in rows
@@ -96,8 +96,8 @@ def load_redteam120(spec: dict[str, Any]) -> list[dict[str, str]]:
 
 
 def load_corpus(name: str, spec: dict[str, Any]) -> list[dict[str, str]]:
-    if name == "plt30":
-        rows = load_plt30(spec)
+    if name == "plt120":
+        rows = load_plt120(spec)
     elif name == "external120":
         rows = load_external120(spec)
     elif name == "redteam120":
@@ -205,6 +205,42 @@ def merge_existing(
     return fresh
 
 
+def merge_legacy_plt30_if_available(
+    rows: list[dict[str, str]],
+    spec: dict[str, Any],
+    output_path: Path,
+) -> list[dict[str, str]]:
+    """Reuse the already-generated PLT001-PLT030 responses.
+
+    The final PLT120 run must not silently regenerate the completed pilot items.
+    It can reuse them either from an existing plt120 output or from the legacy
+    plt30_generated.csv produced by the earlier run.
+    """
+    existing = read_existing(output_path)
+    legacy_path_value = spec.get("legacy_generated_input")
+    if legacy_path_value:
+        legacy_path = ROOT / legacy_path_value
+        if legacy_path.exists():
+            for item_id, row in read_existing(legacy_path).items():
+                existing.setdefault(item_id, row)
+
+    rows = merge_existing(rows, existing)
+
+    required_prefix = int(spec.get("legacy_completed_prefix") or 0)
+    missing_legacy = [
+        f"PLT{i:03d}"
+        for i in range(1, required_prefix + 1)
+        if not next((r["response"].strip() for r in rows if r["item_id"] == f"PLT{i:03d}"), "")
+    ]
+    if missing_legacy:
+        raise RuntimeError(
+            "PLT120 is configured to reuse the already generated PLT001-PLT030 responses, "
+            "but they were not found. Expected local legacy file: "
+            f"{spec.get('legacy_generated_input')}. Missing: {missing_legacy[:10]}"
+        )
+    return rows
+
+
 def write_rows(path: Path, rows: list[dict[str, str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temp = path.with_suffix(path.suffix + ".tmp")
@@ -263,7 +299,7 @@ def main() -> None:
     parser.add_argument("--config", default=str(DEFAULT_CONFIG))
     parser.add_argument(
         "--corpus",
-        choices=("plt30", "external120", "redteam120", "all"),
+        choices=("plt120", "external120", "redteam120", "all"),
         default="all",
     )
     parser.add_argument("--dry-run", action="store_true")
@@ -281,7 +317,7 @@ def main() -> None:
         raise ValueError("This final runner requires exactly one generated response per prompt")
 
     names = (
-        ("plt30", "external120", "redteam120")
+        ("plt120", "external120", "redteam120")
         if args.corpus == "all"
         else (args.corpus,)
     )
@@ -314,7 +350,10 @@ def main() -> None:
         output_path = ROOT / spec["output"]
 
         rows = initialize_rows(name, items, generator, sampling)
-        rows = merge_existing(rows, read_existing(output_path))
+        if name == "plt120":
+            rows = merge_legacy_plt30_if_available(rows, spec, output_path)
+        else:
+            rows = merge_existing(rows, read_existing(output_path))
         write_rows(output_path, rows)
 
         completed_before = sum(1 for row in rows if row["response"].strip())
