@@ -1,10 +1,10 @@
 {
-  "schema_version": "thesis-final-v2",
-  "experiment_id": "thesis-final-v2",
+  "schema_version": "thesis-final-v3",
+  "experiment_id": "thesis-final-v3",
   "pipeline_version": "cultverify-1.1.0",
-  "freeze_code_commit": "200bca4575304795f491e76308d9be327ca269da",
+  "freeze_code_commit": "286598d5eb642c3d632e7b756ccf1954fb922a13",
   "validation": {
-    "github_actions_run_id": 37602825309,
+    "github_actions_run_id": 37608290712,
     "required_status": "success",
     "local_live_smoke_required": true,
     "ci_workflow": "Verifier tests",
@@ -38,11 +38,25 @@
       "D",
       "no_clear_winner",
       "no_acceptable_candidate",
-      "insufficient_evidence"
+      "insufficient_evidence",
+      "not_culturally_applicable",
+      "not_assessable"
     ],
     "acceptability_gate": "any scored dimension 0 -> culturally_inappropriate -> ineligible for endorsement",
     "tie_policy": "exact top-score tie among eligible candidates -> no_clear_winner",
-    "insufficient_policy": "any candidate with no scored cultural basis -> insufficient_evidence for full Best-of-4 comparison"
+    "insufficient_policy": "for a culturally applicable and assessable response, no defensible scored cultural basis -> insufficient_evidence; in Best-of-4 any remaining insufficient_evidence candidate makes the substantive comparison unresolved",
+    "single_response_outcomes": [
+      "culturally_appropriate",
+      "partially_culturally_appropriate",
+      "culturally_inappropriate",
+      "insufficient_evidence",
+      "not_culturally_applicable",
+      "not_assessable"
+    ],
+    "applicability_policy": "prompt-level cultural applicability gate runs before D01-D10 planning; materially non-cultural tasks -> not_culturally_applicable",
+    "assessability_policy": "for culturally applicable prompts, pure refusals/non-answers with no substantive culturally assessable content -> not_assessable before target extraction",
+    "contextual_fallback_policy": "only evidence-unresolved context_dependent_recommendation targets may use contextual fallback to judge observable cultural handling; unresolved external facts/descriptive norms may abstain",
+    "public_score_policy": "vericult_score is null whenever any applicable dimension abstains; exact internal aggregation remains available for deterministic ranking"
   },
   "reward_model_baseline": {
     "model": "Skywork/Skywork-Reward-V2-Qwen3-4B",
@@ -64,7 +78,9 @@
       "D",
       "no_clear_winner",
       "no_acceptable_candidate",
-      "insufficient_evidence"
+      "insufficient_evidence",
+      "not_culturally_applicable",
+      "not_assessable"
     ]
   },
   "execution_order": [
@@ -77,5 +93,11 @@
     "human_gold_join_and_analysis"
   ],
   "external_validation_protocol": "experiments/external_validation_protocol.json",
-  "freeze_policy": "No semantic tuning after this freeze. Human Gold is excluded from all inference. Only documented execution fixes that do not use final labels are permitted."
+  "freeze_policy": "No semantic tuning after this freeze. Human Gold is excluded from all inference. Only documented execution fixes that do not use final labels are permitted.",
+  "restoration_provenance": {
+    "source_branch": "fix/cultural120-result-semantics",
+    "validated_source_commit": "c1944bb1df47a8668689c316e62563bdc700fbf3",
+    "validated_source_ci_run": 37336670390,
+    "reason": "October 5 cultural-120 reliability/result-semantics repair was validated and used for the final failed-item rerun but was never merged into main; its verifier semantics were restored onto the cleaned thesis tree before the definitive freeze."
+  }
 }

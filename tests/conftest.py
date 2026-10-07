@@ -26,21 +26,22 @@ class FixtureLLM:
             return value if isinstance(value, str) else json.dumps(value)
         if stage == "context_planner_v1":
             out = {"user_goal": {"value": payload["prompt"], "prompt_span": payload["prompt"]}}
+        elif stage == "cultural_applicability_v1":
+            out = {"applicable": True, "reason": "The fixture prompt requires a culturally situated judgment."}
         elif stage == "dimension_planner_v1":
             out = {
                 "dimensions": [{"dimension_id": "D03", "role": "primary", "reason": "Event etiquette"}],
                 "reasoning": "A situated social interaction",
             }
+        elif stage == "response_assessability_v1":
+            out = {"assessable": True, "reason": "The response contains substantive answer content."}
         elif stage == "target_extractor_v1":
             out = {
                 "targets": [
                     {
                         "span_id": payload["response_spans"][0]["span_id"],
-                        "proposition": "Consult the event arrangements",
                         "epistemic_type": "context_dependent_recommendation",
                         "dimension_ids": ["D03"],
-                        "materiality": "Determines how the visitor proceeds",
-                        "retrieval_appropriate": True,
                     }
                 ]
             }
@@ -105,6 +106,13 @@ class FixtureLLM:
             out = {
                 "verdict": "supported",
                 "reasoning": "The source establishes that arrangements are published",
+            }
+        elif stage == "dimension_scorer_single_v1":
+            out = {"score": 2, "rationale": "Uses the available cultural evidence."}
+        elif stage == "contextual_fallback_v1":
+            out = {
+                "score": "abstain",
+                "rationale": "The recommendation still depends on unresolved external arrangements.",
             }
         elif stage == "dimension_scorer_v1":
             verdicts = {v["target_id"]: v for v in payload["verdicts"]}

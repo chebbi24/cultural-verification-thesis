@@ -29,6 +29,11 @@ class ContextFrame(Record):
     user_goal: ContextFact | None = None
 
 
+class CulturalApplicability(Record):
+    applicable: Annotated[bool, Field(strict=True)]
+    reason: Text
+
+
 class DimensionApplicability(Record):
     dimension_id: DimensionID
     role: Literal["primary", "secondary"]
@@ -47,6 +52,11 @@ class DimensionPlan(Record):
         if self.dimensions and sum(d.role == "primary" for d in self.dimensions) != 1:
             raise ValueError("Nonempty plans require one primary dimension")
         return self
+
+
+class ResponseAssessability(Record):
+    assessable: Annotated[bool, Field(strict=True)]
+    reason: Text
 
 
 class EpistemicType(str, Enum):
@@ -92,26 +102,8 @@ class TargetBatch(Record):
 
 class TargetSelectionDraft(Record):
     span_id: Text
-    proposition: Text
     epistemic_type: EpistemicType
     dimension_ids: tuple[DimensionID, ...] = Field(min_length=1)
-    materiality: Text
-    retrieval_appropriate: Annotated[bool, Field(strict=True)]
-
-    @model_validator(mode="after")
-    def retrieval_type(self):
-        if (
-            self.epistemic_type in (EpistemicType.EXTERNAL, EpistemicType.NORM, EpistemicType.RECOMMENDATION)
-            and not self.retrieval_appropriate
-        ):
-            raise ValueError(
-                "External facts, descriptive norms and context-dependent recommendations require retrieval"
-            )
-        if self.retrieval_appropriate and self.epistemic_type in (EpistemicType.INTERNAL, EpistemicType.VALUE):
-            raise ValueError("Internal quality/value targets must not trigger retrieval")
-        if len(set(self.dimension_ids)) != len(self.dimension_ids):
-            raise ValueError("Duplicate target dimensions")
-        return self
 
 
 class TargetSelectionBatch(Record):
@@ -281,6 +273,11 @@ class ScoreDecisionBatch(Record):
     scores: tuple[DimensionScoreDecision, ...]
 
 
+class SingleScoreDecision(Record):
+    score: Annotated[int, Field(strict=True, ge=0, le=2)] | Literal["abstain"]
+    rationale: Text
+
+
 class DimensionScore(DimensionScoreDraft):
     target_ids: tuple[Text, ...]
     memo_ids: tuple[Text, ...]
@@ -346,6 +343,8 @@ class CandidateResult(Record):
         "partially_culturally_appropriate",
         "culturally_inappropriate",
         "insufficient_evidence",
+        "not_culturally_applicable",
+        "not_assessable",
     ]
     abstention_reason: str | None
     applicable_count: int
@@ -361,7 +360,16 @@ class CandidateResult(Record):
 
 class RankingResult(Record):
     candidates: tuple[CandidateResult, ...]
-    winner: int | Literal["no_clear_winner", "no_acceptable_candidate", "insufficient_evidence"]
+    winner: (
+        int
+        | Literal[
+            "no_clear_winner",
+            "no_acceptable_candidate",
+            "insufficient_evidence",
+            "not_culturally_applicable",
+            "not_assessable",
+        ]
+    )
     tied_indices: tuple[int, ...]
     coverage_comparable: bool
     tie_break_reason: str | None

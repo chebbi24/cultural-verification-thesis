@@ -1,3 +1,4 @@
+from fractions import Fraction
 import inspect
 import json
 from pathlib import Path
@@ -28,7 +29,7 @@ from cultverify.schemas import (
     VerificationQuestion,
 )
 from cultverify.prompts import PROMPTS
-from cultverify.scoring import aggregate, rank_results
+from cultverify.scoring import aggregate, cultural_appropriateness, rank_results, vericult_score
 from cultverify.trace import digest
 from cultverify.validation import (
     matching_support_documents,
@@ -121,11 +122,8 @@ def test_unknown_target_span_abstains(setup):
     config, _, retriever, _ = setup
     target = {
         "span_id": "S999",
-        "proposition": "x",
         "epistemic_type": "external_fact",
         "dimension_ids": ["D03"],
-        "materiality": "x",
-        "retrieval_appropriate": True,
     }
     llm = FixtureLLM(config, overrides={"target_extractor_v1": {"targets": [target]}})
     result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
@@ -166,11 +164,8 @@ def test_configured_target_limit(setup):
     config = config.model_copy(update={"max_material_targets": 1})
     target = dict(
         span_id="S001",
-        proposition="x",
         epistemic_type="external_fact",
         dimension_ids=["D03"],
-        materiality="x",
-        retrieval_appropriate=True,
     )
     llm = FixtureLLM(config, overrides={"target_extractor_v1": {"targets": [target, target]}})
     result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
@@ -534,6 +529,10 @@ def test_downstream_decisions_receive_only_exact_or_structured_inputs(setup):
         set(dimension) == {"dimension_id", "role"}
         for dimension in target_call["payload"]["dimension_plan"]["dimensions"]
     )
+    target_schema = json.dumps(target_call["schema"], sort_keys=True)
+    assert "proposition" not in target_schema
+    assert "materiality" not in target_schema
+    assert "retrieval_appropriate" not in target_schema
 
     question_call = next(call for call in llm.calls if call["stage"] == "verification_question_v1")
     assert set(question_call["payload"]["target"]) == {"response_quote", "epistemic_type", "dimension_ids"}
@@ -654,7 +653,7 @@ def test_all_external_insufficient_requires_dimension_abstention(setup):
     assert attempts["n"] == 0
     assert all(score.score == "abstain" for score in result.dimension_scores)
     assert all(not score.response_quotes for score in result.dimension_scores)
-    assert all("abstained deterministically" in score.rationale for score in result.dimension_scores)
+    assert all("remains unresolved" in score.rationale for score in result.dimension_scores)
     assert all(score.target_ids for score in result.dimension_scores)
     assert all(score.memo_ids for score in result.dimension_scores)
     assert result.overall_score is None
@@ -663,6 +662,54 @@ def test_all_external_insufficient_requires_dimension_abstention(setup):
     assert result.abstention_reason is not None
     assert "D03:" in result.abstention_reason
     assert result.candidate_abstained
+
+
+def test_context_dependent_recommendation_can_use_selective_contextual_fallback(setup):
+    config, _, _, _ = setup
+    retriever = FixtureRetriever(empty=True)
+    llm = FixtureLLM(
+        config,
+        overrides={
+            "contextual_fallback_v1": {
+                "score": 1,
+                "rationale": "The advice is culturally cautious but remains limited without external confirmation.",
+            }
+        },
+    )
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert result.evidence_coverage == 0
+    assert result.verdicts[0].verdict == "insufficient"
+    assert result.dimension_scores[0].score == 1
+    assert result.cultural_appropriateness == "partially_culturally_appropriate"
+    assert result.vericult_score == 50.0
+    assert any(call["stage"] == "contextual_fallback_v1" for call in llm.calls)
+
+
+def test_unresolved_external_fact_stays_insufficient_without_contextual_fallback(setup):
+    config, _, _, _ = setup
+    retriever = FixtureRetriever(empty=True)
+    llm = FixtureLLM(
+        config,
+        overrides={
+            "target_extractor_v1": {
+                "targets": [
+                    {
+                        "span_id": "S001",
+                        "epistemic_type": "external_fact",
+                        "dimension_ids": ["D03"],
+                    }
+                ]
+            },
+            "contextual_fallback_v1": AssertionError("Pure external facts must not use contextual fallback"),
+        },
+    )
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert result.dimension_scores[0].score == "abstain"
+    assert result.cultural_appropriateness == "insufficient_evidence"
+    assert result.vericult_score is None
+    assert not any(call["stage"] == "contextual_fallback_v1" for call in llm.calls)
 
 
 def test_invalid_followup_output_keeps_current_memo(setup):
@@ -831,6 +878,10 @@ def test_scope_and_query_prompts_prefer_general_then_authoritative():
     assert "relevant retrievable target is insufficient" in PROMPTS["dimension_scorer_v1"]
     assert "Do not return target IDs or memo IDs" in PROMPTS["dimension_scorer_v1"]
     assert "explicitly named places belong in location" in PROMPTS["context_planner_v1"]
+    assert "Fictional worldbuilding" in PROMPTS["cultural_applicability_v1"]
+    assert "pure refusal" in PROMPTS["response_assessability_v1"]
+    assert "Return only score and rationale" in PROMPTS["dimension_scorer_single_v1"]
+    assert "retrieval verdict is NOT evidence" in PROMPTS["contextual_fallback_v1"].replace("\\n", " ")
     assert "Prefer the smallest" in PROMPTS["dimension_planner_v1"]
     assert "sufficient set of dimensions" in PROMPTS["dimension_planner_v1"]
 
@@ -936,6 +987,27 @@ def test_equal_aggregation_and_abstention():
         score(1.5)
 
 
+def test_partial_abstention_suppresses_public_score_without_swallowing_labels():
+    partial = (score(2), score("abstain", "D01"))
+    assert aggregate(partial) == 1.0
+    assert vericult_score(partial) is None
+    assert cultural_appropriateness(partial) == "partially_culturally_appropriate"
+
+    decisive_negative = (score(0), score("abstain", "D01"))
+    assert vericult_score(decisive_negative) is None
+    assert cultural_appropriateness(decisive_negative) == "culturally_inappropriate"
+
+    fully_unresolved = (score("abstain"), score("abstain", "D01"))
+    assert vericult_score(fully_unresolved) is None
+    assert cultural_appropriateness(fully_unresolved) == "insufficient_evidence"
+
+
+def test_fractional_vericult_score_uses_exact_rational_scaling():
+    scores = (score(2), score(2, "D01"), score(1, "D02"))
+    assert aggregate(scores) == float(Fraction(5, 6))
+    assert vericult_score(scores) == float(Fraction(5, 6) * 100)
+
+
 def test_rank_shared_planning_and_exact_tie(setup):
     _, llm, _, verifier = setup
     result = verifier.rank(PROMPT, [RESPONSE, RESPONSE + " B", RESPONSE + " C", RESPONSE + " D"])
@@ -943,6 +1015,7 @@ def test_rank_shared_planning_and_exact_tie(setup):
     assert result.winner == "no_clear_winner" and result.tied_indices == (0, 1, 2, 3)
     assert "no arbitrary tie-break" in result.tie_break_reason
     assert sum(c["stage"] == "context_planner_v1" for c in llm.calls) == 1
+    assert sum(c["stage"] == "cultural_applicability_v1" for c in llm.calls) == 1
     assert sum(c["stage"] == "dimension_planner_v1" for c in llm.calls) == 1
     assert all(c.context is result.candidates[0].context for c in result.candidates)
     assert all(c.dimension_plan is result.candidates[0].dimension_plan for c in result.candidates)
@@ -1135,12 +1208,27 @@ def test_trace_links_and_corruption(setup):
         validate_trace_links(trace.model_copy(update={"target_evidence_links": (link,)}))
 
 
-def test_second_invalid_scoring_returns_failure(setup):
+def test_invalid_batch_scoring_recovers_per_dimension(setup):
     config, _, retriever, _ = setup
     llm = FixtureLLM(config, overrides={"dimension_scorer_v1": {"scores": []}})
     result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
-    assert result.candidate_abstained and result.status == "failed"
+    assert result.status == "completed"
+    assert result.dimension_scores[0].score == 2
     assert sum(c["stage"] == "dimension_scorer_v1" for c in llm.calls) == 2
+    assert any(c["stage"] == "dimension_scorer_single_v1" for c in llm.calls)
+
+
+def test_invalid_batch_and_single_scoring_still_fail_cleanly(setup):
+    config, _, retriever, _ = setup
+    llm = FixtureLLM(
+        config,
+        overrides={
+            "dimension_scorer_v1": {"scores": []},
+            "dimension_scorer_single_v1": {"score": "invalid", "rationale": "x"},
+        },
+    )
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.candidate_abstained and result.status == "failed"
     assert result.evidence and result.errors
 
 
@@ -1149,6 +1237,56 @@ def test_no_dimensions_no_search(setup):
     llm = FixtureLLM(config, overrides={"dimension_planner_v1": {"dimensions": [], "reasoning": "None applicable"}})
     result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
     assert result.status == "completed" and result.candidate_abstained and result.applicable_count == 0
+    assert result.cultural_appropriateness == "not_culturally_applicable"
+    assert not retriever.calls
+
+
+def test_cultural_applicability_gate_stops_incidental_culture_prompt(setup):
+    config, _, retriever, _ = setup
+    magic_prompt = (
+        "In a fantasy game, magical attacks hit major cultural centers. "
+        "Choose the strongest wand: obsidian, world-tree wood, lava rock, or glass."
+    )
+    llm = FixtureLLM(
+        config,
+        overrides={
+            "cultural_applicability_v1": {
+                "applicable": False,
+                "reason": "The word cultural is incidental to a fictional equipment choice.",
+            },
+            "dimension_planner_v1": AssertionError("Dimension planning must not run"),
+        },
+    )
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(magic_prompt, "I choose glass.")
+    assert result.status == "completed"
+    assert result.cultural_appropriateness == "not_culturally_applicable"
+    assert result.applicable_count == 0 and result.scored_count == 0
+    assert result.vericult_score is None and result.overall_score is None
+    assert not retriever.calls
+    assert not any(call["stage"] == "dimension_planner_v1" for call in llm.calls)
+
+
+def test_pure_refusal_is_not_assessable(setup):
+    config, _, retriever, _ = setup
+    llm = FixtureLLM(
+        config,
+        overrides={
+            "response_assessability_v1": {
+                "assessable": False,
+                "reason": "The response is a pure refusal with no substantive answer content.",
+            },
+            "target_extractor_v1": AssertionError("Target extraction must not run for a pure refusal"),
+        },
+    )
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(
+        PROMPT, "Sorry, I am not comfortable answering that."
+    )
+    assert result.status == "completed"
+    assert result.cultural_appropriateness == "not_assessable"
+    assert result.applicable_count == 1 and result.scored_count == 0
+    assert result.vericult_score is None and result.overall_score is None
+    assert all(score.score == "abstain" for score in result.dimension_scores)
+    assert not result.targets and not result.evidence and not result.verdicts
     assert not retriever.calls
 
 
@@ -1156,16 +1294,40 @@ def test_internal_targets_no_external_search(setup):
     config, _, retriever, _ = setup
     target = dict(
         span_id="S001",
-        proposition="x",
         epistemic_type="response_internal_quality",
         dimension_ids=["D03"],
-        materiality="x",
-        retrieval_appropriate=False,
     )
     llm = FixtureLLM(config, overrides={"target_extractor_v1": {"targets": [target]}})
     result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
     assert result.status == "completed" and not retriever.calls
     assert result.evidence_coverage is None and not result.verdicts
+
+
+def test_target_selection_normalizes_span_and_derives_retrieval_routing(setup):
+    config, _, retriever, _ = setup
+    llm = FixtureLLM(
+        config,
+        overrides={
+            "target_extractor_v1": {
+                "targets": [
+                    {
+                        "span_id": "s1",
+                        "epistemic_type": "external_fact",
+                        "dimension_ids": ["D03", "D04", "D03"],
+                    }
+                ]
+            }
+        },
+    )
+    result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
+    assert result.status == "completed"
+    assert len(result.targets) == 1
+    target = result.targets[0]
+    assert target.response_quote == RESPONSE
+    assert target.dimension_ids == ("D03",)
+    assert target.retrieval_appropriate is True
+    assert target.proposition == RESPONSE
+    assert retriever.calls
 
 
 def test_unknown_metadata_rejected_at_public_api(setup):
@@ -1227,11 +1389,8 @@ def test_scoring_links_are_python_owned_and_dimension_safe(setup):
             "targets": [
                 {
                     "span_id": "S001",
-                    "proposition": "A social-etiquette claim.",
                     "epistemic_type": "external_fact",
                     "dimension_ids": ["D03"],
-                    "materiality": "high",
-                    "retrieval_appropriate": True,
                 }
             ]
         }

@@ -1,5 +1,6 @@
 """Structural validation only. Scores and cultural conclusions belong to the LLM."""
 
+from fractions import Fraction
 import re
 import unicodedata
 
@@ -41,8 +42,14 @@ def validate_target_selections(batch, spans, plan, limit):
     allowed_spans = {span["span_id"] for span in spans}
     allowed_dimensions = {d.dimension_id for d in plan.dimensions}
     for target in batch.targets:
-        require(target.span_id in allowed_spans, "Target span must reference supplied response text")
-        require(set(target.dimension_ids) <= allowed_dimensions, "Target dimensions must be planned")
+        raw = target.span_id.strip().upper()
+        match = re.fullmatch(r"S?0*(\d+)", raw)
+        canonical = f"S{int(match.group(1)):03d}" if match else raw
+        require(canonical in allowed_spans, "Target span must reference supplied response text")
+        require(
+            bool(set(target.dimension_ids) & allowed_dimensions),
+            "Each target must reference at least one planned dimension",
+        )
 
 
 def validate_score_decisions(batch, plan, targets, verdicts, ignored_dimensions=()):
@@ -241,11 +248,27 @@ def validate_trace_links(trace):
     require(result.scored_count == len(scored), "Scored count mismatch")
     require(result.applicable_count == len(result.dimension_plan.dimensions), "Applicable count mismatch")
     require(result.abstained_dimensions == abstained, "Abstained dimension summary mismatch")
-    expected_overall = sum(s.score for s in scored) / (2 * len(scored)) if scored else None
+    expected_exact = Fraction(sum(s.score for s in scored), 2 * len(scored)) if scored else None
+    expected_overall = float(expected_exact) if expected_exact is not None else None
     require(result.overall_score == expected_overall, "Overall score mismatch")
-    expected_vericult = expected_overall * 100 if expected_overall is not None else None
+    expected_vericult = None if abstained or expected_exact is None else float(expected_exact * 100)
     require(result.vericult_score == expected_vericult, "Vericult score mismatch")
-    if not scored:
+    if result.status == "completed" and not result.dimension_plan.dimensions:
+        expected_label = "not_culturally_applicable"
+        require(
+            not result.targets and not result.evidence and not result.verdicts,
+            "Non-applicable result must stop before verification",
+        )
+    elif result.cultural_appropriateness == "not_assessable":
+        expected_label = "not_assessable"
+        require(result.status == "completed", "Not-assessable is not a technical failure")
+        require(bool(result.dimension_plan.dimensions), "Not-assessable requires a culturally applicable prompt")
+        require(not scored, "Not-assessable response must not receive cultural dimension scores")
+        require(
+            not result.targets and not result.evidence and not result.verdicts,
+            "Not-assessable result must stop before target extraction",
+        )
+    elif not scored:
         expected_label = "insufficient_evidence"
     elif any(s.score == 0 for s in scored):
         expected_label = "culturally_inappropriate"

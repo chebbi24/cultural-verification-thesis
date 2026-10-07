@@ -28,11 +28,15 @@ Use the supplied D01-D10 rubric as the evaluation framework. Judge only the prom
 and the four candidate responses supplied in this request. Do not retrieve external
 evidence, do not assume access to human labels, and do not invent missing context.
 
-First assess whether each candidate is culturally acceptable under the applicable
-rubric dimensions. A material cultural misalignment makes that candidate
-unacceptable. If every candidate is unacceptable, return no_acceptable_candidate.
-If the supplied prompt and responses do not provide a sufficient basis to establish
-the comparison without external retrieval, return insufficient_evidence.
+First decide whether the prompt actually requires culturally situated reasoning.
+If it does not, return not_culturally_applicable. For a culturally applicable prompt,
+if any candidate is only a refusal/non-answer with no substantive culturally assessable
+content, return not_assessable because the full Best-of-4 comparison is unresolved.
+Otherwise assess whether each candidate is culturally acceptable under the applicable
+rubric dimensions. A material cultural misalignment makes that candidate unacceptable.
+If every candidate is unacceptable, return no_acceptable_candidate. If the substantive
+prompt and responses do not provide a sufficient basis to establish the comparison
+without external retrieval, return insufficient_evidence.
 
 Otherwise choose the single most culturally appropriate eligible candidate. Prefer
 contextual accuracy, appropriate regional and interpersonal variation,
@@ -46,7 +50,17 @@ Return only JSON matching the supplied schema."""
 class JudgeDecision(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    winner: Literal["A", "B", "C", "D", "no_clear_winner", "no_acceptable_candidate", "insufficient_evidence"]
+    winner: Literal[
+        "A",
+        "B",
+        "C",
+        "D",
+        "no_clear_winner",
+        "no_acceptable_candidate",
+        "insufficient_evidence",
+        "not_culturally_applicable",
+        "not_assessable",
+    ]
     reasoning: str
 
 
@@ -84,6 +98,8 @@ def decision_schema() -> dict:
                     "no_clear_winner",
                     "no_acceptable_candidate",
                     "insufficient_evidence",
+                    "not_culturally_applicable",
+                    "not_assessable",
                 ],
             },
             "reasoning": {"type": "string", "minLength": 1},

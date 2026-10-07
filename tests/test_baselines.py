@@ -36,6 +36,8 @@ def test_direct_judge_model_and_schema_are_frozen():
         "no_clear_winner",
         "no_acceptable_candidate",
         "insufficient_evidence",
+        "not_culturally_applicable",
+        "not_assessable",
     ]
 
 
