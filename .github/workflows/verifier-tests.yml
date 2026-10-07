@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-      - agent/clean-standalone-verifier
-      - agent/final-verifier
       - agent/final-experiment-ready
   pull_request:
 

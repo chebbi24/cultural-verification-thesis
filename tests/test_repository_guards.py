@@ -81,3 +81,27 @@ def test_final_inference_runners_do_not_load_human_gold():
     assert "human_annotations" not in source
     assert "winner_votes" not in source
     assert "majority_winner" not in source
+
+
+RETIRED_FINAL_REPOSITORY_PATHS = (
+    ".github/workflows/build-vericult-cultural-set.yml",
+    "scripts/build_vericult_cultural_set.py",
+    "scripts/run_cultural_120.py",
+    "scripts/build_best_of4.py",
+    "src/run_ollama.py",
+    "vericult_cultural_prompts_120_exact.txt",
+    "vericult_cultural_prompts_140_all7_exact.txt",
+    "vericult_exact_prompt_response_pairs_100.txt",
+    "vericult_exact_prompt_response_pairs_100_v2_no_culturellm.txt",
+    "artifacts/retest_logs/2026-10-04_failed_candidate_retest_partial.txt",
+    "data/annotations/hard_failure_validation_template.csv",
+    "data/outputs",
+    "data/prompts",
+    "notebooks/00_colab_setup.ipynb",
+    "redteam",
+)
+
+
+def test_final_repository_excludes_retired_generation_and_output_artifacts():
+    for relative in RETIRED_FINAL_REPOSITORY_PATHS:
+        assert not (ROOT / relative).exists(), f"Retired thesis-development artifact is tracked again: {relative}"

@@ -218,8 +218,8 @@ the frozen method, not hidden special-case corrections.
 
 ```bash
 pytest -q
-ruff check src/cultverify tests
-ruff format --check src/cultverify tests
+ruff check src scripts tests
+ruff format --check src scripts tests
 ```
 
 Normal tests use deterministic fixtures and mocked HTTP boundaries, require no paid
@@ -261,15 +261,20 @@ The batch runner requires a clean checkout matching the frozen code revision in
 prompt, and resumes only prompts already recorded as completed. Do not join any
 machine output with Human Gold until all system predictions have been persisted.
 
-## Repository cleanup
+## Repository scope and thesis freeze
 
-The previous verifier implementation, its runners, scoring/hard-failure regression
-tests and retired setup/release instructions were removed. The old T1–T19 taxonomy,
-its mappings, taxonomy-only benchmark and preparation code were removed from this
-branch. The old `data/prompts/benchmark.csv` is not a final benchmark and is removed.
-Original D01–D10 resources, pilot candidates, research documents and historical outputs
-remain. Historical notebooks and generation scripts are research records, not active
-package entry points; their old paths may no longer work. See `docs/migration.md`.
+The active repository contains only the standalone verifier, independent baselines,
+frozen PLT evaluation inputs and Human Gold provenance, development smoke cases,
+D01–D10 research resources, final experiment manifests/protocols, tests and thesis
+reproducibility documentation. Retired prompt-generation notebooks, historical model
+outputs, abandoned red-team text sets, temporary retest logs and their dedicated
+generation workflow/runners are intentionally excluded from the frozen tree.
+
+The external-validation protocol remains in
+`experiments/external_validation_protocol.json`; external benchmark records are
+materialized only under that declared source-authenticated protocol and are not stored
+as ad-hoc root-level generated text files. See `docs/migration.md` for the earlier
+standalone-verifier migration history.
 
 Provider contracts: [Ollama chat](https://docs.ollama.com/api/chat),
 [OpenRouter chat](https://openrouter.ai/docs/api/api-reference/chat/create-a-chat-completion),

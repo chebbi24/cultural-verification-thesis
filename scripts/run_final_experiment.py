@@ -22,6 +22,7 @@ from cultverify.retrieval import TavilyRetriever
 SCHEMA_VERSION = "final-vericult-batch-v1"
 EXPECTED_PROMPT_IDS = tuple(f"PLT{i:03d}" for i in range(1, 31))
 CANDIDATE_LABELS = "ABCD"
+POST_FREEZE_METADATA_FILES = {"experiments/final_manifest.json", "docs/final_validation.md"}
 
 
 def sha256_file(path: Path) -> str:
@@ -74,9 +75,9 @@ def assert_frozen_checkout(manifest: dict) -> None:
     if head == freeze:
         return
     changed = set(filter(None, _git("diff", "--name-only", f"{freeze}..{head}").splitlines()))
-    if changed - {"experiments/final_manifest.json"}:
+    if changed - POST_FREEZE_METADATA_FILES:
         raise RuntimeError(
-            "Checkout differs from the frozen code revision outside experiments/final_manifest.json: "
+            "Checkout differs from the frozen code revision outside the allowed post-freeze metadata files: "
             + ", ".join(sorted(changed))
         )
 
