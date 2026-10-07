@@ -15,7 +15,11 @@ from urllib.parse import urlsplit, urlunsplit
 
 import requests
 
-from scripts.run_final_experiment import assert_frozen_checkout, sha256_file, validate_freeze_files
+try:
+    from scripts.run_final_experiment import assert_frozen_checkout, sha256_file, validate_freeze_files
+except ModuleNotFoundError:
+    # Support direct execution: python scripts/preflight_final_experiment.py
+    from run_final_experiment import assert_frozen_checkout, sha256_file, validate_freeze_files
 
 
 def tags_url(chat_url: str) -> str:
