@@ -1,0 +1,157 @@
+{
+  "schema_version": "vericult-external120-archive-v2",
+  "experiment_role": "pre-definitive-freeze cross-dataset positive-control / sanity validation; not the final frozen PLT/post-freeze external benchmark",
+  "corpus": {
+    "total_records": 120,
+    "composition": {
+      "CARE": 20,
+      "Community Alignment": 20,
+      "PLURAL": 20,
+      "PACT": 20,
+      "ThaiCLI": 20,
+      "PRISM": 20
+    },
+    "historical_source_commit": "0ab76f650b1bde1fbaa539a7515c980e15eb6459",
+    "archived_source_path": "data/evaluation/external_120_pre_freeze/prompt_response_pairs_120.txt"
+  },
+  "execution": {
+    "final_merged_results_source": "Project Library file created 2026-10-05: Eingefügter Text(20261005-195423).txt",
+    "exact_runtime_code_commit": "not captured in exported result rows",
+    "architecture_note": "The experiment predates the definitive repository freeze, but its observed cultural_applicability_v1 / not_culturally_applicable behavior belongs to the semantic lineage restored into final Vericult 1.1. Keep the empirical run separate because exact runtime Git SHA is not embedded in the compact export and because it is a positive-control run rather than the final frozen benchmark.",
+    "final_completed": 116,
+    "final_failed": 4,
+    "completion_rate": 0.9666666666666667,
+    "unresolved": [
+      {
+        "record_id": "028",
+        "dataset": "Community Alignment",
+        "reason": "cultural_applicability_v1 transport ReadTimeout"
+      },
+      {
+        "record_id": "034",
+        "dataset": "Community Alignment",
+        "reason": "cultural_applicability_v1 transport ReadTimeout"
+      },
+      {
+        "record_id": "076",
+        "dataset": "PACT",
+        "reason": "target_extractor_v1 invalid output after bounded retry; later diagnosis: malformed S0:01 span ID"
+      },
+      {
+        "record_id": "084",
+        "dataset": "ThaiCLI",
+        "reason": "cultural_applicability_v1 transport ReadTimeout"
+      }
+    ],
+    "validated_semantic_lineage": {
+      "branch": "fix/cultural120-result-semantics",
+      "validated_commit": "c1944bb1df47a8668689c316e62563bdc700fbf3",
+      "validation_ci_run": 37336670390,
+      "provenance_note": "The final failed-item rerun was conducted after this repair was validated and its outputs exhibit the repaired applicability semantics; the compact exported result rows do not embed an exact runtime Git SHA."
+    },
+    "restored_final_verifier": {
+      "semantic_freeze": "286598d5eb642c3d632e7b756ccf1954fb922a13",
+      "final_repository_snapshot": "cc2de515cc481a6ec82c8c3edd5611209b84e97b",
+      "final_main_ci_run": 37608473802,
+      "semantics_note": "cultural_applicability_v1 and not_culturally_applicable are part of the definitive restored Vericult 1.1 semantics, together with not_assessable, selective contextual fallback, deterministic span normalization/routing, and per-dimension scorer recovery."
+    }
+  },
+  "overall_completed": {
+    "labels": {
+      "insufficient_evidence": 6,
+      "partially_culturally_appropriate": 80,
+      "culturally_appropriate": 22,
+      "not_culturally_applicable": 8
+    },
+    "numeric_score_count": 102,
+    "mean_numeric_score": 87.23583877995642,
+    "mean_evidence_coverage": 0.7149532710280373
+  },
+  "datasets": {
+    "CARE": {
+      "total": 20,
+      "completed": 20,
+      "failed": 0,
+      "completed_labels": {
+        "insufficient_evidence": 1,
+        "partially_culturally_appropriate": 17,
+        "not_culturally_applicable": 2
+      },
+      "numeric_score_count": 17,
+      "mean_numeric_score": 83.82352941176471,
+      "mean_evidence_coverage": 0.8235294117647058
+    },
+    "Community Alignment": {
+      "total": 20,
+      "completed": 18,
+      "failed": 2,
+      "completed_labels": {
+        "partially_culturally_appropriate": 9,
+        "culturally_appropriate": 8,
+        "not_culturally_applicable": 1
+      },
+      "numeric_score_count": 17,
+      "mean_numeric_score": 91.47058823529412,
+      "mean_evidence_coverage": 0.7549019607843137
+    },
+    "PLURAL": {
+      "total": 20,
+      "completed": 20,
+      "failed": 0,
+      "completed_labels": {
+        "partially_culturally_appropriate": 12,
+        "culturally_appropriate": 5,
+        "insufficient_evidence": 3
+      },
+      "numeric_score_count": 17,
+      "mean_numeric_score": 89.70588235294117,
+      "mean_evidence_coverage": 0.5666666666666667
+    },
+    "PACT": {
+      "total": 20,
+      "completed": 19,
+      "failed": 1,
+      "completed_labels": {
+        "partially_culturally_appropriate": 17,
+        "culturally_appropriate": 1,
+        "not_culturally_applicable": 1
+      },
+      "numeric_score_count": 18,
+      "mean_numeric_score": 87.5,
+      "mean_evidence_coverage": 0.7777777777777778
+    },
+    "ThaiCLI": {
+      "total": 20,
+      "completed": 19,
+      "failed": 1,
+      "completed_labels": {
+        "partially_culturally_appropriate": 13,
+        "culturally_appropriate": 3,
+        "insufficient_evidence": 1,
+        "not_culturally_applicable": 2
+      },
+      "numeric_score_count": 16,
+      "mean_numeric_score": 84.375,
+      "mean_evidence_coverage": 0.6666666666666666
+    },
+    "PRISM": {
+      "total": 20,
+      "completed": 20,
+      "failed": 0,
+      "completed_labels": {
+        "partially_culturally_appropriate": 12,
+        "culturally_appropriate": 5,
+        "insufficient_evidence": 1,
+        "not_culturally_applicable": 2
+      },
+      "numeric_score_count": 17,
+      "mean_numeric_score": 86.3562091503268,
+      "mean_evidence_coverage": 0.7222222222222222
+    }
+  },
+  "interpretation": {
+    "source_signal": "The corpus deliberately selected source reference, human-preferred, survey-preferred, culture-following, human-reviewed-chosen, or highest-rated responses.",
+    "positive_control_result": "Among 102 completed cases with a substantive cultural score, 22 were culturally_appropriate and 80 partially_culturally_appropriate; none were culturally_inappropriate.",
+    "caution": "This supports coarse source-consistency/feasibility, not accuracy, because source signals are heterogeneous and the corpus is positively selected."
+  }
+}
