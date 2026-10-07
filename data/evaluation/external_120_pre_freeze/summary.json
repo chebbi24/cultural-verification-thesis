@@ -1,6 +1,6 @@
 {
-  "schema_version": "vericult-external120-archive-v1",
-  "experiment_role": "pre-freeze cross-dataset positive-control / sanity validation; not the final frozen Vericult 1.1 external benchmark",
+  "schema_version": "vericult-external120-archive-v2",
+  "experiment_role": "pre-definitive-freeze cross-dataset positive-control / sanity validation; not the final frozen PLT/post-freeze external benchmark",
   "corpus": {
     "total_records": 120,
     "composition": {
@@ -17,7 +17,7 @@
   "execution": {
     "final_merged_results_source": "Project Library file created 2026-10-05: Eingefügter Text(20261005-195423).txt",
     "exact_runtime_code_commit": "not captured in exported result rows",
-    "architecture_note": "Results predate the final Vericult 1.1 semantics and include cultural_applicability_v1 / not_culturally_applicable. Do not pool these labels with final Vericult 1.1 results.",
+    "architecture_note": "The experiment predates the definitive repository freeze, but its observed cultural_applicability_v1 / not_culturally_applicable behavior belongs to the semantic lineage restored into final Vericult 1.1. Keep the empirical run separate because exact runtime Git SHA is not embedded in the compact export and because it is a positive-control run rather than the final frozen benchmark.",
     "final_completed": 116,
     "final_failed": 4,
     "completion_rate": 0.9666666666666667,
@@ -42,7 +42,19 @@
         "dataset": "ThaiCLI",
         "reason": "cultural_applicability_v1 transport ReadTimeout"
       }
-    ]
+    ],
+    "validated_semantic_lineage": {
+      "branch": "fix/cultural120-result-semantics",
+      "validated_commit": "c1944bb1df47a8668689c316e62563bdc700fbf3",
+      "validation_ci_run": 37336670390,
+      "provenance_note": "The final failed-item rerun was conducted after this repair was validated and its outputs exhibit the repaired applicability semantics; the compact exported result rows do not embed an exact runtime Git SHA."
+    },
+    "restored_final_verifier": {
+      "semantic_freeze": "286598d5eb642c3d632e7b756ccf1954fb922a13",
+      "final_repository_snapshot": "cc2de515cc481a6ec82c8c3edd5611209b84e97b",
+      "final_main_ci_run": 37608473802,
+      "semantics_note": "cultural_applicability_v1 and not_culturally_applicable are part of the definitive restored Vericult 1.1 semantics, together with not_assessable, selective contextual fallback, deterministic span normalization/routing, and per-dimension scorer recovery."
+    }
   },
   "overall_completed": {
     "labels": {
