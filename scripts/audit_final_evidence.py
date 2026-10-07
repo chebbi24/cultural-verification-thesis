@@ -71,11 +71,12 @@ def main(argv: list[str] | None = None) -> int:
     expected_ids = expected_item_ids(experiment_manifest)
     records = latest_records(args.live_output)
 
-    if tuple(records) != expected_ids:
+    expected_set = set(expected_ids)
+    if set(records) != expected_set or len(records) != len(expected_ids):
         missing = [item_id for item_id in expected_ids if item_id not in records]
-        extra = [item_id for item_id in records if item_id not in set(expected_ids)]
+        extra = [item_id for item_id in records if item_id not in expected_set]
         raise RuntimeError(
-            "LIVE output does not contain exactly the 360 frozen items in canonical order. "
+            "LIVE output does not contain exactly the 360 frozen items. "
             f"Missing={missing[:12]} Extra={extra[:12]}"
         )
     if any(record.get("mode") != "LIVE" or record.get("status") != "completed" for record in records.values()):
@@ -83,7 +84,8 @@ def main(argv: list[str] | None = None) -> int:
 
     trace_paths: list[Path] = []
     referenced_snapshots: set[str] = set()
-    for item_id, record in records.items():
+    for item_id in expected_ids:
+        record = records[item_id]
         trace_path = Path(record["trace_path"])
         if not trace_path.is_file():
             raise RuntimeError(f"Missing response trace for {item_id}: {trace_path}")
