@@ -63,8 +63,8 @@ Generate every ready corpus in one run:
 python scripts/generate_final_candidates.py --corpus all
 ```
 
-The runner checkpoints after every candidate. Re-running the same command resumes
-without regenerating completed candidates.
+The runner checkpoints after every response. Re-running the same command resumes
+without regenerating completed responses.
 
 ## Outputs
 
@@ -81,4 +81,5 @@ and frozen before any Vericult evaluation begins.
 The existing PLT human annotations belong to the old frozen A-D responses in
 `best_of4_v1.csv`. They must not be treated as labels for newly generated
 GPT-OSS candidates. New GPT-OSS candidates require their own human evaluation if
-human agreement is reported for that candidate set.
+human agreement is reported for that response set.
+\n\n## Final protocol correction\n\nThe final generation stage produces exactly **one GPT-OSS response per prompt**. The earlier Best-of-4 generation design is retired for the new final corpus. Across PLT30 + External120 + RedTeam120 this yields 270 generated responses total.\n
