@@ -1,6 +1,7 @@
 import re
 
 from .schemas import (
+    EpistemicType,
     InitialQuestions,
     MaterialTarget,
     TargetBatch,
@@ -35,6 +36,17 @@ def response_spans(response):
     return tuple(spans)
 
 
+def _canonical_span_id(raw_span_id, allowed_span_ids):
+    raw = raw_span_id.strip().upper()
+    if raw in allowed_span_ids:
+        return raw
+    match = re.fullmatch(r"S?0*(\d+)", raw)
+    if not match:
+        return None
+    candidate = f"S{int(match.group(1)):03d}"
+    return candidate if candidate in allowed_span_ids else None
+
+
 def extract_targets(session, prompt, response, context, plan):
     spans = response_spans(response)
     batch = session.call(
@@ -51,21 +63,43 @@ def extract_targets(session, prompt, response, context, plan):
             "max_material_targets": session.config.max_material_targets,
         },
         TargetSelectionBatch,
-        lambda b: validate_target_selections(b, spans, plan, session.config.max_material_targets),
+        lambda batch: validate_target_selections(
+            batch,
+            spans,
+            plan,
+            session.config.max_material_targets,
+        ),
     )
     span_text = {span["span_id"]: span["text"] for span in spans}
-    drafts = tuple(
-        TargetDraft(
-            response_quote=span_text[target.span_id],
-            proposition=target.proposition,
-            epistemic_type=target.epistemic_type,
-            dimension_ids=target.dimension_ids,
-            materiality=target.materiality,
-            retrieval_appropriate=target.retrieval_appropriate,
+    allowed_span_ids = set(span_text)
+    allowed_dimensions = {dimension.dimension_id for dimension in plan.dimensions}
+    drafts = []
+    for target in batch.targets:
+        span_id = _canonical_span_id(target.span_id, allowed_span_ids)
+        if span_id is None:
+            continue
+        dimension_ids = tuple(
+            dict.fromkeys(dimension_id for dimension_id in target.dimension_ids if dimension_id in allowed_dimensions)
         )
-        for target in batch.targets
-    )
-    grounded = TargetBatch(targets=drafts, truncated=batch.truncated)
+        if not dimension_ids:
+            continue
+        retrieval_appropriate = target.epistemic_type in {
+            EpistemicType.EXTERNAL,
+            EpistemicType.NORM,
+            EpistemicType.RECOMMENDATION,
+        }
+        response_quote = span_text[span_id]
+        drafts.append(
+            TargetDraft(
+                response_quote=response_quote,
+                proposition=response_quote,
+                epistemic_type=target.epistemic_type,
+                dimension_ids=dimension_ids,
+                materiality="Selected as decision-relevant to the planned cultural assessment.",
+                retrieval_appropriate=retrieval_appropriate,
+            )
+        )
+    grounded = TargetBatch(targets=tuple(drafts), truncated=batch.truncated)
     validate_targets(grounded, response, plan, session.config.max_material_targets)
     targets = tuple(
         MaterialTarget(**target.model_dump(), target_id=stable_id("target", [i, target.model_dump(mode="json")]))

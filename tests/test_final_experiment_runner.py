@@ -25,7 +25,13 @@ def test_final_runner_accepts_only_canonical_plts():
 
 def test_final_runner_winner_labels_cover_selective_outcomes():
     assert [winner_label(i) for i in range(4)] == list("ABCD")
-    for outcome in ("no_clear_winner", "no_acceptable_candidate", "insufficient_evidence"):
+    for outcome in (
+        "no_clear_winner",
+        "no_acceptable_candidate",
+        "insufficient_evidence",
+        "not_culturally_applicable",
+        "not_assessable",
+    ):
         assert winner_label(outcome) == outcome
     with pytest.raises(ValueError):
         winner_label(4)
