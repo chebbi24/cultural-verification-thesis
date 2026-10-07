@@ -61,7 +61,9 @@ def main(argv=None):
         api_key = (
             os.getenv("OPENROUTER_API_KEY")
             if config.verifier_model_provider == "openrouter"
-            else os.getenv("L3S_API_KEY") if config.verifier_model_provider == "l3s" else None
+            else os.getenv("L3S_API_KEY")
+            if config.verifier_model_provider == "l3s"
+            else None
         )
         llm = HTTPModel(config, api_key)
         retriever = TavilyRetriever(os.getenv("TAVILY_API_KEY"), config.search_depth) if config.mode == "LIVE" else None
