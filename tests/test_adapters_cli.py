@@ -231,9 +231,9 @@ def test_real_live_then_replay(tmp_path):
     live = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(prompt, response)
     assert live.status == "completed" and live.evidence
     replay_config = config.model_copy(update={"mode": "REPLAY"})
-    replay = CulturalVerifier(
-        llm=HTTPModel(replay_config, api_key), retriever=None, config=replay_config
-    ).verify(prompt, response)
+    replay = CulturalVerifier(llm=HTTPModel(replay_config, api_key), retriever=None, config=replay_config).verify(
+        prompt, response
+    )
     assert replay.status == "completed"
     assert [s for b in live.evidence for s in b.snapshots] == [s for b in replay.evidence for s in b.snapshots]
     assert RunTrace.model_validate_json(Path(replay.trace_path).read_text()).mode == "REPLAY"
