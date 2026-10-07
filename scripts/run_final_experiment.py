@@ -52,7 +52,9 @@ def expected_item_ids(spec: dict[str, Any]) -> tuple[str, ...]:
     return tuple(f"{prefix}{i:03d}" for i in range(1, count + 1))
 
 
-def read_generated_rows(path: Path, corpus_name: str, spec: dict[str, Any], generator: dict[str, Any]) -> list[dict[str, str]]:
+def read_generated_rows(
+    path: Path, corpus_name: str, spec: dict[str, Any], generator: dict[str, Any]
+) -> list[dict[str, str]]:
     with path.open(encoding="utf-8-sig", newline="") as handle:
         rows = list(csv.DictReader(handle))
 
@@ -102,8 +104,7 @@ def read_generated_rows(path: Path, corpus_name: str, spec: dict[str, Any], gene
             raise ValueError(f"{corpus_name}/{item_id}: generated response is empty")
         if row["corpus"].strip() != expected_corpus_value:
             raise ValueError(
-                f"{corpus_name}/{item_id}: corpus field {row['corpus']!r} "
-                f"does not match {expected_corpus_value!r}"
+                f"{corpus_name}/{item_id}: corpus field {row['corpus']!r} does not match {expected_corpus_value!r}"
             )
         if sha256_text(prompt) != row["prompt_sha256"].strip():
             raise ValueError(f"{corpus_name}/{item_id}: prompt SHA-256 mismatch")
@@ -163,9 +164,7 @@ def load_final_rows(manifest: dict[str, Any], corpus: str = "all") -> list[dict[
     if len(item_ids) != len(set(item_ids)):
         raise ValueError("Final 360-item input contains duplicate item IDs")
     if corpus == "all" and len(rows) != int(manifest["dataset"]["items"]):
-        raise ValueError(
-            f"Final manifest expects {manifest['dataset']['items']} items, found {len(rows)}"
-        )
+        raise ValueError(f"Final manifest expects {manifest['dataset']['items']} items, found {len(rows)}")
     return rows
 
 
@@ -220,8 +219,7 @@ def verify_runtime_manifest(path: Path, manifest: dict[str, Any], config_path: P
     if runtime.get("config_sha256") != sha256_file(config_path):
         raise RuntimeError("Runtime manifest was captured for a different verifier config")
     expected_hashes = {
-        name: sha256_file(Path(manifest["dataset"]["corpora"][name]["path"]))
-        for name in FINAL_CORPUS_ORDER
+        name: sha256_file(Path(manifest["dataset"]["corpora"][name]["path"])) for name in FINAL_CORPUS_ORDER
     }
     if runtime.get("dataset_sha256") != expected_hashes:
         raise RuntimeError("Runtime manifest was captured for different generated datasets")
@@ -302,7 +300,9 @@ def build_verifier(config: Config) -> CulturalVerifier:
     api_key = (
         os.getenv("OPENROUTER_API_KEY")
         if config.verifier_model_provider == "openrouter"
-        else os.getenv("L3S_API_KEY") if config.verifier_model_provider == "l3s" else None
+        else os.getenv("L3S_API_KEY")
+        if config.verifier_model_provider == "l3s"
+        else None
     )
     llm = HTTPModel(config, api_key)
     if config.mode == "LIVE":
