@@ -1,0 +1,13 @@
+{
+  "schema_version": "vericult-backbone-freeze-v1",
+  "frozen_at": "2026-10-02",
+  "purpose": "Backbone freeze before held-out CARB external evaluation",
+  "verifier_backbone": {
+    "provider": "ollama",
+    "model_id": "qwen3:4b",
+    "temperature": 0
+  },
+  "selection_basis": "Retained after prior development-stage comparisons; CARB is excluded from backbone selection and tuning.",
+  "holdout_policy": "Do not change the verifier backbone based on CARB outcomes. Any later model change constitutes a new experimental configuration and must not replace this CARB run retrospectively.",
+  "note": "This file freezes the semantic backbone only. The final experiment manifest must additionally record the final architecture/code commit, Ollama digest, prompts, rubric, retrieval settings, and runtime hashes."
+}

@@ -90,6 +90,35 @@ class TargetBatch(Record):
     truncated: bool = False
 
 
+class TargetSelectionDraft(Record):
+    span_id: Text
+    proposition: Text
+    epistemic_type: EpistemicType
+    dimension_ids: tuple[DimensionID, ...] = Field(min_length=1)
+    materiality: Text
+    retrieval_appropriate: Annotated[bool, Field(strict=True)]
+
+    @model_validator(mode="after")
+    def retrieval_type(self):
+        if (
+            self.epistemic_type in (EpistemicType.EXTERNAL, EpistemicType.NORM, EpistemicType.RECOMMENDATION)
+            and not self.retrieval_appropriate
+        ):
+            raise ValueError(
+                "External facts, descriptive norms and context-dependent recommendations require retrieval"
+            )
+        if self.retrieval_appropriate and self.epistemic_type in (EpistemicType.INTERNAL, EpistemicType.VALUE):
+            raise ValueError("Internal quality/value targets must not trigger retrieval")
+        if len(set(self.dimension_ids)) != len(self.dimension_ids):
+            raise ValueError("Duplicate target dimensions")
+        return self
+
+
+class TargetSelectionBatch(Record):
+    targets: tuple[TargetSelectionDraft, ...] = Field(max_length=3)
+    truncated: bool = False
+
+
 class QuestionDraft(Record):
     kind: Literal["baseline", "variation", "followup"]
     text: Text
@@ -240,6 +269,16 @@ class DimensionScoreDraft(Record):
 
 class ScoreDraftBatch(Record):
     scores: tuple[DimensionScoreDraft, ...]
+
+
+class DimensionScoreDecision(Record):
+    dimension_id: DimensionID
+    score: Annotated[int, Field(strict=True, ge=0, le=2)] | Literal["abstain"]
+    rationale: Text
+
+
+class ScoreDecisionBatch(Record):
+    scores: tuple[DimensionScoreDecision, ...]
 
 
 class DimensionScore(DimensionScoreDraft):

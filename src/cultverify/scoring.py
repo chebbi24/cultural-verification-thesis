@@ -3,11 +3,11 @@ from .schemas import (
     DimensionScore,
     RankingResult,
     ScoreBatch,
-    ScoreDraftBatch,
+    ScoreDecisionBatch,
     TargetVerdict,
     TargetVerdictDraft,
 )
-from .validation import validate_score_drafts, validate_scores, validate_verdict
+from .validation import validate_score_decisions, validate_scores, validate_verdict
 
 
 def _memo_evidence_view(memo):
@@ -117,10 +117,9 @@ def score_dimensions(session, prompt, response, context, plan, targets, verdicts
                 "memos": [_memo_evidence_view(m) for m in active_memos],
                 "rubric": rubric,
             },
-            ScoreDraftBatch,
-            lambda b: validate_score_drafts(
+            ScoreDecisionBatch,
+            lambda b: validate_score_decisions(
                 b,
-                response,
                 plan,
                 targets,
                 verdicts,
@@ -165,8 +164,14 @@ def score_dimensions(session, prompt, response, context, plan, targets, verdicts
                 for target in relevant_targets
                 if target.target_id in direct_target_ids | directional_target_ids
             )
+            response_quotes = tuple(
+                target.response_quote for target in relevant_targets if target.target_id in linked_target_ids
+            )
+            if draft.score != "abstain" and response and not response_quotes:
+                response_quotes = (response,)
             score = DimensionScore(
                 **draft.model_dump(mode="json"),
+                response_quotes=response_quotes,
                 target_ids=linked_target_ids,
                 memo_ids=tuple(
                     dict.fromkeys(

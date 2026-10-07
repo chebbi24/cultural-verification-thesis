@@ -117,10 +117,10 @@ def test_duplicate_dimensions_rejected():
         DimensionPlan(dimensions=(dim, dim), reasoning="x")
 
 
-def test_invalid_target_quote_abstains(setup):
+def test_unknown_target_span_abstains(setup):
     config, _, retriever, _ = setup
     target = {
-        "response_quote": "hallucinated",
+        "span_id": "S999",
         "proposition": "x",
         "epistemic_type": "external_fact",
         "dimension_ids": ["D03"],
@@ -165,7 +165,7 @@ def test_configured_target_limit(setup):
     config, _, retriever, _ = setup
     config = config.model_copy(update={"max_material_targets": 1})
     target = dict(
-        response_quote=RESPONSE,
+        span_id="S001",
         proposition="x",
         epistemic_type="external_fact",
         dimension_ids=["D03"],
@@ -578,7 +578,6 @@ def test_directional_verdict_forces_numeric_score_retry(setup):
                     "dimension_id": d["dimension_id"],
                     "score": value,
                     "rationale": "Assessable but incomplete evidence.",
-                    "response_quotes": [payload["response"]],
                 }
                 for d in payload["dimension_plan"]["dimensions"]
             ]
@@ -603,7 +602,6 @@ def test_numeric_score_gets_assessable_target_link_from_python(setup):
                     "dimension_id": d["dimension_id"],
                     "score": 2,
                     "rationale": "Assessable evidence.",
-                    "response_quotes": [payload["response"]],
                 }
                 for d in payload["dimension_plan"]["dimensions"]
             ]
@@ -642,7 +640,6 @@ def test_all_external_insufficient_requires_dimension_abstention(setup):
                     "dimension_id": d["dimension_id"],
                     "score": 2,
                     "rationale": "The model incorrectly tries to score unavailable evidence.",
-                    "response_quotes": [payload["response"]],
                     "target_ids": [
                         t["target_id"] for t in payload["targets"] if d["dimension_id"] in t["dimension_ids"]
                     ],
@@ -1158,7 +1155,7 @@ def test_no_dimensions_no_search(setup):
 def test_internal_targets_no_external_search(setup):
     config, _, retriever, _ = setup
     target = dict(
-        response_quote=RESPONSE,
+        span_id="S001",
         proposition="x",
         epistemic_type="response_internal_quality",
         dimension_ids=["D03"],
@@ -1229,7 +1226,7 @@ def test_scoring_links_are_python_owned_and_dimension_safe(setup):
         return {
             "targets": [
                 {
-                    "response_quote": RESPONSE,
+                    "span_id": "S001",
                     "proposition": "A social-etiquette claim.",
                     "epistemic_type": "external_fact",
                     "dimension_ids": ["D03"],
@@ -1247,13 +1244,11 @@ def test_scoring_links_are_python_owned_and_dimension_safe(setup):
                     "dimension_id": "D03",
                     "score": 2,
                     "rationale": "Supported etiquette.",
-                    "response_quotes": [RESPONSE],
                 },
                 {
                     "dimension_id": "D02",
                     "score": 1,
                     "rationale": "Direct language assessment.",
-                    "response_quotes": [RESPONSE],
                 },
             ]
         }
@@ -1284,7 +1279,6 @@ def test_score_memo_links_are_derived_from_target_ids(setup):
                     "dimension_id": "D03",
                     "score": 2,
                     "rationale": "x",
-                    "response_quotes": [RESPONSE],
                 }
             ]
         }
@@ -1300,6 +1294,7 @@ def test_score_memo_links_are_derived_from_target_ids(setup):
     scorer_schema = json.dumps(scorer_call["schema"], sort_keys=True)
     assert "target_ids" not in scorer_schema
     assert "memo_ids" not in scorer_schema
+    assert "response_quotes" not in scorer_schema
 
 
 def test_ungrounded_support_cannot_reach_target_comparison(setup):
