@@ -1,4 +1,4 @@
-"""Capture the local runtime identity required before the frozen final experiment."""
+"""Capture runtime identity for the frozen 360-item single-response experiment."""
 
 from __future__ import annotations
 
@@ -8,18 +8,27 @@ import json
 import os
 import platform
 import sys
-from dotenv import load_dotenv
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
 import requests
+from dotenv import load_dotenv
 
 try:
-    from scripts.run_final_experiment import assert_frozen_checkout, sha256_file, validate_freeze_files
+    from scripts.run_final_experiment import (
+        assert_frozen_checkout,
+        load_final_rows,
+        sha256_file,
+        validate_freeze_files,
+    )
 except ModuleNotFoundError:
-    # Support direct execution: python scripts/preflight_final_experiment.py
-    from run_final_experiment import assert_frozen_checkout, sha256_file, validate_freeze_files
+    from run_final_experiment import (
+        assert_frozen_checkout,
+        load_final_rows,
+        sha256_file,
+        validate_freeze_files,
+    )
 
 
 def tags_url(chat_url: str) -> str:
@@ -40,7 +49,6 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, default=Path("experiments/final_manifest.json"))
     parser.add_argument("--config", type=Path, default=Path("experiments/final_vericult_config.json"))
-    parser.add_argument("--dataset", type=Path, default=Path("data/evaluation/best_of4_v1.csv"))
     parser.add_argument(
         "--output",
         type=Path,
@@ -51,7 +59,10 @@ def main(argv: list[str] | None = None) -> int:
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
     config = json.loads(args.config.read_text(encoding="utf-8"))
     assert_frozen_checkout(manifest)
-    validate_freeze_files(manifest, args.dataset, args.config)
+    dataset_hashes = validate_freeze_files(manifest, args.config)
+    rows = load_final_rows(manifest, "all")
+    if len(rows) != 360:
+        raise RuntimeError(f"Final experiment must contain exactly 360 prompt-response pairs; found {len(rows)}")
 
     provider = os.getenv("CULTVERIFY_PROVIDER", config["verifier_model_provider"])
     model_id = os.getenv("CULTVERIFY_MODEL", config["verifier_model_id"])
@@ -96,18 +107,23 @@ def main(argv: list[str] | None = None) -> int:
         }
     else:
         raise RuntimeError(f"Unsupported final-experiment provider: {provider}")
+
     runtime = {
-        "schema_version": "final-runtime-v1",
+        "schema_version": "final-runtime-v2",
         "captured_at_utc": datetime.now(timezone.utc).isoformat(),
         "git_head": __import__("subprocess")
         .run(["git", "rev-parse", "HEAD"], check=True, capture_output=True, text=True)
         .stdout.strip(),
         "python": sys.version,
         "platform": platform.platform(),
-        "dataset_sha256": sha256_file(args.dataset),
+        "n_items": len(rows),
+        "dataset_sha256": dataset_hashes,
         "config_sha256": sha256_file(args.config),
         "verifier_model": verifier_model,
-        "packages": {name: importlib.metadata.version(name) for name in ("cultverify", "pydantic", "requests")},
+        "packages": {
+            name: importlib.metadata.version(name)
+            for name in ("cultverify", "pydantic", "requests")
+        },
         "credentials_present": {
             "TAVILY_API_KEY": bool(os.getenv("TAVILY_API_KEY")),
             "OPENROUTER_API_KEY": bool(os.getenv("OPENROUTER_API_KEY")),
@@ -117,7 +133,8 @@ def main(argv: list[str] | None = None) -> int:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(runtime, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(
-        f"Runtime frozen: {runtime['verifier_model'].get('installed_name', runtime['verifier_model']['requested_id'])} "
+        f"Runtime frozen for {len(rows)} items: "
+        f"{runtime['verifier_model'].get('installed_name', runtime['verifier_model']['requested_id'])} "
         f"digest={runtime['verifier_model']['digest']} -> {args.output}"
     )
     return 0
