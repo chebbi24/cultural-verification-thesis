@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import sys
+from dotenv import load_dotenv
 from pathlib import Path
 from .config import Config
 from .llm import HTTPModel
@@ -12,6 +13,7 @@ from .retrieval import TavilyRetriever
 
 
 def main(argv=None):
+    load_dotenv()
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     for name in ("verify", "rank"):
@@ -29,7 +31,7 @@ def main(argv=None):
             )
         command.add_argument("--config", type=Path, help="Config JSON, credentials excluded")
         command.add_argument("--model")
-        command.add_argument("--provider", choices=("ollama", "openrouter"))
+        command.add_argument("--provider", choices=("ollama", "openrouter", "l3s"))
         command.add_argument("--mode", choices=("LIVE", "REPLAY"))
         command.add_argument("--cache-directory", type=Path)
         command.add_argument("--trace-directory", type=Path)
@@ -41,6 +43,7 @@ def main(argv=None):
             "verifier_model_provider": "CULTVERIFY_PROVIDER",
             "mode": "CULTVERIFY_MODE",
             "ollama_url": "OLLAMA_URL",
+            "l3s_api_url": "L3S_API_URL",
         }
         for key, name in env.items():
             if name in os.environ:
@@ -55,7 +58,11 @@ def main(argv=None):
             if getattr(args, arg) is not None:
                 values[key] = getattr(args, arg)
         config = Config.model_validate(values)
-        api_key = os.getenv("OPENROUTER_API_KEY") if config.verifier_model_provider == "openrouter" else None
+        api_key = (
+            os.getenv("OPENROUTER_API_KEY")
+            if config.verifier_model_provider == "openrouter"
+            else os.getenv("L3S_API_KEY") if config.verifier_model_provider == "l3s" else None
+        )
         llm = HTTPModel(config, api_key)
         retriever = TavilyRetriever(os.getenv("TAVILY_API_KEY"), config.search_depth) if config.mode == "LIVE" else None
         verifier = CulturalVerifier(llm=llm, retriever=retriever, config=config)
