@@ -7,7 +7,7 @@ PIPELINE_VERSION = "cultverify-1.1.0"
 
 
 class Config(Record):
-    verifier_model_provider: Literal["ollama", "openrouter", "custom"] = "ollama"
+    verifier_model_provider: Literal["ollama", "openrouter", "l3s", "custom"] = "ollama"
     verifier_model_id: str = Field(min_length=1)  # Deliberate experimental choice, no silent default.
     temperature: float = Field(default=0, ge=0, le=2)
     retry_count: int = Field(default=1, ge=0, le=1)
@@ -21,6 +21,7 @@ class Config(Record):
     cache_directory: Path = Path("artifacts/evidence")
     trace_directory: Path = Path("artifacts/traces")
     ollama_url: str = "http://localhost:11434/api/chat"
+    l3s_api_url: str = "https://YOUR_L3S_HOST/v1/chat/completions"
     search_depth: Literal["basic", "advanced"] = "advanced"
     excluded_domains: tuple[str, ...] = ()
     excluded_repos: tuple[str, ...] = ("chebbi24/cultural-verification-thesis",)
