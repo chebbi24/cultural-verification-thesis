@@ -1,13 +1,15 @@
 {
   "schema_version": "vericult-backbone-freeze-v1",
-  "frozen_at": "2026-10-02",
+  "frozen_at": "2026-10-07",
   "purpose": "Backbone freeze before held-out CARB external evaluation",
   "verifier_backbone": {
-    "provider": "ollama",
-    "model_id": "qwen3:4b",
+    "provider": "l3s",
+    "model_id": "vllm/qwen3.6:35b-a3b-fp8",
+    "api_base": "https://inference.kbs.uni-hannover.de/",
+    "chat_completions_endpoint": "https://inference.kbs.uni-hannover.de/v1/chat/completions",
     "temperature": 0
   },
-  "selection_basis": "Retained after prior development-stage comparisons; CARB is excluded from backbone selection and tuning.",
-  "holdout_policy": "Do not change the verifier backbone based on CARB outcomes. Any later model change constitutes a new experimental configuration and must not replace this CARB run retrospectively.",
-  "note": "This file freezes the semantic backbone only. The final experiment manifest must additionally record the final architecture/code commit, Ollama digest, prompts, rubric, retrieval settings, and runtime hashes."
+  "selection_basis": "Final thesis verifier backbone switched to the L3S-hosted Qwen3.6 35B-A3B FP8 endpoint before final experiment execution.",
+  "holdout_policy": "Do not change the verifier backbone based on final benchmark outcomes. Any later model change constitutes a new experimental configuration.",
+  "note": "Credentials are never stored in Git. L3S_API_KEY is loaded from the local git-ignored .env file."
 }
