@@ -59,6 +59,32 @@ def test_openrouter_contract_same_model_no_fallback():
     assert "plugins" not in body
 
 
+
+def test_l3s_openai_compatible_contract():
+    config = Config(
+        verifier_model_provider="l3s",
+        verifier_model_id="l3s/frozen-model",
+        l3s_api_url="https://l3s.example/v1/chat/completions",
+    )
+    client = HTTPModel(config, api_key="test-only-placeholder")
+    response = Mock()
+    response.json.return_value = {"choices": [{"message": {"content": '{"text":"query"}'}}]}
+    with patch("cultverify.llm.requests.post", return_value=response) as post:
+        raw = client.complete(
+            stage="query_rewriter_v1",
+            system="Instructions",
+            payload={"question": "q"},
+            schema=QueryDraft.model_json_schema(),
+        )
+    assert json.loads(raw)["text"] == "query"
+    assert post.call_args.args[0] == config.l3s_api_url
+    assert post.call_args.kwargs["headers"]["Authorization"] == "Bearer test-only-placeholder"
+    body = post.call_args.kwargs["json"]
+    assert body["model"] == config.verifier_model_id
+    assert body["temperature"] == 0
+    assert body["response_format"]["json_schema"]["strict"] is True
+    assert "test-only-placeholder" not in json.dumps(body)
+
 def test_provider_tuple_schema_compatible():
     schema = strict_schema(InitialQuestions.model_json_schema())
     assert "prefixItems" not in json.dumps(schema)
