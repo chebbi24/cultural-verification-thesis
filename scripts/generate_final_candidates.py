@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
-"""Generate frozen Best-of-4 candidates for the final thesis prompt pools.
+"""Generate one frozen GPT-OSS response per prompt for the final thesis corpora.
 
-The generator never reads human-gold files and never overwrites the existing
-source/native responses. Each candidate is produced by an independent API call
-using the original prompt verbatim.
+The generator never reads human-gold files and never overwrites the original
+source/native responses. The original prompt is sent verbatim.
 
 Examples:
     python scripts/generate_final_candidates.py --dry-run --corpus all
-    python scripts/generate_final_candidates.py --corpus plt30 --limit 3
+    python scripts/generate_final_candidates.py --corpus redteam120 --limit 3
     python scripts/generate_final_candidates.py --corpus all
 """
 
@@ -30,7 +29,6 @@ from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG = ROOT / "experiments" / "generator_freeze.json"
-LABELS = ("A", "B", "C", "D")
 
 
 def sha256_text(value: str) -> str:
@@ -129,39 +127,31 @@ def load_corpus(name: str, spec: dict[str, Any]) -> list[dict[str, str]]:
         suffix = "" if len(missing) <= 12 else f", ... (+{len(missing) - 12} more)"
         raise ValueError(
             f"{name}: {len(missing)} prompts are not locally materialized: {preview}{suffix}. "
-            "Generation is intentionally blocked rather than inventing or reconstructing prompt text."
+            "Generation is blocked rather than reconstructing prompt text."
         )
     return rows
 
 
-def output_fields() -> list[str]:
-    base = [
-        "corpus",
-        "item_id",
-        "source_dataset",
-        "source_record_id",
-        "language",
-        "culture",
-        "prompt",
-        "prompt_sha256",
-        "generator_model",
-        "temperature",
-        "top_p",
-        "max_tokens",
-    ]
-    for label in LABELS:
-        lower = label.lower()
-        base.extend(
-            [
-                f"response_{lower}",
-                f"response_{lower}_sha256",
-                f"generated_at_{lower}",
-                f"prompt_tokens_{lower}",
-                f"completion_tokens_{lower}",
-                f"total_tokens_{lower}",
-            ]
-        )
-    return base
+FIELDS = [
+    "corpus",
+    "item_id",
+    "source_dataset",
+    "source_record_id",
+    "language",
+    "culture",
+    "prompt",
+    "prompt_sha256",
+    "generator_model",
+    "temperature",
+    "top_p",
+    "max_tokens",
+    "response",
+    "response_sha256",
+    "generated_at",
+    "prompt_tokens",
+    "completion_tokens",
+    "total_tokens",
+]
 
 
 def initialize_rows(
@@ -172,24 +162,23 @@ def initialize_rows(
 ) -> list[dict[str, str]]:
     rows = []
     for item in items:
-        row = {
-            "corpus": corpus,
-            **item,
-            "prompt_sha256": sha256_text(item["prompt"]),
-            "generator_model": generator["model_id"],
-            "temperature": str(sampling["temperature"]),
-            "top_p": str(sampling["top_p"]),
-            "max_tokens": str(sampling["max_tokens"]),
-        }
-        for label in LABELS:
-            lower = label.lower()
-            row[f"response_{lower}"] = ""
-            row[f"response_{lower}_sha256"] = ""
-            row[f"generated_at_{lower}"] = ""
-            row[f"prompt_tokens_{lower}"] = ""
-            row[f"completion_tokens_{lower}"] = ""
-            row[f"total_tokens_{lower}"] = ""
-        rows.append(row)
+        rows.append(
+            {
+                "corpus": corpus,
+                **item,
+                "prompt_sha256": sha256_text(item["prompt"]),
+                "generator_model": generator["model_id"],
+                "temperature": str(sampling["temperature"]),
+                "top_p": str(sampling["top_p"]),
+                "max_tokens": str(sampling["max_tokens"]),
+                "response": "",
+                "response_sha256": "",
+                "generated_at": "",
+                "prompt_tokens": "",
+                "completion_tokens": "",
+                "total_tokens": "",
+            }
+        )
     return rows
 
 
@@ -210,20 +199,17 @@ def merge_existing(
         if old.get("prompt_sha256") != row["prompt_sha256"]:
             raise ValueError(f"{row['item_id']}: prompt changed since existing generation output")
         if old.get("generator_model") != row["generator_model"]:
-            raise ValueError(f"{row['item_id']}: generator model differs from existing generation output")
-        for label in LABELS:
-            lower = label.lower()
-            keys = (
-                f"response_{lower}",
-                f"response_{lower}_sha256",
-                f"generated_at_{lower}",
-                f"prompt_tokens_{lower}",
-                f"completion_tokens_{lower}",
-                f"total_tokens_{lower}",
-            )
-            for key in keys:
-                if old.get(key):
-                    row[key] = old[key]
+            raise ValueError(f"{row['item_id']}: generator model differs from existing output")
+        for key in (
+            "response",
+            "response_sha256",
+            "generated_at",
+            "prompt_tokens",
+            "completion_tokens",
+            "total_tokens",
+        ):
+            if old.get(key):
+                row[key] = old[key]
     return fresh
 
 
@@ -231,7 +217,7 @@ def write_rows(path: Path, rows: list[dict[str, str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temp = path.with_suffix(path.suffix + ".tmp")
     with temp.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=output_fields(), extrasaction="ignore")
+        writer = csv.DictWriter(handle, fieldnames=FIELDS, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
     temp.replace(path)
@@ -267,32 +253,17 @@ def generate_one(
             if not isinstance(content, str) or not content.strip():
                 raise ValueError(f"Empty/non-text assistant content: {message!r}")
             usage = data.get("usage") or {}
-            token_usage = {
+            return content.strip(), {
                 "prompt_tokens": int(usage.get("prompt_tokens") or 0),
                 "completion_tokens": int(usage.get("completion_tokens") or 0),
                 "total_tokens": int(usage.get("total_tokens") or 0),
             }
-            return content.strip(), token_usage
         except (requests.RequestException, ValueError, KeyError, TypeError) as exc:
             last_error = exc
             if attempt > retries:
                 break
             time.sleep(2 * attempt)
     raise RuntimeError(f"Generation failed after {retries + 1} attempts: {last_error}")
-
-
-def validate_existing_config(rows: list[dict[str, str]], sampling: dict[str, Any]) -> None:
-    expected = {
-        "temperature": str(sampling["temperature"]),
-        "top_p": str(sampling["top_p"]),
-        "max_tokens": str(sampling["max_tokens"]),
-    }
-    for row in rows:
-        for key, value in expected.items():
-            if row.get(key) != value:
-                raise ValueError(
-                    f"{row['item_id']}: existing {key}={row.get(key)!r} differs from frozen {value!r}"
-                )
 
 
 def main() -> None:
@@ -314,8 +285,8 @@ def main() -> None:
     generator = config["generator"]
     sampling = config["sampling"]
 
-    if int(sampling["candidates_per_prompt"]) != len(LABELS):
-        raise ValueError("This frozen runner requires exactly four candidates A-D")
+    if int(sampling["candidates_per_prompt"]) != 1:
+        raise ValueError("This final runner requires exactly one generated response per prompt")
 
     names = (
         ("plt30", "external120", "redteam120")
@@ -323,7 +294,6 @@ def main() -> None:
         else (args.corpus,)
     )
 
-    # Validate every requested corpus before making a single paid/remote model call.
     loaded: dict[str, list[dict[str, str]]] = {}
     for name in names:
         rows = load_corpus(name, config["corpora"][name])
@@ -344,7 +314,6 @@ def main() -> None:
         generator["api_url_env"],
         "https://inference.kbs.uni-hannover.de/v1/chat/completions",
     )
-
     session = requests.Session()
 
     for name in names:
@@ -354,64 +323,48 @@ def main() -> None:
 
         rows = initialize_rows(name, items, generator, sampling)
         rows = merge_existing(rows, read_existing(output_path))
-        validate_existing_config(rows, sampling)
         write_rows(output_path, rows)
 
-        total_candidates = len(rows) * len(LABELS)
-        completed_before = sum(
-            1
-            for row in rows
-            for label in LABELS
-            if row[f"response_{label.lower()}"].strip()
-        )
+        completed_before = sum(1 for row in rows if row["response"].strip())
         print(
-            f"\n{name}: {len(rows)} prompts / {total_candidates} candidates "
+            f"\n{name}: {len(rows)} prompts / {len(rows)} responses "
             f"({completed_before} already complete)"
         )
 
         for row_index, row in enumerate(rows, start=1):
-            for label in LABELS:
-                lower = label.lower()
-                response_key = f"response_{lower}"
-                if row[response_key].strip():
-                    continue
+            if row["response"].strip():
+                continue
 
-                print(f"[{name} {row_index}/{len(rows)}] {row['item_id']} candidate {label} ...", flush=True)
-                started = time.monotonic()
-                content, usage = generate_one(
-                    session=session,
-                    api_url=api_url,
-                    api_key=api_key,
-                    model_id=generator["model_id"],
-                    prompt=row["prompt"],
-                    sampling=sampling,
-                    timeout=args.timeout,
-                    retries=args.retries,
-                )
-                elapsed = time.monotonic() - started
+            print(f"[{name} {row_index}/{len(rows)}] {row['item_id']} ...", flush=True)
+            started = time.monotonic()
+            content, usage = generate_one(
+                session=session,
+                api_url=api_url,
+                api_key=api_key,
+                model_id=generator["model_id"],
+                prompt=row["prompt"],
+                sampling=sampling,
+                timeout=args.timeout,
+                retries=args.retries,
+            )
+            elapsed = time.monotonic() - started
 
-                row[response_key] = content
-                row[f"response_{lower}_sha256"] = sha256_text(content)
-                row[f"generated_at_{lower}"] = datetime.now(timezone.utc).isoformat()
-                row[f"prompt_tokens_{lower}"] = str(usage["prompt_tokens"])
-                row[f"completion_tokens_{lower}"] = str(usage["completion_tokens"])
-                row[f"total_tokens_{lower}"] = str(usage["total_tokens"])
-                write_rows(output_path, rows)
+            row["response"] = content
+            row["response_sha256"] = sha256_text(content)
+            row["generated_at"] = datetime.now(timezone.utc).isoformat()
+            row["prompt_tokens"] = str(usage["prompt_tokens"])
+            row["completion_tokens"] = str(usage["completion_tokens"])
+            row["total_tokens"] = str(usage["total_tokens"])
+            write_rows(output_path, rows)
 
-                print(
-                    f"  saved in {elapsed:.1f}s; "
-                    f"tokens={usage['total_tokens'] or 'not reported'}",
-                    flush=True,
-                )
+            print(
+                f"  saved in {elapsed:.1f}s; tokens={usage['total_tokens'] or 'not reported'}",
+                flush=True,
+            )
 
-        missing = [
-            f"{row['item_id']}:{label}"
-            for row in rows
-            for label in LABELS
-            if not row[f"response_{label.lower()}"].strip()
-        ]
+        missing = [row["item_id"] for row in rows if not row["response"].strip()]
         if missing:
-            raise RuntimeError(f"{name}: incomplete candidates remain: {missing[:10]}")
+            raise RuntimeError(f"{name}: incomplete responses remain: {missing[:10]}")
 
         print(f"{name}: COMPLETE -> {output_path.relative_to(ROOT)}")
 
