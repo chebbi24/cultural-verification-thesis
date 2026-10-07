@@ -2,11 +2,16 @@
   "schema_version": "thesis-final-v2",
   "experiment_id": "thesis-final-v2",
   "pipeline_version": "cultverify-1.1.0",
-  "freeze_code_commit": "cbe62773eb16068b3b22873f3f863a9682f34385",
+  "freeze_code_commit": "200bca4575304795f491e76308d9be327ca269da",
   "validation": {
-    "github_actions_run_id": 36738708657,
+    "github_actions_run_id": 37602825309,
     "required_status": "success",
-    "local_live_smoke_required": true
+    "local_live_smoke_required": true,
+    "ci_workflow": "Verifier tests",
+    "post_freeze_metadata_allowlist": [
+      "experiments/final_manifest.json",
+      "docs/final_validation.md"
+    ]
   },
   "dataset": {
     "path": "data/evaluation/best_of4_v1.csv",

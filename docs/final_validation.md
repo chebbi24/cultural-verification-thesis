@@ -1,40 +1,56 @@
-# Final repository validation — Vericult 1.1
+# Final repository validation — Vericult 1.1 thesis freeze
 
-Validation target: experiment-ready branch after the Vericult 1.1 selective-decision
-implementation and final experiment harness were added.
+Frozen semantic/code revision: `200bca4575304795f491e76308d9be327ca269da`.
 
-CI validation on commit `ead68f06572b1a7db0e36a76006f465c405eb618`
-(GitHub Actions run `36738629175`) used Python 3.12 and the repository
-`requirements.lock`.
+GitHub Actions validation run: `37602825309` (**Verifier tests**, success) on Python 3.12.
 
-Results:
+Validated gates:
 
-- Compile: `python -m compileall -q src scripts tests` — passed.
-- Unit/integration suite: **130 passed, 1 skipped**.
-- Ruff lint: `ruff check src scripts tests` — passed.
-- Ruff formatting: `ruff format --check src scripts tests` — passed; 34 files formatted.
-- The single skipped test is the explicitly gated real-provider LIVE → REPLAY smoke
-  test. CI intentionally does not possess Ollama/Tavily credentials.
+- dependency installation from `requirements.lock` — passed;
+- `python -m compileall -q src scripts tests` — passed;
+- full `python -m pytest -q` unit/integration suite — passed;
+- `ruff check src scripts tests` — passed;
+- `ruff format --check src scripts tests` — passed.
 
-The passing suite covers the pre-existing verifier architecture plus the Vericult 1.1
-decision layer and final-experiment guards: score-0 candidate rejection,
-`no_acceptable_candidate`, `insufficient_evidence`, exact eligible ties without a
-primary-dimension tie-break, direct-judge deterministic candidate permutation,
-canonical PLT input validation, resume behavior, runtime-manifest validation,
-evidence-manifest mutation detection, and inference-runner isolation from Human Gold.
+The frozen code includes deterministic response-span grounding: the semantic model
+selects supplied span IDs instead of reproducing candidate quotations, Python resolves
+those IDs back to exact response substrings, and validation rejects unknown spans.
+The corresponding deterministic-grounding regression tests are part of the passing
+suite.
+
+## Repository-scope cleanup
+
+Before this freeze, retired thesis-development material was removed from the active
+tree: abandoned root-level cultural prompt-set exports, historical red-team prompt
+and model-output files, the old Ollama generation runner, the retired cultural-set
+builder/workflow, a dead Best-of-4 conversion script, temporary retest logs, and the
+development notebook. Repository guards now fail if these retired paths are
+reintroduced.
+
+The frozen PLT input, Human Gold provenance, D01–D10 research assets, independent
+baselines, smoke cases, experiment protocol/manifests, research documentation and
+external-validation protocol remain tracked.
+
+## Freeze metadata policy
+
+`experiments/final_manifest.json` identifies the semantic/code revision above as
+`freeze_code_commit`. Only the manifest itself and this validation document are
+allowed to differ in the post-freeze metadata commit; the final experiment runner
+rejects any other tracked changes relative to the frozen code revision.
 
 ## Required local provider gate
 
-Before the final PLT LIVE acquisition, run the credential-gated provider test on the
-frozen checkout:
+CI does not have the local Ollama runtime or Tavily credentials. Before final LIVE
+evidence acquisition, run on the frozen checkout:
 
 ```bash
 CULTVERIFY_RUN_LIVE=1 python -m pytest -q -m live
+python scripts/preflight_final_experiment.py
 ```
 
-This must pass with the final local `qwen3:4b` Ollama installation and Tavily key.
-Then run `scripts/preflight_final_experiment.py` to capture the exact Ollama model
-digest and runtime versions. No PLT item is used by the provider smoke test.
+The provider gate must use the final local `qwen3:4b` installation and the Tavily
+credential. The preflight captures the exact Ollama digest and runtime versions in
+`artifacts/final_experiment/runtime_manifest.json`.
 
 Software validation establishes implementation conformance and reproducibility
 guards; it does not establish cultural accuracy or empirical superiority.
