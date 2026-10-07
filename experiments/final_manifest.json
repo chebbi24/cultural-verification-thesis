@@ -2,7 +2,7 @@
   "schema_version": "thesis-final-v4-single-response",
   "experiment_id": "thesis-final-v4-360x1",
   "pipeline_version": "cultverify-1.1.0",
-  "freeze_code_commit": "4740e4dc1fa555d4eb97e3b03d24ee6fa97d575c",
+  "freeze_code_commit": "19bab66bf67c4a610fe1f88476a051bad5bcbabe",
   "validation": {
     "status": "pending_post_migration_validation",
     "local_live_smoke_required": true,
