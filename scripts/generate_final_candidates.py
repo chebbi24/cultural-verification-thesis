@@ -63,27 +63,19 @@ def _field(block: str, name: str) -> str:
 
 def load_external120(spec: dict[str, Any]) -> list[dict[str, str]]:
     path = ROOT / spec["input"]
-    text = path.read_text(encoding="utf-8")
-    matches = list(re.finditer(r"(?m)^RECORD\s+(\d{3})\s*$", text))
-    rows: list[dict[str, str]] = []
-    for index, match in enumerate(matches):
-        start = match.end()
-        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
-        block = text[start:end]
-        prompt_match = re.search(r"(?ms)^PROMPT:\s*\n(.*?)\nRESPONSE:\s*\n", block)
-        if not prompt_match:
-            raise ValueError(f"Could not parse PROMPT for external RECORD {match.group(1)}")
-        rows.append(
-            {
-                "item_id": f"EXT{match.group(1)}",
-                "prompt": prompt_match.group(1).strip(),
-                "source_dataset": _field(block, "DATASET"),
-                "source_record_id": _field(block, "SOURCE_ROW/ID"),
-                "language": _field(block, "LANGUAGE"),
-                "culture": _field(block, "CULTURE/COUNTRY"),
-            }
-        )
-    return rows
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    return [
+        {
+            "item_id": row[spec["id_field"]].strip(),
+            "prompt": row[spec["prompt_field"]].strip(),
+            "source_dataset": (row.get("dataset") or "").strip(),
+            "source_record_id": (row.get("source_row_id") or "").strip(),
+            "language": (row.get("language") or "").strip(),
+            "culture": (row.get("culture_country") or "").strip(),
+        }
+        for row in rows
+    ]
 
 
 def load_redteam120(spec: dict[str, Any]) -> list[dict[str, str]]:
