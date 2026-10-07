@@ -1,51 +1,37 @@
-# Final experiment configuration
-# Frozen for Bachelor thesis experiments
+# Convenience index for the final thesis experiment.
+# Authoritative semantic freeze remains experiments/final_manifest.json
+# and experiments/final_vericult_config.json.
 
-experiment:
-  name: vericult_final
-  dataset_plan:
-    external_benchmark_items: 120
-    redteam_items: 90
-    plt_best_of4_items: 30
-    total_items: 240
+authoritative:
+  manifest: experiments/final_manifest.json
+  vericult_config: experiments/final_vericult_config.json
+  backbone_freeze: experiments/backbone_freeze.json
 
-vericult:
-  semantic_backbone: Qwen3.6-35B-A3B
-  temperature: 0.0
-  max_material_targets: 3
-  verification_questions_per_target: 2
-  retrieval_top_k: 3
-  max_rounds: 2
-  retrieval_provider: Tavily
-  execution:
-    acquisition: LIVE
-    evaluation: REPLAY
-  dimension_scale:
-    - 0
-    - 1
-    - 2
-    - abstain
-  tie_policy: no_clear_winner
-  evidence_policy:
-    candidate_blind_retrieval: true
-    freeze_memo_before_candidate_comparison: true
+frozen_inputs:
+  plt_best_of4:
+    path: data/evaluation/best_of4_v1.csv
+    items: 30
+  external_120:
+    path: data/final/external_120/prompt_response_pairs_120.txt
+    previous_results: data/final/external_120/results_final_merged.jsonl
+    summary: data/final/external_120/summary.json
+    items: 120
+  redteam_90:
+    path: data/final/vericult_redteam_90_final_selection.csv
+    manifest: data/final/vericult_redteam_90_freeze_manifest.txt
+    items: 90
+    selection_sha256: 309f9a8bb18e77262bf4a892f0ef112779e65f91f689bee86fa852b5f906d1ef
 
-direct_llm_judge:
-  model: gpt-4.1-2025-04-14
-  temperature: 0.0
-  tie_policy: no_clear_winner
+planned_total_items: 240
 
-reward_model:
-  model: Skywork/Skywork-Reward-Gemma-2-27B-v0.2
-  deterministic_forward_pass: true
-  tie_policy: no_clear_winner
+models:
+  vericult:
+    source: experiments/final_manifest.json
+  direct_llm_judge:
+    source: experiments/final_manifest.json
+  reward_model:
+    source: experiments/final_manifest.json
 
-candidate_generation:
-  model: Qwen3.6-35B-A3B
-  temperature: 0.7
-  top_p: 1.0
-
-frozen_redteam:
-  path: data/final/vericult_redteam_90_final_selection.csv
-  manifest: data/final/vericult_redteam_90_freeze_manifest.txt
-  sha256: 309f9a8bb18e77262bf4a892f0ef112779e65f91f689bee86fa852b5f906d1ef
+note: >
+  Do not override the model identifiers or semantic settings here.
+  This file is an index only; the existing JSON freeze files are authoritative.
