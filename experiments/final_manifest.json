@@ -2,7 +2,7 @@
   "schema_version": "thesis-final-v3",
   "experiment_id": "thesis-final-v3",
   "pipeline_version": "cultverify-1.1.0",
-  "freeze_code_commit": "286598d5eb642c3d632e7b756ccf1954fb922a13",
+  "freeze_code_commit": "8c6777b1a4bcd35d3cb08fec0574e6df7d487705",
   "validation": {
     "github_actions_run_id": 37608290712,
     "required_status": "success",
@@ -93,11 +93,32 @@
     "human_gold_join_and_analysis"
   ],
   "external_validation_protocol": "experiments/external_validation_protocol.json",
-  "freeze_policy": "No semantic tuning after this freeze. Human Gold is excluded from all inference. Only documented execution fixes that do not use final labels are permitted.",
+  "freeze_policy": "No semantic tuning after this freeze. Human Gold is excluded from all inference. The package now includes the previously collected PLT30, archived external120, and frozen red-team90 inputs. Only documented execution fixes that do not use final labels are permitted.",
   "restoration_provenance": {
     "source_branch": "fix/cultural120-result-semantics",
     "validated_source_commit": "c1944bb1df47a8668689c316e62563bdc700fbf3",
     "validated_source_ci_run": 37336670390,
     "reason": "October 5 cultural-120 reliability/result-semantics repair was validated and used for the final failed-item rerun but was never merged into main; its verifier semantics were restored onto the cleaned thesis tree before the definitive freeze."
+  },
+  "frozen_inputs": {
+    "plt_best_of4": {
+      "path": "data/evaluation/best_of4_v1.csv",
+      "items": 30,
+      "sha256": "bb1f096dfbc74913a80219c983edeadb2b26f9b64ce912313d8cad29501a7587"
+    },
+    "external_120": {
+      "path": "data/final/external_120/prompt_response_pairs_120.txt",
+      "results": "data/final/external_120/results_final_merged.jsonl",
+      "summary": "data/final/external_120/summary.json",
+      "items": 120,
+      "provenance_branch": "archive/external-120-pre-freeze"
+    },
+    "redteam_90": {
+      "path": "data/final/vericult_redteam_90_final_selection.csv",
+      "manifest": "data/final/vericult_redteam_90_freeze_manifest.txt",
+      "items": 90,
+      "selection_sha256": "309f9a8bb18e77262bf4a892f0ef112779e65f91f689bee86fa852b5f906d1ef"
+    },
+    "planned_total_items": 240
   }
 }
