@@ -2,12 +2,12 @@
   "schema_version": "thesis-final-v4-single-response",
   "experiment_id": "thesis-final-v4-360x1",
   "pipeline_version": "cultverify-1.1.0",
-  "freeze_code_commit": "11c55f78e5eddecef2680da566f4a603d3ad9d07",
+  "freeze_code_commit": "e0012258d308d68c24c4b87737a3c781164009ea",
   "validation": {
-    "status": "pending_post_migration_validation",
+    "status": "pending_post_fix_validation",
     "local_live_smoke_required": true,
     "ci_workflow": "Verifier tests",
-    "note": "The semantic freeze commit records the 360x1 runner, preflight, evidence audit, leakage config, tests, and protocol. Final LIVE must not start until tests, lint, formatting, smoke, and preflight pass."
+    "note": "Final LIVE must not start until tests, lint, formatting, credential-gated smoke, and preflight pass on the 360x1 semantic freeze."
   },
   "dataset": {
     "design": "single_prompt_response",
@@ -24,25 +24,30 @@
         "items": 120,
         "id_prefix": "PLT",
         "generator_corpus": "plt120",
-        "sha256": "a5f6dac8eb3f67ff2eb30835d3bc5b57ee145eedb3a8771852e3c421b63a62a2",
-        "role": "custom cultural red-team challenge; PLT001-PLT030 retained as development-origin cases and PLT031-PLT120 as the expanded challenge set"
+        "role": "custom cultural red-team challenge; PLT001-PLT030 retained as development-origin cases and PLT031-PLT120 as the expanded challenge set",
+        "semantic_sha256": "febf9cf570b31e2f1a1ca5ee61466d6d8618fb7bd8d008a127b6cf6eb80214aa"
       },
       "external120": {
         "path": "data/generated/gpt_oss_120b/external120_generated.csv",
         "items": 120,
         "id_prefix": "EXT",
         "generator_corpus": "external120",
-        "sha256": "2be2c31c7fbf01c7b4b9625087f4257e2b98325d83c98988c934b80b00f1fd2a",
-        "role": "external multicultural/mostly appropriate evaluation set regenerated under the common generator"
+        "role": "external multicultural/mostly appropriate evaluation set regenerated under the common generator",
+        "semantic_sha256": "9d2c0e58afb89d2641adc549d7cfaff5eba9d45d549f728d6cba664778811a96"
       },
       "redteam120": {
         "path": "data/generated/gpt_oss_120b/redteam120_generated.csv",
         "items": 120,
         "id_prefix": "RT",
         "generator_corpus": "redteam120",
-        "sha256": "ebb200a7448e4cf860a229bc4b5ea747d59998a5a1b3622047982ea7935e9b50",
-        "role": "externally grounded cultural red-team evaluation set regenerated under the common generator"
+        "role": "externally grounded cultural red-team evaluation set regenerated under the common generator",
+        "semantic_sha256": "b0e8f9e81b4020bce0a5355790f511f9efaddc65944eddbdb072bbb2afb5989d"
       }
+    },
+    "hash_policy": {
+      "algorithm": "SHA-256",
+      "basis": "canonical ordered JSON over item_id, prompt_sha256, response_sha256, generator_model, temperature, top_p, and max_tokens",
+      "rationale": "Freezes the exact semantic prompt-response inputs and generator settings while remaining invariant to CSV newline/quoting representation. Per-row prompt_sha256 and response_sha256 are independently validated before this digest is accepted."
     }
   },
   "generator": {
