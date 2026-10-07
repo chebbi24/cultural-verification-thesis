@@ -61,22 +61,33 @@ The local virtual environment is ignored and no longer tracked; Git history is n
 
 ## Configuration and CLI
 
-The model must be selected explicitly. Export variables from `.env.example` as
-appropriate; the program does **not** automatically source `.env` files.
+The model must be selected explicitly. Copy `.env.example` to a local `.env`
+once and fill in the real credentials/model endpoint there. The local `.env` file
+is git-ignored and is loaded automatically by the CLI and final experiment runners.
 
 ```bash
-export CULTVERIFY_PROVIDER=ollama
-export CULTVERIFY_MODEL='qwen3:4b'  # frozen final thesis backbone
-export TAVILY_API_KEY='your-key'
+cp .env.example .env
+# edit .env once:
+# CULTVERIFY_PROVIDER=l3s
+# CULTVERIFY_MODEL=<exact L3S model id>
+# L3S_API_URL=<exact L3S chat-completions endpoint>
+# L3S_API_KEY=<secret key>
+# TAVILY_API_KEY=<secret key>
+
 python -m cultverify.cli verify \
   --prompt 'How should I write a first email to a university professor?' \
   --response 'Use a polite greeting and clearly explain the purpose of your message.'
 ```
 
-Ollama must be running with the selected model installed. For OpenRouter, set
+For the new L3S backbone, set `CULTVERIFY_PROVIDER=l3s`, the exact model ID,
+the full L3S chat-completions endpoint in `L3S_API_URL`, and `L3S_API_KEY`.
+The adapter uses an OpenAI-compatible chat-completions request with bearer-token
+authentication and strict JSON-schema output. If the concrete L3S deployment exposes
+a different request contract, update only the provider adapter rather than embedding
+credentials in experiment code.
+
+Ollama remains available for local runs. For OpenRouter, set
 `CULTVERIFY_PROVIDER=openrouter`, an explicit model ID, and `OPENROUTER_API_KEY`.
-Choose a model supporting JSON-schema structured output. Pin its revision/digest
-where the provider permits it; a mutable model alias is not a reproducibility guarantee.
 No credentials are included in traces or configuration JSON.
 
 For Best-of-4, `responses.json` is a plain JSON array of four response strings:
