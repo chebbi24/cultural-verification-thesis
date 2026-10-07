@@ -120,10 +120,7 @@ def main(argv: list[str] | None = None) -> int:
         "dataset_sha256": dataset_hashes,
         "config_sha256": sha256_file(args.config),
         "verifier_model": verifier_model,
-        "packages": {
-            name: importlib.metadata.version(name)
-            for name in ("cultverify", "pydantic", "requests")
-        },
+        "packages": {name: importlib.metadata.version(name) for name in ("cultverify", "pydantic", "requests")},
         "credentials_present": {
             "TAVILY_API_KEY": bool(os.getenv("TAVILY_API_KEY")),
             "OPENROUTER_API_KEY": bool(os.getenv("OPENROUTER_API_KEY")),
