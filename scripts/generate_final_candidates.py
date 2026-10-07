@@ -88,7 +88,7 @@ def load_external120(spec: dict[str, Any]) -> list[dict[str, str]]:
     return rows
 
 
-def load_redteam90(spec: dict[str, Any]) -> list[dict[str, str]]:
+def load_redteam120(spec: dict[str, Any]) -> list[dict[str, str]]:
     path = ROOT / spec["input"]
     with path.open(encoding="utf-8-sig", newline="") as handle:
         rows = list(csv.DictReader(handle))
@@ -110,8 +110,8 @@ def load_corpus(name: str, spec: dict[str, Any]) -> list[dict[str, str]]:
         rows = load_plt30(spec)
     elif name == "external120":
         rows = load_external120(spec)
-    elif name == "redteam90":
-        rows = load_redteam90(spec)
+    elif name == "redteam120":
+        rows = load_redteam120(spec)
     else:
         raise ValueError(f"Unknown corpus: {name}")
 
@@ -300,7 +300,7 @@ def main() -> None:
     parser.add_argument("--config", default=str(DEFAULT_CONFIG))
     parser.add_argument(
         "--corpus",
-        choices=("plt30", "external120", "redteam90", "all"),
+        choices=("plt30", "external120", "redteam120", "all"),
         default="all",
     )
     parser.add_argument("--dry-run", action="store_true")
@@ -318,7 +318,7 @@ def main() -> None:
         raise ValueError("This frozen runner requires exactly four candidates A-D")
 
     names = (
-        ("plt30", "external120", "redteam90")
+        ("plt30", "external120", "redteam120")
         if args.corpus == "all"
         else (args.corpus,)
     )
