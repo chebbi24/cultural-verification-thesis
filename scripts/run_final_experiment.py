@@ -141,6 +141,24 @@ def read_generated_rows(
     return normalized
 
 
+def semantic_dataset_sha256(rows: list[dict[str, str]]) -> str:
+    """Hash the frozen semantic input independently of CSV newline/quoting details."""
+    payload = [
+        {
+            "generator_model": row["generator_model"],
+            "item_id": row["item_id"],
+            "max_tokens": row["max_tokens"],
+            "prompt_sha256": row["prompt_sha256"],
+            "response_sha256": row["response_sha256"],
+            "temperature": row["temperature"],
+            "top_p": row["top_p"],
+        }
+        for row in rows
+    ]
+    canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def load_final_rows(manifest: dict[str, Any], corpus: str = "all") -> list[dict[str, str]]:
     corpora = manifest["dataset"]["corpora"]
     names = FINAL_CORPUS_ORDER if corpus == "all" else (corpus,)
@@ -204,10 +222,11 @@ def validate_freeze_files(manifest: dict[str, Any], config_path: Path) -> dict[s
         path = Path(spec["path"])
         if not path.is_file():
             raise RuntimeError(f"Frozen generated dataset is missing: {path}")
-        actual = sha256_file(path)
-        expected = spec.get("sha256")
+        rows = read_generated_rows(path, corpus_name, spec, manifest["generator"])
+        actual = semantic_dataset_sha256(rows)
+        expected = spec.get("semantic_sha256")
         if expected and actual != expected:
-            raise RuntimeError(f"Frozen generated dataset hash mismatch: {path}")
+            raise RuntimeError(f"Frozen generated dataset semantic hash mismatch: {path}")
         hashes[corpus_name] = actual
     return hashes
 
@@ -218,9 +237,7 @@ def verify_runtime_manifest(path: Path, manifest: dict[str, Any], config_path: P
     runtime = json.loads(path.read_text(encoding="utf-8"))
     if runtime.get("config_sha256") != sha256_file(config_path):
         raise RuntimeError("Runtime manifest was captured for a different verifier config")
-    expected_hashes = {
-        name: sha256_file(Path(manifest["dataset"]["corpora"][name]["path"])) for name in FINAL_CORPUS_ORDER
-    }
+    expected_hashes = validate_freeze_files(manifest, config_path)
     if runtime.get("dataset_sha256") != expected_hashes:
         raise RuntimeError("Runtime manifest was captured for different generated datasets")
     if not runtime.get("verifier_model", {}).get("digest"):
