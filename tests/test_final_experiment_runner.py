@@ -10,6 +10,7 @@ from scripts.run_final_experiment import (
     expected_item_ids,
     load_completed,
     read_generated_rows,
+    semantic_dataset_sha256,
     sha256_file,
     verify_evidence_manifest,
     verify_runtime_manifest,
@@ -122,19 +123,23 @@ def test_runtime_manifest_must_match_config_and_all_dataset_hashes(tmp_path):
 
     corpora = {}
     runtime_hashes = {}
+    generator = _generator()
     for name, prefix in (("plt120", "PLT"), ("external120", "EXT"), ("redteam120", "RT")):
         path = tmp_path / f"{name}.csv"
         _write_generated(path, name, prefix)
-        digest = sha256_file(path)
-        corpora[name] = {
+        spec = {
             "path": str(path),
             "items": 2,
             "id_prefix": prefix,
-            "sha256": digest,
+            "generator_corpus": name,
         }
+        rows = read_generated_rows(path, name, spec, generator)
+        digest = semantic_dataset_sha256(rows)
+        spec["semantic_sha256"] = digest
+        corpora[name] = spec
         runtime_hashes[name] = digest
 
-    manifest = {"dataset": {"corpora": corpora}}
+    manifest = {"dataset": {"corpora": corpora}, "generator": generator}
     runtime = tmp_path / "runtime.json"
     runtime.write_text(
         json.dumps(
