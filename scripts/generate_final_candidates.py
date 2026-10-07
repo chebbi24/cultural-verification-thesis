@@ -213,15 +213,15 @@ def merge_existing(
             raise ValueError(f"{row['item_id']}: generator model differs from existing generation output")
         for label in LABELS:
             lower = label.lower()
-            for suffix in (
-                "response",
-                "response_sha256",
-                "generated_at",
-                "prompt_tokens",
-                "completion_tokens",
-                "total_tokens",
-            ):
-                key = f"{suffix}_{lower}" if suffix != "response" else f"response_{lower}"
+            keys = (
+                f"response_{lower}",
+                f"response_{lower}_sha256",
+                f"generated_at_{lower}",
+                f"prompt_tokens_{lower}",
+                f"completion_tokens_{lower}",
+                f"total_tokens_{lower}",
+            )
+            for key in keys:
                 if old.get(key):
                     row[key] = old[key]
     return fresh
