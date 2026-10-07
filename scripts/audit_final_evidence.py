@@ -76,8 +76,7 @@ def main(argv: list[str] | None = None) -> int:
         missing = [item_id for item_id in expected_ids if item_id not in records]
         extra = [item_id for item_id in records if item_id not in expected_set]
         raise RuntimeError(
-            "LIVE output does not contain exactly the 360 frozen items. "
-            f"Missing={missing[:12]} Extra={extra[:12]}"
+            f"LIVE output does not contain exactly the 360 frozen items. Missing={missing[:12]} Extra={extra[:12]}"
         )
     if any(record.get("mode") != "LIVE" or record.get("status") != "completed" for record in records.values()):
         raise RuntimeError("Every final LIVE item must be completed before evidence is frozen")
@@ -103,17 +102,13 @@ def main(argv: list[str] | None = None) -> int:
                     referenced_snapshots.add(snapshot_id)
 
     if len(trace_paths) != len(expected_ids):
-        raise RuntimeError(
-            f"Expected {len(expected_ids)} response traces, found {len(trace_paths)}"
-        )
+        raise RuntimeError(f"Expected {len(expected_ids)} response traces, found {len(trace_paths)}")
 
     evidence_files = sorted(args.evidence_dir.glob("*.json"))
     evidence_names = {path.stem for path in evidence_files}
     missing_snapshots = sorted(referenced_snapshots - evidence_names)
     if missing_snapshots:
-        raise RuntimeError(
-            "Missing referenced frozen snapshots: " + ", ".join(missing_snapshots)
-        )
+        raise RuntimeError("Missing referenced frozen snapshots: " + ", ".join(missing_snapshots))
 
     dataset_hashes = {
         name: {
