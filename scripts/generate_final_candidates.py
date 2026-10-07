@@ -181,9 +181,7 @@ def read_existing(path: Path) -> dict[str, dict[str, str]]:
         return {row["item_id"]: row for row in csv.DictReader(handle)}
 
 
-def merge_existing(
-    fresh: list[dict[str, str]], existing: dict[str, dict[str, str]]
-) -> list[dict[str, str]]:
+def merge_existing(fresh: list[dict[str, str]], existing: dict[str, dict[str, str]]) -> list[dict[str, str]]:
     for row in fresh:
         old = existing.get(row["item_id"])
         if not old:
@@ -316,11 +314,7 @@ def main() -> None:
     if int(sampling["candidates_per_prompt"]) != 1:
         raise ValueError("This final runner requires exactly one generated response per prompt")
 
-    names = (
-        ("plt120", "external120", "redteam120")
-        if args.corpus == "all"
-        else (args.corpus,)
-    )
+    names = ("plt120", "external120", "redteam120") if args.corpus == "all" else (args.corpus,)
 
     loaded: dict[str, list[dict[str, str]]] = {}
     for name in names:
@@ -357,10 +351,7 @@ def main() -> None:
         write_rows(output_path, rows)
 
         completed_before = sum(1 for row in rows if row["response"].strip())
-        print(
-            f"\n{name}: {len(rows)} prompts / {len(rows)} responses "
-            f"({completed_before} already complete)"
-        )
+        print(f"\n{name}: {len(rows)} prompts / {len(rows)} responses ({completed_before} already complete)")
 
         for row_index, row in enumerate(rows, start=1):
             if row["response"].strip():
