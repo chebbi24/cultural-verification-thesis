@@ -7,11 +7,10 @@
     "api_key_env": "L3S_API_KEY"
   },
   "sampling": {
-    "candidates_per_prompt": 4,
+    "candidates_per_prompt": 1,
     "temperature": 0.8,
     "top_p": 0.95,
     "max_tokens": 1200,
-    "independent_calls": true,
     "system_prompt": null,
     "prompt_transformation": "none"
   },
@@ -21,20 +20,20 @@
       "expected_prompts": 30,
       "prompt_field": "prompt",
       "id_field": "prompt_id",
-      "output": "data/generated/gpt_oss_120b/plt30_generated_bestof4.csv"
+      "output": "data/generated/gpt_oss_120b/plt30_generated.csv"
     },
     "external120": {
       "input": "data/final/external_120/prompt_response_pairs_120.txt",
       "expected_prompts": 120,
       "format": "vericult_prompt_response_txt",
-      "output": "data/generated/gpt_oss_120b/external120_generated_bestof4.csv"
+      "output": "data/generated/gpt_oss_120b/external120_generated.csv"
     },
     "redteam120": {
       "input": "data/final/vericult_redteam_120_prompts.csv",
       "expected_prompts": 120,
       "prompt_field": "prompt",
       "id_field": "final_id",
-      "output": "data/generated/gpt_oss_120b/redteam120_generated_bestof4.csv",
+      "output": "data/generated/gpt_oss_120b/redteam120_generated.csv",
       "require_all_prompts_materialized": true
     }
   },
@@ -43,7 +42,8 @@
     "no_human_gold_access": true,
     "preserve_existing_source_responses": true,
     "resume_without_regenerating_completed_candidates": true,
-    "freeze_generated_outputs_before_vericult": true
+    "freeze_generated_outputs_before_vericult": true,
+    "single_response_per_prompt": true
   },
   "freeze_rationale": "GPT-OSS 120B is used as one fixed strong contemporary open-weight generator. Vericult uses a separate Qwen3.6 backbone, reducing same-model-family coupling between generation and verification."
 }
