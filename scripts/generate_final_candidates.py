@@ -96,8 +96,8 @@ def load_redteam120(spec: dict[str, Any]) -> list[dict[str, str]]:
         {
             "item_id": row[spec["id_field"]].strip(),
             "prompt": (row.get(spec["prompt_field"]) or "").strip(),
-            "source_dataset": (row.get("source") or "").strip(),
-            "source_record_id": (row.get("source_record_key") or "").strip(),
+            "source_dataset": (row.get("source_name") or row.get("source") or "").strip(),
+            "source_record_id": (row.get("source_record_key") or row.get("final_id") or "").strip(),
             "language": (row.get("language") or "").strip(),
             "culture": (row.get("country_culture") or "").strip(),
         }
