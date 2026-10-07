@@ -2,7 +2,7 @@
   "schema_version": "thesis-final-v3",
   "experiment_id": "thesis-final-v3",
   "pipeline_version": "cultverify-1.1.0",
-  "freeze_code_commit": "8c6777b1a4bcd35d3cb08fec0574e6df7d487705",
+  "freeze_code_commit": "975749196e264211d878be8765b06b7c9cd320d4",
   "validation": {
     "github_actions_run_id": 37608290712,
     "required_status": "success",
@@ -25,11 +25,11 @@
     "role": "comparison only after all machine predictions are persisted"
   },
   "vericult": {
-    "backbone": "qwen3:4b",
-    "provider": "ollama",
+    "backbone": "vllm/qwen3.6:35b-a3b-fp8",
+    "provider": "l3s",
     "temperature": 0,
     "config": "experiments/final_vericult_config.json",
-    "config_sha256": "3742f0ab4cb644760b7b455fdbd350ffbc6849c7579bc719749a57e70815c729",
+    "config_sha256": "a6115043ec7d4f0fd83f07e75f03910603d2d8c130a2694fcdd1f0c1fb55866d",
     "runtime_digest_manifest": "artifacts/final_experiment/runtime_manifest.json",
     "decision_space": [
       "A",
@@ -56,7 +56,9 @@
     "applicability_policy": "prompt-level cultural applicability gate runs before D01-D10 planning; materially non-cultural tasks -> not_culturally_applicable",
     "assessability_policy": "for culturally applicable prompts, pure refusals/non-answers with no substantive culturally assessable content -> not_assessable before target extraction",
     "contextual_fallback_policy": "only evidence-unresolved context_dependent_recommendation targets may use contextual fallback to judge observable cultural handling; unresolved external facts/descriptive norms may abstain",
-    "public_score_policy": "vericult_score is null whenever any applicable dimension abstains; exact internal aggregation remains available for deterministic ranking"
+    "public_score_policy": "vericult_score is null whenever any applicable dimension abstains; exact internal aggregation remains available for deterministic ranking",
+    "api_endpoint": "https://inference.kbs.uni-hannover.de/v1/chat/completions",
+    "credentials": "L3S_API_KEY from local .env; never committed"
   },
   "reward_model_baseline": {
     "model": "Skywork/Skywork-Reward-V2-Qwen3-4B",
@@ -93,7 +95,7 @@
     "human_gold_join_and_analysis"
   ],
   "external_validation_protocol": "experiments/external_validation_protocol.json",
-  "freeze_policy": "No semantic tuning after this freeze. Human Gold is excluded from all inference. The package now includes the previously collected PLT30, archived external120, and frozen red-team90 inputs. Only documented execution fixes that do not use final labels are permitted.",
+  "freeze_policy": "No semantic tuning after this L3S Qwen3.6 backbone freeze. Human Gold is excluded from all inference. Only documented execution fixes that do not use final labels are permitted.",
   "restoration_provenance": {
     "source_branch": "fix/cultural120-result-semantics",
     "validated_source_commit": "c1944bb1df47a8668689c316e62563bdc700fbf3",
