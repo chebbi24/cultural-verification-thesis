@@ -24,10 +24,12 @@ class HTTPModel:
     """Each request has fresh messages. Never retains candidate conversation state."""
 
     def __init__(self, config: Config, api_key: str | None = None):
-        if config.verifier_model_provider not in ("ollama", "openrouter"):
+        if config.verifier_model_provider not in ("ollama", "openrouter", "l3s"):
             raise ValueError("Supply a custom LLM adapter for provider=custom")
         if config.verifier_model_provider == "openrouter" and not api_key:
             raise ValueError("OPENROUTER_API_KEY is required")
+        if config.verifier_model_provider == "l3s" and not api_key:
+            raise ValueError("L3S_API_KEY is required")
         self.config = config
         self._api_key = api_key
 
@@ -44,7 +46,7 @@ class HTTPModel:
                 "options": {"temperature": self.config.temperature},
             }
             headers = {}
-        else:
+        elif self.config.verifier_model_provider == "openrouter":
             url = "https://openrouter.ai/api/v1/chat/completions"
             body = {
                 "model": self.config.verifier_model_id,
@@ -57,6 +59,21 @@ class HTTPModel:
                 },
             }
             headers = {"Authorization": f"Bearer {self._api_key}"}
+        else:  # L3S OpenAI-compatible chat-completions endpoint
+            url = self.config.l3s_api_url
+            body = {
+                "model": self.config.verifier_model_id,
+                "messages": messages,
+                "temperature": self.config.temperature,
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {"name": stage, "strict": True, "schema": strict_schema(schema)},
+                },
+            }
+            headers = {
+                "Authorization": f"Bearer {self._api_key}",
+                "Content-Type": "application/json",
+            }
         # Transport retries are handled by SemanticSession so every attempt is traced.
         response = requests.post(url, json=body, headers=headers, timeout=self.config.llm_timeout)
         response.raise_for_status()
