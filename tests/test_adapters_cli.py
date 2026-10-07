@@ -59,7 +59,6 @@ def test_openrouter_contract_same_model_no_fallback():
     assert "plugins" not in body
 
 
-
 def test_l3s_openai_compatible_contract():
     config = Config(
         verifier_model_provider="l3s",
@@ -84,6 +83,7 @@ def test_l3s_openai_compatible_contract():
     assert body["temperature"] == 0
     assert body["response_format"]["json_schema"]["strict"] is True
     assert "test-only-placeholder" not in json.dumps(body)
+
 
 def test_provider_tuple_schema_compatible():
     schema = strict_schema(InitialQuestions.model_json_schema())
