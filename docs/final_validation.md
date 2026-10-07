@@ -1,8 +1,16 @@
-# Final repository validation — Vericult 1.1 thesis freeze
+# Final repository validation — restored Vericult 1.1 thesis freeze
 
-Frozen semantic/code revision: `200bca4575304795f491e76308d9be327ca269da`.
+Frozen semantic/code revision: `286598d5eb642c3d632e7b756ccf1954fb922a13`.
 
-GitHub Actions validation run: `37602825309` (**Verifier tests**, success) on Python 3.12.
+GitHub Actions validation run: `37608290712` (**Verifier tests**, success) on Python 3.12.
+
+This freeze restores the verifier semantics that had already been validated on
+October 5 on branch `fix/cultural120-result-semantics` at
+`c1944bb1df47a8668689c316e62563bdc700fbf3` (CI run `37336670390`), but were
+never merged into `main`. Those semantics were used for the final failed-item rerun
+of the 120-case cross-dataset experiment. The restoration was applied selectively
+onto the cleaned thesis repository; retired challenge builders/datasets were not
+reintroduced.
 
 Validated gates:
 
@@ -10,25 +18,40 @@ Validated gates:
 - `python -m compileall -q src scripts tests` — passed;
 - full `python -m pytest -q` unit/integration suite — passed;
 - `ruff check src scripts tests` — passed;
-- `ruff format --check src scripts tests` — passed.
+- `ruff format --check src scripts tests` — passed;
+- current repository-scope guards — passed.
 
-The frozen code includes deterministic response-span grounding: the semantic model
-selects supplied span IDs instead of reproducing candidate quotations, Python resolves
-those IDs back to exact response substrings, and validation rejects unknown spans.
-The corresponding deterministic-grounding regression tests are part of the passing
-suite.
+## Restored final semantics
+
+The frozen verifier now contains the full validated October 5 result semantics:
+
+- prompt-level `cultural_applicability_v1` before D01–D10 planning;
+- `not_culturally_applicable` when cultural reasoning is not materially required;
+- `response_assessability_v1` for culturally applicable prompts;
+- `not_assessable` for pure refusals/non-answers with no substantive assessable answer;
+- deterministic response-span selection with Python-owned exact quotations;
+- normalization of equivalent span IDs while retaining the exact-span invariant;
+- deterministic retrieval routing from epistemic type;
+- per-dimension structural recovery when batch scoring remains invalid after bounded retry;
+- dimension outcomes 0, 1, 2 or `abstain`;
+- `insufficient_evidence` only for culturally applicable, assessable responses with no defensible scored basis;
+- selective `contextual_fallback_v1` only for unresolved context-dependent recommendations;
+- unresolved external facts and descriptive cultural norms remaining eligible for abstention;
+- public `vericult_score=null` whenever any applicable dimension abstains;
+- a score-0 material cultural failure remaining `culturally_inappropriate` even with partial abstention;
+- expanded Best-of-4/direct-judge outcomes including `not_culturally_applicable` and `not_assessable`.
+
+These distinctions keep three different cases separate: the task is not materially
+cultural, the response contains no assessable answer, or the task is cultural and
+assessable but the verifier lacks sufficient evidence.
 
 ## Repository-scope cleanup
 
-Before this freeze, retired thesis-development material was removed from the active
-tree: abandoned root-level cultural prompt-set exports, historical red-team prompt
-and model-output files, the old Ollama generation runner, the retired cultural-set
-builder/workflow, a dead Best-of-4 conversion script, temporary retest logs, and the
-development notebook. Repository guards now fail if these retired paths are
-reintroduced.
-
-The frozen PLT input, Human Gold provenance, D01–D10 research assets, independent
-baselines, smoke cases, experiment protocol/manifests, research documentation and
+The earlier cleanup remains intact. Retired root-level cultural prompt exports,
+historical model-output files, obsolete generators/runners, temporary retest logs,
+and abandoned challenge artifacts are not restored to the active tree. The frozen
+PLT input, Human Gold provenance, D01–D10 research assets, independent baselines,
+smoke cases, experiment protocols/manifests, research documentation and
 external-validation protocol remain tracked.
 
 ## Freeze metadata policy
@@ -36,7 +59,7 @@ external-validation protocol remain tracked.
 `experiments/final_manifest.json` identifies the semantic/code revision above as
 `freeze_code_commit`. Only the manifest itself and this validation document are
 allowed to differ in the post-freeze metadata commit; the final experiment runner
-rejects any other tracked changes relative to the frozen code revision.
+rejects other tracked semantic changes relative to the frozen revision.
 
 ## Required local provider gate
 
@@ -48,9 +71,9 @@ CULTVERIFY_RUN_LIVE=1 python -m pytest -q -m live
 python scripts/preflight_final_experiment.py
 ```
 
-The provider gate must use the final local `qwen3:4b` installation and the Tavily
+The provider gate must use the final local `qwen3:4b` installation and Tavily
 credential. The preflight captures the exact Ollama digest and runtime versions in
 `artifacts/final_experiment/runtime_manifest.json`.
 
 Software validation establishes implementation conformance and reproducibility
-guards; it does not establish cultural accuracy or empirical superiority.
+guards; it does not by itself establish cultural accuracy or empirical superiority.
