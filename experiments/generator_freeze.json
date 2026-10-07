@@ -23,9 +23,10 @@
       "output": "data/generated/gpt_oss_120b/plt30_generated.csv"
     },
     "external120": {
-      "input": "data/final/external_120/prompt_response_pairs_120.txt",
+      "input": "data/final/external_120/multicultural_120_prompts.csv",
       "expected_prompts": 120,
-      "format": "vericult_prompt_response_txt",
+      "prompt_field": "prompt",
+      "id_field": "external_id",
       "output": "data/generated/gpt_oss_120b/external120_generated.csv"
     },
     "redteam120": {
