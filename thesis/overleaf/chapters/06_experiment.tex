@@ -151,7 +151,7 @@ This gives the complete final dataset the following structure:
 \item \textbf{ExternalRedteam120}: 120 new red-team prompts synthesized from external public source material.
 \end{itemize}
 
-The total is therefore 360 frozen prompt--response pairs.
+The final dataset therefore contains 360 frozen prompt--response pairs.
 
 \subsection{Construction Procedure}
 
@@ -236,7 +236,7 @@ The thesis does not claim that GPT-OSS 120B is the strongest available generator
 
 \section{Frozen Dataset Identity}
 
-A raw CSV byte hash is sensitive to harmless changes in newline or quoting representation. The final experiment therefore uses a semantic SHA-256 digest.
+A raw CSV hash can change because of line endings or quoting even when the prompts and responses are unchanged. The final experiment therefore uses a semantic SHA-256 digest.
 
 For each row, the hash input contains:
 
@@ -415,7 +415,7 @@ at revision:
 
 The baseline remains completely separate from \texttt{src/cultverify}. Reward scores never enter Vericult. For the final single-response task, the adapter applies the reward model once to every frozen prompt--response pair and stores the raw scalar reward.
 
-The thesis deliberately does not invent a universal reward threshold for cultural appropriateness. Skywork was trained as a preference reward model, and a raw value such as 2.0 or -1.0 has no model-independent cultural interpretation. The primary single-response RM analysis therefore reports the score distribution and, on the subset where Vericult has a fully scored numeric result, the association between reward and Vericult score. If a final human reference for the same responses becomes available, reward-model discrimination can additionally be measured against that reference.
+The thesis does not invent a universal Skywork threshold for cultural appropriateness. Skywork is a preference reward model, so a raw score such as 2.0 or -1.0 does not have a general cultural meaning. The single-response analysis therefore reports the reward-score distribution. Where Vericult has a complete numeric score, the two scores can also be compared. Accuracy against humans is only possible if the same final responses receive human labels.
 
 This treatment preserves the reward model as a genuine independent baseline without forcing its native scalar output into an arbitrary categorical label.
 
@@ -450,7 +450,7 @@ Direct-judge exact label agreement with Vericult is reported descriptively. It i
 
 The repository contains a real human annotation study from the earlier Best-of-4 phase. It is reported here as development provenance, not as ground truth for the final 360 GPT-OSS responses.
 
-Five students completed all 30 pilot prompts. Each prompt had four historical candidate responses, producing 120 candidate responses in total. The study therefore contains 600 candidate-level 1--3 appropriateness ratings and 150 Best-of-4 choices. Under the frozen majority rule, 17 of the 30 prompts had a unique winner with at least three of five votes, seven of these reached strong consensus with four or five votes, and 13 prompts remained ambiguous. The observed Fleiss' kappa for winner choices was 0.090494.
+Five students completed all 30 pilot prompts. Each prompt had four historical responses. This gives 120 responses, 600 appropriateness ratings, and 150 Best-of-4 votes. Seventeen prompts had a unique winner with at least three of five votes. Seven reached strong consensus with four or five votes. Thirteen remained ambiguous. Fleiss' kappa for the winner choices was 0.090494.
 
 \begin{table}[ht]
 \centering
@@ -534,7 +534,7 @@ Where the trace supports it, report wall-clock runtime, semantic call counts, an
 
 \section{Statistical Interpretation}
 
-The 360 items are not an IID sample from one population. The three corpora have different construction processes. Statistical significance tests comparing corpus percentages would therefore require stronger assumptions than the design supports.
+The 360 items are not one random sample from one population. The three corpora were built in different ways. For this reason, the thesis mainly reports descriptive corpus comparisons instead of treating small percentage differences as population effects.
 
 The thesis mainly uses descriptive statistics, confidence intervals where a clear sampling interpretation exists, and paired comparisons only when the same items have an independent correctness reference.
 
@@ -593,7 +593,7 @@ ExternalRedteam120 & \texttt{b0e8f9e81b4020bce0a5355790f511f9efaddc65944eddbdb07
 
 Evidence retrieval must not return the benchmark's own reference answer as if it were an independent cultural source. The final configuration therefore excludes the thesis repository and known external benchmark hosting locations. The domain \texttt{huggingface.co} is excluded because five of the External120 sources are hosted there. The \texttt{UpstageAI/ThaiCLI\_H6} repository is also excluded.
 
-These exclusions reduce one form of leakage but do not guarantee complete independence. A benchmark question or its answer could be copied elsewhere on the public web. The thesis therefore treats retrieval leakage as a risk to audit, not as a solved problem.
+These exclusions reduce leakage, but they cannot guarantee full independence. A benchmark question or answer may exist on another website. Retrieval leakage is therefore treated as a limitation that must be checked.
 
 The ExternalRedteam120 provenance sources remain generally eligible as evidence because they are public source documents used to motivate new questions, rather than repositories of released benchmark answers. This is a deliberate distinction. Source relevance, independence, and scope must still be evaluated for each retrieved claim.
 
