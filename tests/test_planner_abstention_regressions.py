@@ -121,7 +121,6 @@ def test_timeout_retries_then_succeeds_without_semantic_repair():
         requests.Timeout("simulated provider timeout"),
         '{"dimensions":[{"dimension_id":"D02","role":"primary","reason":"Relevant"}],"reasoning":"Material"}',
     ])
-    original_complete = llm.complete
 
     def complete(**kwargs):
         outcome = next(llm.sequence)
