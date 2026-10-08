@@ -47,7 +47,7 @@ Corpus & Items & Role \\
 \midrule
 PLT120 & 120 & Custom cultural challenge set. PLT001--PLT030 are development-origin cases; PLT031--PLT120 are the expanded challenge set. \\
 External120 & 120 & Multicultural prompts drawn from six external datasets and regenerated under the common final generator. \\
-Redteam120 & 120 & Externally grounded cultural red-team prompts designed to expose cultural misrepresentation, stereotyping, historical sensitivity errors, and related failures. \\
+ExternalRedteam120 & 120 & Thesis-written red-team prompts grounded in external public sources. \\
 \midrule
 Total & 360 & One fixed GPT-OSS response per prompt. \\
 \bottomrule
@@ -60,7 +60,7 @@ PLT120 contains controlled prompts written for this project.
 
 External120 increases cultural and linguistic variety by reusing prompts from external research datasets.
 
-Redteam120 intentionally contains difficult or provocative cultural situations and is therefore expected to stress the verifier more strongly.
+ExternalRedteam120 contains difficult and sensitive situations. It is designed as a stress test, not as a normal-use sample.
 
 \section{PLT120}
 
@@ -124,7 +124,7 @@ The source file \texttt{data/final/external\_120/multicultural\_120\_prompts.csv
 
 The final subset is a fixed curated set of 20 prompts per source. The repository preserves the selected rows and their source IDs, but it does not contain a separate final sampling script that would justify calling the subset a random sample. For that reason, this thesis does not describe External120 as random or statistically representative of the six original datasets.
 
-No prompt rewriting is applied during final generation. The frozen manifest sets prompt transformation to \texttt{none}. The original response, preferred response, or benchmark answer is not used as the final candidate. Instead, the same GPT-OSS generator that is used for PLT120 and ExternalRedteam120 generates one new response for every External120 prompt.
+No prompt rewriting is applied during final generation. The frozen manifest sets prompt transformation to \texttt{none}. The original response, preferred response, or benchmark answer is not used as the final response. Instead, the same GPT-OSS generator that is used for PLT120 and ExternalRedteam120 generates one new response for every External120 prompt.
 
 This regeneration is needed for a fair comparison across the three parts of the final dataset. If External120 kept responses produced by many different original models, a difference in Vericult outcomes could come from the response model rather than from the prompt source.
 
@@ -194,7 +194,7 @@ Using only external prompts would make it harder to target known failure modes a
 
 Using only red-team prompts would overrepresent negative cases and refusals.
 
-The final design therefore combines all three. PLT provides controlled challenge cases, External120 provides external diversity, and Redteam120 provides targeted stress testing.
+The final design combines three different sources of evidence: PLT120 provides our custom challenge cases, External120 adds prompts created by other researchers, and ExternalRedteam120 adds source-grounded stress tests.
 
 The corpora are analyzed both together and separately. Corpus-level differences are descriptive because the sampling processes differ.
 
@@ -264,7 +264,7 @@ Corpus & Semantic SHA-256 \\
 \midrule
 PLT120 & \texttt{febf9cf570b31e2f1a1ca5ee61466d6d8618fb7bd8d008a127b6cf6eb80214aa} \\
 External120 & \texttt{9d2c0e58afb89d2641adc549d7cfaff5eba9d45d549f728d6cba664778811a96} \\
-Redteam120 & \texttt{b0e8f9e81b4020bce0a5355790f511f9efaddc65944eddbdb072bbb2afb5989d} \\
+ExternalRedteam120 & \texttt{b0e8f9e81b4020bce0a5355790f511f9efaddc65944eddbdb072bbb2afb5989d} \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -327,7 +327,7 @@ The exclusions include:
 
 These exclusions are particularly important for External120.
 
-Redteam120 uses public reports and real-world evidence to ground newly written challenge prompts. Those source pages remain eligible unless they match a general exclusion rule. Otherwise, the verifier would be prevented from retrieving legitimate evidence about the topic being tested.
+ExternalRedteam120 uses public reports and other real-world sources to ground newly written challenge prompts. Those source pages remain eligible unless they match a general exclusion rule. Otherwise, the verifier would be prevented from retrieving legitimate evidence about the topic being tested.
 
 \section{Preflight}
 
@@ -563,11 +563,11 @@ PLT120 contains researcher-designed prompts intended to expose problems in cultu
 
 External120 contains 20 selected prompts from each of six public sources: CARE, Community Alignment, PLURAL, PACT, ThaiCLI, and PRISM. The original source metadata is stored per row. These examples provide variation in cultural setting and language. They should not be described as a random sample of each original benchmark. The final input includes the generated GPT-OSS response rather than a released reference answer.
 
-Redteam120 contains externally grounded cultural challenge prompts. The prompt construction draws on public source material about issues such as cultural identity, minority rights, religious practice, historical memory, and institutional expectations. A public source used to motivate a prompt is not automatically the correct answer to that prompt. The verifier must still examine the generated response and its claims.
+ExternalRedteam120 contains externally grounded cultural challenge prompts. The prompt construction draws on public source material about issues such as cultural identity, minority rights, religious practice, historical memory, and institutional expectations. A public source used to motivate a prompt is not automatically the correct answer to that prompt. The verifier must still examine the generated response and its claims.
 
 \section{Why the Dataset Is Not a Balanced Accuracy Test}
 
-The corpora have different construction goals. PLT120 and Redteam120 emphasize challenging cases, whereas External120 includes more ordinary cultural questions. This design is useful for stress-testing failure modes, but the overall percentage of inappropriate responses should not be interpreted as the expected failure rate of a model in everyday use.
+The corpora have different goals. PLT120 and ExternalRedteam120 focus on difficult cases, while External120 also contains more ordinary cultural questions. This design is useful for stress-testing failure modes, but the overall percentage of inappropriate responses should not be interpreted as the expected failure rate of a model in everyday use.
 
 Likewise, a refusal on a red-team prompt may be desirable from a safety perspective while still being a non-answer for cultural-content evaluation. The experiment reports these cases separately. This prevents a high refusal rate from artificially improving an appropriateness score.
 
@@ -585,7 +585,7 @@ Corpus & Semantic SHA-256\\
 \midrule
 PLT120 & \texttt{febf9cf570b31e2f1a1ca5ee61466d6d8618fb7bd8d008a127b6cf6eb80214aa}\\
 External120 & \texttt{9d2c0e58afb89d2641adc549d7cfaff5eba9d45d549f728d6cba664778811a96}\\
-Redteam120 & \texttt{b0e8f9e81b4020bce0a5355790f511f9efaddc65944eddbdb072bbb2afb5989d}\\
+ExternalRedteam120 & \texttt{b0e8f9e81b4020bce0a5355790f511f9efaddc65944eddbdb072bbb2afb5989d}\\
 \bottomrule
 \end{longtable}
 
@@ -595,7 +595,7 @@ Evidence retrieval must not return the benchmark's own reference answer as if it
 
 These exclusions reduce one form of leakage but do not guarantee complete independence. A benchmark question or its answer could be copied elsewhere on the public web. The thesis therefore treats retrieval leakage as a risk to audit, not as a solved problem.
 
-The Redteam120 provenance sources remain generally eligible as evidence because they are public source documents used to motivate new questions, rather than repositories of released benchmark answers. This is a deliberate distinction. Source relevance, independence, and scope must still be evaluated for each retrieved claim.
+The ExternalRedteam120 provenance sources remain generally eligible as evidence because they are public source documents used to motivate new questions, rather than repositories of released benchmark answers. This is a deliberate distinction. Source relevance, independence, and scope must still be evaluated for each retrieved claim.
 
 \section{Evidence Freeze Audit}
 
