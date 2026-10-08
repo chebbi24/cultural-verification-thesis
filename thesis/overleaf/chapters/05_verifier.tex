@@ -38,36 +38,24 @@ Figure~\ref{fig:pipeline} gives the simplified pipeline.
 
 \begin{figure}[ht]
 \centering
-\fbox{\parbox{0.92\textwidth}{\centering
-Prompt + fixed response \\
-\(downarrow\) \\
-Prompt context extraction \\
-\(downarrow\) \\
-Cultural-applicability gate \\
-\(downarrow\) \\
-D01--D10 planning \\
-\(downarrow\) \\
-Response-assessability gate \\
-\(downarrow\) \\
-Material target extraction \\
-\(downarrow\) \\
-Two neutral questions per retrievable target \\
-\(downarrow\) \\
-Candidate-blind query rewriting and retrieval \\
-\(downarrow\) \\
-Source classification and evidence memo \\
-\(downarrow\) \\
-At most one gap-specific follow-up \\
-\(downarrow\) \\
-Frozen evidence memo \\
-\(downarrow\) \\
-Target comparison \\
-\(downarrow\) \\
-D01--D10 scoring and final outcome \\
-\(downarrow\) \\
-Structured trace
-}}
-\caption{Final single-response Vericult pipeline.}
+\begin{tikzpicture}[node distance=5mm and 8mm, every node/.style={font=\small}]
+\node[flowwide] (input) {Prompt $p$ + frozen response $r$};
+\node[flowwide, below=of input] (plan) {Prompt-only context extraction\\Cultural applicability + D01--D10 plan};
+\node[flowwide, below=of plan] (assess) {Response assessability\\Material target extraction ($|T|\leq 3$)};
+\node[flowwide, below=of assess] (questions) {Two neutral verification questions\\for each retrievable target};
+\node[flowwide, below=of questions] (evidence) {Candidate-blind query rewriting + retrieval\\source filtering + evidence memo};
+\node[flowwide, below=of evidence] (freeze) {Optional one-question follow-up\\then freeze final evidence memo};
+\node[flowwide, below=of freeze] (compare) {Reintroduce target\\support / mixed / contradiction / insufficient};
+\node[flowwide, below=of compare] (score) {D01--D10 scoring + abstention\\categorical outcome + structured trace};
+\draw[flowarrow] (input)--(plan);
+\draw[flowarrow] (plan)--(assess);
+\draw[flowarrow] (assess)--(questions);
+\draw[flowarrow] (questions)--(evidence);
+\draw[flowarrow] (evidence)--(freeze);
+\draw[flowarrow] (freeze)--(compare);
+\draw[flowarrow] (compare)--(score);
+\end{tikzpicture}
+\caption{Final single-response Vericult pipeline. The response is visible during target and question formation, but evidence construction is separated from later target comparison.}
 \label{fig:pipeline}
 \end{figure}
 
