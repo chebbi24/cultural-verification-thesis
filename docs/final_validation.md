@@ -2,9 +2,9 @@
 
 ## Authoritative semantic revision
 
-- Freeze code commit: `24f2b1ea4bacb4f152e94b42fe3e3dd1c6fdca3f`
-- GitHub Actions "Verifier tests": run `37713592159`, **success**
-- Python 3.12: **158 tests passed, 1 skipped**
+- Freeze code commit: `e451ff40b50bf1a91a30175c1885d1660a87e51c`
+- GitHub Actions "Verifier tests": run `37713891461`, **success**
+- Python 3.12: **159 tests passed, 1 skipped**
 - Compile, Ruff lint and Ruff format: **passed**
 - Manifest: `experiments/final_manifest.json`; config:
   `experiments/final_vericult_config.json`
@@ -39,6 +39,7 @@ above semantic freeze without establishing a new revision.
   verifies LIVE record identity and prompt/response traces, and freezes hashes.
 - REPLAY checks its evidence execution identity and the frozen LIVE output hash.
 - Preflight and the runner reject silent model, provider or L3S endpoint changes.
+- Direct invocation of `python scripts/preflight_final_experiment.py` imports both frozen-model validation and execution-identity helpers, including the script-mode fallback. A regression subprocess test forces that import path.
 
 ## Required local steps before official LIVE
 
