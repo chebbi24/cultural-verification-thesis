@@ -20,7 +20,7 @@ The verifier asks four practical questions:
 \item Does it acknowledge uncertainty or variation when the context does not support a single rule?
 \end{enumerate}
 
-A response can therefore be culturally appropriate even if it recommends behavior that is uncommon. The important issue is whether it explains the situation accurately and does not turn a tendency into an obligation.
+A response can still be appropriate when it recommends an uncommon choice. What matters is whether it explains the situation accurately and avoids turning a tendency into a rule.
 
 \section{Requirements for the Rubric}
 
@@ -56,7 +56,7 @@ The dimensions were not copied from one benchmark. They were synthesized from se
 
 Adilazuarda et al. show that culture in LLM research is represented through a mixture of demographic and semantic proxies, including values, norms, everyday knowledge, language, and other domains \parencite{adilazuarda2024culture}. Liu et al. provide a broader taxonomy of culturally aware NLP and emphasize relationships between language, knowledge, values, and social groups \parencite{liu2025culturally}. BLEnD demonstrates the importance of everyday material knowledge \parencite{myung2024blend}. NormAd focuses on social etiquette and situational norms \parencite{rao2025normad}. SafeWorld makes the distinction between cultural and legal standards explicit \parencite{yin2024safeworld}. CARB organizes reward-model evaluation around commonsense, values, safety, and linguistics \parencite{zhang2025carb}.
 
-The final D01--D10 scheme is the researcher's synthesis of these concerns. It is therefore important not to say that a particular paper "defines" D01 or D07. The literature motivates the need to cover these areas; the exact boundaries and names are implementation decisions made in this thesis.
+The final D01--D10 scheme is a synthesis made in this thesis. No cited paper is claimed to define D01 or D07 exactly. The literature motivates the areas that need to be covered; this thesis chooses the final names and boundaries.
 
 
 \section{From Prior Research to D01--D10}
@@ -87,11 +87,11 @@ D10 & Identity, diversity and intergroup relations & Cultural evaluation and plu
 \bottomrule
 \end{longtable}
 
-The matrix should be read as a design justification, not as a claim that each cited paper defines the corresponding Vericult dimension. The cited research motivates coverage of those phenomena; the exact ten-part decomposition is this thesis's operational synthesis.
+The matrix explains the design. It does not claim that the cited papers already use the same ten dimensions.
 
 \section{Cultural Knowledge Is Not Cultural Appropriateness}
 
-A central distinction in this thesis is between knowing a culturally relevant fact and using that knowledge appropriately. Cultural benchmarks often test whether a model can identify a correct fact or socially accepted option. Vericult instead evaluates the complete generated response in context.
+This thesis separates cultural knowledge from culturally appropriate use of that knowledge. Cultural benchmarks often test whether a model can identify a correct fact or socially accepted option. Vericult instead evaluates the complete generated response in context.
 
 \begin{table}[ht]
 \centering
@@ -109,7 +109,7 @@ Institutional rule & The model correctly describes a formal rule. & The response
 \end{tabularx}
 \end{table}
 
-This distinction explains why Vericult does not stop after fact checking. Evidence can establish that a proposition is supported, but the dimension scorer must still ask whether the response's framing, recommendation, level of certainty, and treatment of variation are appropriate for the prompt.
+For this reason, Vericult does not stop after fact checking. Evidence can establish that a proposition is supported, but the dimension scorer must still ask whether the response's framing, recommendation, level of certainty, and treatment of variation are appropriate for the prompt.
 
 \section{The Ten Dimensions}
 
@@ -206,7 +206,7 @@ This dimension is important for cases involving war memory, colonial history, ge
 
 D10 covers national, regional, ethnic, migration, disability, sexual, and other identities. It focuses on stereotyping, exclusion, discrimination, and representation of plural identities.
 
-A central principle is non-essentialism. A response should not treat identity as a deterministic description of a person's beliefs or behavior. This is especially relevant to red-team prompts that invite the model to justify exclusion or broad stereotypes.
+One principle is non-essentialism. A response should not treat identity as a deterministic description of a person's beliefs or behavior. This is especially relevant to red-team prompts that invite the model to justify exclusion or broad stereotypes.
 
 \section{Dimension Planning}
 
@@ -292,4 +292,4 @@ Third, some dimensions are easier to ground with web evidence than others. D05 o
 
 Fourth, a numeric score can still simplify disagreement. The trace and dimension rationales are therefore treated as important outputs, not just debugging information.
 
-Finally, the rubric cannot remove bias from the semantic backbone. It constrains what the model is asked to do and provides auditable stages, but the model can still make errors. The final experiment therefore evaluates the pipeline as implemented rather than assuming that the rubric guarantees cultural correctness.
+Finally, the rubric cannot remove bias from the semantic backbone. It constrains what the model is asked to do and provides auditable stages, but the model can still make errors. The final experiment evaluates the full pipeline. The rubric alone does not guarantee a correct cultural judgment.
