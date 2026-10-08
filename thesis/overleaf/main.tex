@@ -10,6 +10,14 @@
 \usepackage{parskip}
 \setlength{\parindent}{0pt}
 \usepackage{graphicx,booktabs,longtable,tabularx,array,enumitem,amsmath,amssymb,csquotes,xcolor,listings,hyperref}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,shapes.geometric}
+\tikzset{
+  flowbox/.style={draw,rounded corners,align=center,minimum height=8mm,text width=3.4cm},
+  flowwide/.style={draw,rounded corners,align=center,minimum height=8mm,text width=5.0cm},
+  flowarrow/.style={-{Latex[length=2.2mm]},thick},
+  boundary/.style={draw,dashed,rounded corners,inner sep=5pt}
+}
 \usepackage[nameinlink,noabbrev]{cleveref}
 \usepackage[backend=biber,style=authoryear,maxcitenames=2]{biblatex}
 \addbibresource{references.bib}
@@ -57,9 +65,8 @@ Date: & October 2026 \\
 \appendix
 \input{appendices/A_rubric}
 \input{appendices/B_reproducibility}
-\input{appendices/C_dataset_examples}
-\input{appendices/D_code_examples}
 \input{appendices/C_semantic_prompts}
 \input{appendices/D_dataset_examples}
+\input{appendices/E_code_examples}
 \printbibliography
 \end{document}
