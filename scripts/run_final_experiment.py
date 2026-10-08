@@ -259,6 +259,11 @@ def verify_evidence_manifest(path: Path) -> None:
     if not path.is_file():
         raise RuntimeError("REPLAY requires the frozen LIVE evidence manifest")
     manifest = json.loads(path.read_text(encoding="utf-8"))
+    live = manifest.get("live_output")
+    if live:
+        live_path = Path(live["path"])
+        if not live_path.is_file() or sha256_file(live_path) != live["sha256"]:
+            raise RuntimeError(f"Frozen LIVE output changed or is missing: {live_path}")
     for record in manifest.get("evidence_files", []):
         evidence_path = Path(record["path"])
         if not evidence_path.is_file() or sha256_file(evidence_path) != record["sha256"]:
@@ -322,6 +327,7 @@ def read_checkpoint_records(path: Path) -> list[dict[str, Any]]:
                 raise RuntimeError(f"Non-object JSONL checkpoint record in {path}")
             records.append(record)
             if not raw.endswith(b"\n"):
+                handle.seek(0, os.SEEK_END)
                 handle.write(b"\n")
     return records
 
@@ -483,6 +489,9 @@ def main(argv: list[str] | None = None) -> int:
     verify_runtime_manifest(args.runtime_manifest, manifest, args.config)
     if args.mode == "REPLAY":
         verify_evidence_manifest(args.evidence_manifest)
+        frozen_evidence = json.loads(args.evidence_manifest.read_text(encoding="utf-8"))
+        if frozen_evidence.get("execution_id") != experiment_identity(manifest):
+            raise RuntimeError("REPLAY evidence belongs to a different frozen execution")
 
     values = json.loads(args.config.read_text(encoding="utf-8"))
     env_overrides = {
