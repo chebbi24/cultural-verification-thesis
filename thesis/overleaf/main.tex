@@ -1,0 +1,62 @@
+\documentclass[12pt,a4paper]{report}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{lmodern,microtype}
+\usepackage{geometry}
+\geometry{left=3cm,right=2.5cm,top=2.5cm,bottom=2.5cm}
+\usepackage{setspace}
+\onehalfspacing
+\usepackage{parskip}
+\setlength{\parindent}{0pt}
+\usepackage{graphicx,booktabs,longtable,tabularx,array,enumitem,amsmath,amssymb,csquotes,xcolor,listings,hyperref}
+\usepackage[nameinlink,noabbrev]{cleveref}
+\usepackage[backend=biber,style=authoryear,maxcitenames=2]{biblatex}
+\addbibresource{references.bib}
+\hypersetup{colorlinks=true,linkcolor=black,citecolor=black,urlcolor=blue}
+\lstset{basicstyle=\ttfamily\small,breaklines=true,frame=single,columns=fullflexible,showstringspaces=false}
+\newcommand{\placeholder}[1]{\textcolor{red}{\textbf{[#1]}}}
+\begin{document}
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+{\Large Leibniz Universität Hannover\par}
+\vspace{1cm}
+{\huge\bfseries Verification Framework of Cultural Appropriateness in Large Language Model Outputs\par}
+\vspace{1.5cm}
+{\Large Bachelor Thesis\par}
+\vspace{1.5cm}
+{\large Rayan Chebbi\par}
+\vfill
+\begin{tabular}{ll}
+Degree programme: & B.Sc. Computer Science \\
+University: & Leibniz Universität Hannover \\
+Supervisor: & \placeholder{SUPERVISOR NAME} \\
+Submission date: & \placeholder{FINAL SUBMISSION DATE} \\
+\end{tabular}
+\vfill
+\end{titlepage}
+\pagenumbering{roman}
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+\input{chapters/00_abstract}
+\tableofcontents
+\listoffigures
+\listoftables
+\clearpage
+\pagenumbering{arabic}
+\input{chapters/01_introduction}
+\input{chapters/02_background}
+\input{chapters/03_related_work}
+\input{chapters/04_framework}
+\input{chapters/05_verifier}
+\input{chapters/06_experiment}
+\input{chapters/07_results}
+\input{chapters/08_discussion}
+\input{chapters/09_limitations}
+\input{chapters/10_conclusion}
+\appendix
+\input{appendices/A_rubric}
+\input{appendices/B_reproducibility}
+\printbibliography
+\end{document}
