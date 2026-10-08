@@ -175,7 +175,10 @@ def test_trace_validator_accepts_resolved_primary_and_abstained_secondary(setup)
     from cultverify.validation import validate_trace_links
 
     _, _, _, verifier = setup
-    original = verifier.verify("Explain visiting arrangements for a local community event.", "Check the organiser’s published visiting arrangements.")
+    original = verifier.verify(
+        "Explain visiting arrangements for a local community event.",
+        "Check the organiser’s published visiting arrangements.",
+    )
     assert original.status == "completed"
     assert original.dimension_scores[0].score == 2
 
@@ -206,8 +209,6 @@ def test_trace_validator_accepts_resolved_primary_and_abstained_secondary(setup)
     trace = original_trace.model_copy(update={"result": updated_result})
     validate_trace_links(trace)
 
-    wrong_label = updated_result.model_copy(
-        update={"cultural_appropriateness": "partially_culturally_appropriate"}
-    )
+    wrong_label = updated_result.model_copy(update={"cultural_appropriateness": "partially_culturally_appropriate"})
     with pytest.raises(ValueError, match="Cultural appropriateness mismatch"):
         validate_trace_links(original_trace.model_copy(update={"result": wrong_label}))
