@@ -152,6 +152,7 @@ def test_timeout_retries_then_succeeds_without_semantic_repair():
 def test_exhausted_transport_timeouts_remain_technical_failures():
     import requests
     from cultverify.config import Config
+
     config = Config(verifier_model_id="test", transport_retry_count=1)
     llm = ScriptedLLM(config, [requests.Timeout("simulated")] * 2)
 
