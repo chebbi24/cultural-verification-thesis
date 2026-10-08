@@ -2,13 +2,13 @@
   "schema_version": "thesis-final-v4-single-response",
   "experiment_id": "thesis-final-v4-360x1",
   "pipeline_version": "cultverify-1.1.0",
-  "freeze_code_commit": "e451ff40b50bf1a91a30175c1885d1660a87e51c",
+  "freeze_code_commit": "024d6433fb38e589618e0a1abf8c7696b3a36c2c",
   "validation": {
-    "status": "unit_ci_passed_direct_script_preflight_fixed_local_preflight_pending",
+    "status": "unit_ci_passed_local_preflight_pending",
     "local_live_smoke_required": true,
     "ci_workflow": "Verifier tests",
-    "note": "CI success (preflight direct-script regression added, 159 tests passed, 1 skipped; compile, Ruff lint, Ruff format). PLT002 and PLT003 LIVE completed with expected classifications before this import-only correction; PLT001 L3S timeout unresolved. Fresh local preflight required before final LIVE.",
-    "github_actions_run_id": 37713891461,
+    "note": "GitHub CI success at frozen revision (166 tests passed, 1 skipped; compile, Ruff lint/format passed). PLT002 and PLT003 were LIVE tested on the unchanged verifier implementation; PLT001 L3S ReadTimeout remains possible. Local credential-gated preflight and final 360 LIVE/REPLAY runs remain to be completed.",
+    "github_actions_run_id": 37714423989,
     "required_status": "success"
   },
   "dataset": {
@@ -111,13 +111,20 @@
   "reward_model_baseline": {
     "model": "Skywork/Skywork-Reward-V2-Qwen3-4B",
     "revision": "fd958fe",
-    "script": "src/baseline_rm.py",
-    "status": "pending_single_response_adapter",
-    "role": "independent comparison only; scores never enter Vericult"
+    "script": "scripts/run_final_baselines.py --baseline reward-model",
+    "status": "single_response_adapter_implemented_pending_gpu_inference",
+    "role": "independent comparison only; scores never enter Vericult",
+    "output_interpretation": "raw scalar reward only; no invented cultural threshold"
   },
   "direct_llm_judge_baseline": {
-    "status": "pending_single_response_adapter",
-    "role": "independent no-retrieval cultural judge on the same fixed prompt-response pairs"
+    "status": "single_response_adapter_implemented_pending_l3s_inference",
+    "role": "independent no-retrieval cultural judge on the same fixed prompt-response pairs",
+    "script": "scripts/run_final_baselines.py --baseline direct-judge",
+    "provider": "l3s",
+    "model": "vllm/qwen3.6:35b-a3b-fp8",
+    "temperature": 0,
+    "retrieval": "none",
+    "prompt_definition": "frozen independent single-response judge instruction reproduced in thesis/overleaf/appendices/C_semantic_prompts.tex; executable source scripts/run_final_baselines.py"
   },
   "execution_order": [
     "runtime_preflight",
