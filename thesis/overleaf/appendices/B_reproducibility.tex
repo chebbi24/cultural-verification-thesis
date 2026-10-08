@@ -1,26 +1,87 @@
 \chapter{Reproducibility Manifest}
+\label{app:reproducibility}
+
+This appendix records the values that were fixed before the final experiment. Result-dependent artifact hashes are inserted after the LIVE audit and REPLAY run complete.
+
 \begin{longtable}{p{0.34\textwidth} p{0.60\textwidth}}
 \toprule
-Field & Value \\
+Field & Frozen value \\
 \midrule
 Repository & \texttt{chebbi24/cultural-verification-thesis} \\
 Final experiment branch & \texttt{agent/final-experiment-ready} \\
 Thesis-writing branch & \texttt{thesis/full-report-rewrite} \\
-Evaluation size & 360 fixed prompt--response pairs \\
-Generator & \texttt{gpt-oss:120b-mxfp4} \\
+Experiment ID & \texttt{thesis-final-v4-360x1} \\
+Pipeline version & \texttt{cultverify-1.1.0} \\
+Semantic code freeze & \texttt{099e4116a809ee004c1cdea04d1bcc2a14e7d142} \\
+Final design & single prompt--response evaluation \\
+Total items & 360 \\
+PLT120 items & 120 \\
+External120 items & 120 \\
+Redteam120 items & 120 \\
+Generator provider & L3S \\
+Generator model & \texttt{gpt-oss:120b-mxfp4} \\
 Generator temperature & 0.8 \\
 Generator top-p & 0.95 \\
 Generator max tokens & 1200 \\
+Generator system prompt & none \\
+Responses per prompt & 1 \\
+Verifier provider & L3S \\
 Verifier backbone & \texttt{vllm/qwen3.6:35b-a3b-fp8} \\
+Verifier temperature & 0 \\
+Verifier config SHA-256 & \texttt{decc0fb6f9ec271b96371449201c2389481fc262779fc37aa3be516c1e2a89fb} \\
+Semantic retry count & 1 \\
+Transport retry count & 1 \\
+LLM timeout & 180 seconds \\
+Retrieval timeout & 45 seconds \\
 Retriever & Tavily in LIVE mode \\
-Primary reported mode & REPLAY \\
+Search depth & advanced \\
+Top-k documents per query & 3 \\
 Maximum material targets & 3 \\
-Initial questions & 2 per retrievable target \\
-Maximum follow-up & 1 per target \\
-Frozen code commit & \placeholder{INSERT} \\
-Final config hash & \placeholder{INSERT} \\
-Evidence manifest hash & \placeholder{INSERT} \\
-Experiment dates & \placeholder{INSERT} \\
-Final REPLAY output hash & \placeholder{INSERT} \\
+Initial questions per retrievable target & 2 \\
+Maximum retrieval rounds & 2 \\
+Primary reported mode & REPLAY \\
+PLT120 semantic SHA-256 & \texttt{febf9cf570b31e2f1a1ca5ee61466d6d8618fb7bd8d008a127b6cf6eb80214aa} \\
+External120 semantic SHA-256 & \texttt{9d2c0e58afb89d2641adc549d7cfaff5eba9d45d549f728d6cba664778811a96} \\
+Redteam120 semantic SHA-256 & \texttt{b0e8f9e81b4020bce0a5355790f511f9efaddc65944eddbdb072bbb2afb5989d} \\
+External benchmark domain exclusion & \texttt{huggingface.co} \\
+Excluded repositories & thesis repository; \texttt{UpstageAI/ThaiCLI\_H6} \\
+Skywork baseline model & \texttt{Skywork/Skywork-Reward-V2-Qwen3-4B} \\
+Skywork revision & \texttt{fd958fe} \\
+CI workflow & Verifier tests \\
+CI run ID & \texttt{37701437713} \\
+CI semantic-freeze result & 143 passed, 1 skipped; compile and Ruff checks passed \\
+Final LIVE evidence manifest & \placeholder{FINAL RESULTS: INSERT HASH AFTER AUDIT} \\
+Final REPLAY output hash & \placeholder{FINAL RESULTS: INSERT AFTER REPLAY} \\
+Final baseline output hashes & \placeholder{FINAL RESULTS: INSERT AFTER BASELINE RUNS} \\
+Final experiment date(s) & \placeholder{FINAL RESULTS: INSERT ACTUAL RUN DATES} \\
 \bottomrule
 \end{longtable}
+
+\section*{Freeze Policy}
+
+No semantic tuning is performed after the recorded 360-pair code/configuration freeze. Generated responses, model choice, rubric, target budgets, leakage rules, and decision semantics are not changed in response to the final Vericult outcomes.
+
+Human labels are excluded from inference.
+
+If a post-freeze software problem requires a semantic change, the changed experiment must be recorded as a separate run rather than silently replacing the frozen result.
+
+\section*{Final Artifact Inventory}
+
+The final thesis archive should contain stable references to:
+
+\begin{itemize}
+\item the three generated CSV files;
+\item \texttt{experiments/final\_manifest.json};
+\item \texttt{experiments/final\_vericult\_config.json};
+\item the runtime manifest;
+\item LIVE JSONL results;
+\item LIVE traces;
+\item evidence snapshots and schedules;
+\item evidence manifest;
+\item REPLAY JSONL results;
+\item independent baseline outputs;
+\item analysis tables/figures;
+\item exact thesis source.
+\end{itemize}
+
+The result-dependent artifacts above are created by the final execution and are not reconstructed from memory or conversational notes.
