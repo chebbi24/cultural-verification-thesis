@@ -166,3 +166,48 @@ def test_exhausted_transport_timeouts_remain_technical_failures():
         session.call("dimension_planner_v1", {}, DimensionPlan)
     assert len(session.calls) == 2
     assert all(call.error == "Timeout" for call in session.calls)
+
+
+def test_trace_validator_accepts_resolved_primary_and_abstained_secondary(setup):
+    from pathlib import Path
+
+    from cultverify.schemas import DimensionApplicability, RunTrace
+    from cultverify.validation import validate_trace_links
+
+    _, _, _, verifier = setup
+    original = verifier.verify("Explain visiting arrangements for a local community event.", "Check the organiser’s published visiting arrangements.")
+    assert original.status == "completed"
+    assert original.dimension_scores[0].score == 2
+
+    unresolved_dimension = DimensionApplicability(
+        dimension_id="D08",
+        role="secondary",
+        reason="Independently relevant but not verified",
+    )
+    unresolved_score = _score("D08", "abstain")
+    scores = original.dimension_scores + (unresolved_score,)
+    updated_plan = original.dimension_plan.model_copy(
+        update={"dimensions": original.dimension_plan.dimensions + (unresolved_dimension,)}
+    )
+    updated_result = original.model_copy(
+        update={
+            "dimension_plan": updated_plan,
+            "dimension_scores": scores,
+            "applicable_count": 2,
+            "scored_count": 1,
+            "overall_score": 1.0,
+            "vericult_score": None,
+            "abstained_dimensions": ("D08",),
+            "abstention_reason": "D08: Regression fixture",
+            "cultural_appropriateness": "insufficient_evidence",
+        }
+    )
+    original_trace = RunTrace.model_validate_json(Path(original.trace_path).read_text())
+    trace = original_trace.model_copy(update={"result": updated_result})
+    validate_trace_links(trace)
+
+    wrong_label = updated_result.model_copy(
+        update={"cultural_appropriateness": "partially_culturally_appropriate"}
+    )
+    with pytest.raises(ValueError, match="Cultural appropriateness mismatch"):
+        validate_trace_links(original_trace.model_copy(update={"result": wrong_label}))
