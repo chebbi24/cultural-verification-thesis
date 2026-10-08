@@ -2,80 +2,38 @@
 
 \section{Motivation}
 
-Large language models are increasingly used for everyday tasks. People ask them to explain information, write messages, plan travel, prepare for work situations, answer sensitive questions, and give advice. In many of these tasks, a response can only be useful if it fits the user's cultural context.
+Large language models are used for travel advice, workplace communication, explanations of traditions, and many other everyday tasks. In these situations, factual correctness is only part of the problem. The answer also has to fit the situation.
 
-A simple example is language. The German greeting "Moin" is strongly associated with northern Germany. A model that describes it as a universally natural greeting for every region may sound fluent but still miss an important cultural detail. The same problem can appear in much more sensitive areas, such as religion, gender roles, family expectations, historical memory, minority identities, or legal and institutional rules.
+A small example is enough to show why. The greeting Moin is common in northern Germany. A model may know the word and still give poor advice if it presents it as the natural choice in every German region. The same pattern appears in harder cases involving religion, family expectations, gender, history, identity, or law.
 
-This makes cultural evaluation difficult. A response can be grammatically correct and factually plausible while still being inappropriate in context. It can also make a correct statement but present it too broadly. For example, saying that a practice is common is different from saying that everybody follows it. Saying that something is traditional is different from saying that people are required to do it.
+For this thesis, culture is therefore not the same as nationality. A prompt can involve a region, a religion, a language variety, a workplace role, a family relationship, or a historical issue. It would be risky to infer beliefs or behaviour from a person's name or passport alone.
 
-Current research confirms that culture is not one simple variable. Adilazuarda et al. show that work on culture in LLMs uses many different proxies, including language, nationality, values, customs, and other semantic domains \parencite{adilazuarda2024culture}. Liu et al. similarly describe culture as a multi-part concept and show that culturally aware NLP covers knowledge, language, values, social groups, and adaptation \parencite{liu2025culturally}.
-
-This thesis does not use nationality as a complete cultural label. A prompt may instead refer to a region, religion, language variety, institution, family role, workplace relationship, historical topic, or identity group.
-
+The surveys by Adilazuarda et al. and Liu et al. show the same broad problem from the research side: cultural NLP covers many different signals and tasks rather than one single variable \parencite{adilazuarda2024culture,liu2025culturally}. My focus is narrower. I want to know whether one generated response handles the cultural situation in its prompt well.
 \section{Why Existing Evaluation Is Not Enough}
 
-Most modern LLM systems already use some form of evaluation during training or deployment. Reward models can score responses. LLM judges can compare candidates. Safety classifiers can block harmful content. Cultural benchmarks can test specific cultural knowledge.
+There are already several ways to evaluate LLM outputs. Reward models assign preference scores. LLM judges can give direct ratings and explanations. Cultural benchmarks test knowledge or norm understanding. These approaches are useful, but they answer different questions.
 
-These methods are useful, but they do not all answer the same question.
+A reward score can tell us that one response is preferred, but it usually does not tell us which cultural claim caused the problem or what source supports the judgment. A direct LLM judge gives more explanation, but it may still rely only on its own internal knowledge. Previous work has also shown that LLM judges can be affected by presentation and order effects \parencite{zheng2023judging,wang2024fair}.
 
-A reward model estimates preference. It can tell us that one answer receives a higher reward than another, but the score does not normally expose which cultural statement is wrong or which external source supports the judgment.
+Cultural benchmarks such as BLEND, CulturalBench, NormAd, SafeWorld, and CARB test important parts of cultural capability \parencite{myung2024blend,chiu2025culturalbench,rao2025normad,yin2024safeworld,zhang2025carb}. My task is different. The response already exists, and I want to check that response after generation.
 
-An LLM judge can provide a direct explanation, but it still relies mainly on the judge model's internal knowledge. Prior work has also shown that LLM judges can be affected by response order and other evaluator effects \parencite{zheng2023judging,wang2024fair}.
-
-A cultural benchmark can measure whether a model knows a predefined answer. BLEnD, CulturalBench, NormAd, SafeWorld, and CARB all make important contributions, but they use their own task formats and fixed benchmark designs \parencite{myung2024blend,chiu2025culturalbench,rao2025normad,yin2024safeworld,zhang2025carb}.
-
-The practical question in this thesis is different:
-
-\begin{quote}
-A model has already produced one response. Can that response be checked in a transparent way for cultural appropriateness?
-\end{quote}
-
-The output should show more than the final label. It should show the relevant dimensions, the claims that were checked, the evidence that was found, and any point where the system did not have enough information.
-
+That means the evaluator should show more than a final label. It should show which part of the answer was checked, what evidence was used, and where the system was unsure.
 \section{Problem Statement}
 
-The technical task can be stated as follows.
+The task in this thesis starts with one prompt $p$ and one fixed response $r$. The verifier has to decide whether culture is relevant, identify the parts of the response that matter, retrieve evidence when a claim can be checked externally, and then apply a clear rubric.
 
-Given a prompt (p) and one generated response (r), the verifier should:
+This is not ordinary fact checking. Some claims are factual, for example a legal rule or the date of a public holiday. Other questions are about etiquette, values, or identity and may not have one simple answer. Sources can also disagree or represent only one part of a community.
 
-\begin{enumerate}
-\item determine whether culturally situated reasoning is materially required;
-\item extract only the cultural context explicitly supported by the prompt;
-\item identify the relevant D01--D10 cultural dimensions;
-\item decide whether the response contains substantive assessable content;
-\item identify a small number of material response targets;
-\item retrieve evidence for targets that are externally checkable;
-\item preserve uncertainty and cultural variation;
-\item compare the response with a frozen evidence basis;
-\item produce a traceable cultural-appropriateness outcome.
-\end{enumerate}
+A second difficulty comes from retrieval itself. If the response wording is used directly as a search query, the system may mainly find material that repeats the same framing. For that reason, Vericult first turns the selected claim into neutral questions and only then starts the evidence search.
 
-Several difficulties make this harder than ordinary fact checking.
-
-First, cultural information is context dependent. A greeting, gift, dress practice, family expectation, or historical symbol can have different meanings in different settings.
-
-Second, not every cultural statement is factual. A value conflict cannot always be solved by finding one web page.
-
-Third, evidence can be biased or incomplete. Online sources overrepresent some languages, countries, institutions, and communities.
-
-Fourth, the response itself can influence retrieval. If the system searches with the response's own wording, it may mainly find sources that support that wording.
-
-Fifth, final evaluation data must remain independent from system tuning. A verifier that is adjusted after seeing final outcomes is harder to evaluate fairly.
-
+The main problem is practical: how can cultural evaluation be made more transparent without pretending that every cultural question has one objective answer?
 \section{Research Gap}
 
-The related literature addresses many parts of the problem.
+Existing work covers many parts of this problem, but not the exact combination used here. CulturalBench and BLEND focus on cultural knowledge. NormAd studies social norms. SafeWorld studies geographically different safety and legal settings. CultureLLM changes the generator itself. CARB evaluates reward models.
 
-CulturalBench and BLEnD provide cultural knowledge benchmarks. NormAd evaluates cultural adaptability. SafeWorld studies geo-diverse safety and legal standards. CultureLLM and ValuesRAG attempt to improve culturally aligned generation. CARB focuses on the cultural awareness of reward models.
+Vericult is placed after generation. It checks one prompt--response pair and keeps separate records for context, targets, evidence, and scores. The main contribution is the order of these steps: important claims are selected, checkable claims are turned into neutral questions, evidence is gathered without the response text, the evidence is frozen, and only then is the response compared with it.
 
-However, the literature does not directly provide the exact evaluation layer investigated here: a standalone post-hoc verifier that combines explicit cultural dimensions, bounded external evidence, a clear separation between evidence collection and final response checking, abstention, frozen retrieval artifacts, and complete traceability for one arbitrary prompt--response pair.
-
-This is the gap that Vericult is designed to explore.
-
-The contribution is not retrieval alone, an LLM judge alone, or a cultural rubric alone. The contribution is how these parts are ordered. Vericult selects important response targets, turns checkable targets into neutral questions, gathers evidence without the response, freezes the evidence, and only then compares the response with it. If the evidence is too weak, the system can abstain. The trace keeps each step for later review.
-
-The thesis does not claim that these design choices are automatically better than existing evaluators. They are implemented as a testable architecture. The final experiment then examines how the architecture behaves on 360 fixed responses and how its decisions can be interpreted.
-
+This is a design choice that can be tested. It is not a claim that Vericult is automatically better than a reward model or a direct judge.
 \section{Research Questions}
 
 The final thesis is organized around four research questions.
