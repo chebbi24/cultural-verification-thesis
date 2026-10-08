@@ -1,0 +1,57 @@
+\chapter{Experimental Design and Evaluation Protocol}
+\label{chap:experiment}
+
+\section{Evaluation Unit}
+The final experiment evaluates one fixed prompt--response pair at a time. Best-of-4 ranking is development history, not the primary final task.
+
+\section{Final Dataset}
+\begin{table}[ht]
+\centering
+\caption{Final evaluation corpora.}
+\label{tab:corpora}
+\begin{tabular}{l r l}
+\toprule
+Corpus & Items & Purpose \\
+\midrule
+PLT120 & 120 & Researcher-designed cultural scenarios \\
+External120 & 120 & Prompts from external multicultural datasets \\
+Redteam120 & 120 & Externally grounded red-team cases \\
+\midrule
+Total & 360 & Fixed prompt--response pairs \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+External120 contains 20 prompts each from CARE, Community Alignment, PLURAL, PACT, ThaiCLI, and PRISM. Exact source records and licenses must be reported from the frozen metadata.
+
+\section{Response Generation}
+All final responses use the same generator: \texttt{gpt-oss:120b-mxfp4}, temperature 0.8, top-p 0.95, maximum 1200 generated tokens, one response per prompt, and no additional system prompt. Prompt and response hashes are recorded.
+
+\section{Verifier Configuration}
+The final Vericult backbone is \texttt{vllm/qwen3.6:35b-a3b-fp8} through L3S. Tavily is used for LIVE retrieval, while REPLAY uses frozen evidence. The maximum target count is three. Each retrievable target receives two initial questions and at most one follow-up.
+
+\placeholder{INSERT FINAL CONFIG HASH, FROZEN CODE COMMIT, MODEL RUNTIME IDENTITY AND RUN DATES.}
+
+\section{Execution Order}
+\begin{enumerate}
+\item preflight validation;
+\item LIVE verification of all fixed pairs;
+\item evidence audit and freeze;
+\item REPLAY verification using frozen evidence;
+\item independent baseline execution;
+\item statistical and qualitative analysis.
+\end{enumerate}
+
+\section{Independent Baselines}
+The planned reward-model baseline is Skywork-Reward-V2. A separate direct LLM judge is the second baseline. Neither is used inside Vericult. Because the final task is single-response evaluation, any baseline originally designed for ranking needs a documented mapping from its raw score or decision to the quantity being compared.
+
+\placeholder{FREEZE EXACT BASELINE CHECKPOINTS, DIRECT-JUDGE PROMPT, SCORE/LABEL MAPPING AND RUN STATUS.}
+
+\section{Human Reference Boundary}
+The previous five-person human study applies to older PLT001--PLT030 Best-of-4 candidate responses. Those labels cannot be reused as gold labels for the new GPT-OSS responses. Without new labels for the same final responses, cross-system differences are descriptive rather than accuracy against human ground truth.
+
+\section{Metrics}
+The analysis reports completion counts, outcome distribution, D01--D10 selection and scores, abstention, retrievable-target counts, evidence sufficiency and coverage, failures, corpus differences, and runtime information supported by the traces. Paired accuracy statistics are used only if a valid independent reference exists for the same responses.
+
+\section{Reproducibility}
+The experiment freezes the three generated CSVs, semantic hashes, generator settings, verifier configuration, code revision, evidence snapshots, and final output files. Later sensitivity runs are stored separately rather than merged into the primary experiment.
