@@ -17,7 +17,7 @@ For Vericult, the main lesson is that seemingly simple daily-life advice can dep
 
 CulturalBench contains 1,696 human-written and human-verified questions from 45 regions and 17 topics in its published ACL 2025 version \parencite{chiu2025culturalbench}. Five independent annotators verified each question. The paper reports 92.4\% human accuracy and a range of 28.7--61.5\% for the evaluated frontier models on its hard setup. It also describes problems with questions that admit multiple correct answers.
 
-This last observation is particularly relevant here. If a cultural practice has regional or situational alternatives, a verifier should not reject a response merely because it differs from the first retrieved description. Vericult therefore includes scope and variation questions in the evidence stage.
+This matters for Vericult. A cultural practice can have regional or situational alternatives. The verifier should not reject a response only because it differs from the first source found. Vericult therefore asks a second question about scope and variation.
 
 CulturalBench is primarily a question-answering benchmark. Vericult is not evaluated on the same published questions under the same protocol. Its scores must not be compared numerically with CulturalBench accuracy.
 
@@ -31,7 +31,7 @@ These results illustrate why a prompt that only names a country may be insuffici
 
 CultureLLM addresses cultural differences through training data augmentation and model adaptation \parencite{li2024culturellm}. The authors use World Values Survey seed data and train culturally adapted models. The NeurIPS 2024 paper reports experiments across 60 culture-related datasets and nine cultures. This is a generator-side approach: the aim is to make model outputs better before they are produced.
 
-Vericult takes a different position in the system architecture. It does not change the generator or use its scores for post-training. It receives a fixed prompt and response and checks the response after generation. CultureLLM is therefore useful motivation but not a direct baseline.
+Vericult works at a different point in the system. It does not train or change the generator. It receives a fixed prompt and response after generation. CultureLLM is useful background, but it is not a direct baseline.
 
 \section{Reward Models and RewardBench}
 
@@ -45,7 +45,7 @@ In the present thesis, Skywork is an independent comparator. Its raw score is no
 
 The closest methodological motivation is the Cultural Awareness Reward modeling Benchmark (CARB), proposed by Zhang et al.\ \parencite{zhang2025carb}. The arXiv paper, first posted in September 2025, describes ten cultures and four cultural domains. It evaluates reward models on culture-related preferences and reports that some models rely on surface-level correlations rather than the cultural meaning of a response. The authors also propose Think-as-Locals to improve culture-aware reward modeling.
 
-This thesis builds on the problem identified by CARB but not on its architecture. Vericult is neither CARB nor a hybrid of CARB and a reward model. Its central method is to select checkable response targets, gather and freeze independent evidence, and score cultural appropriateness using an explicit rubric.
+CARB motivates part of the problem, but Vericult does not use CARB's architecture. It is not a hybrid of CARB and a reward model. Vericult selects response targets, gathers evidence for the checkable ones, freezes that evidence, and then applies its rubric.
 
 The difference in evaluation units is important. CARB studies reward-model preference behavior. Vericult's final experiment consists of 360 individual prompt--response pairs. No CARB score can be used as a direct head-to-head performance number unless both approaches are tested on a shared evaluation task with a common independent reference.
 
