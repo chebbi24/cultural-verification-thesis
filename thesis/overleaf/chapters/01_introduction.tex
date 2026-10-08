@@ -58,7 +58,7 @@ Second, not every cultural statement is factual. A value conflict cannot always 
 
 Third, evidence can be biased or incomplete. Online sources overrepresent some languages, countries, institutions, and communities.
 
-Fourth, the response itself can influence retrieval. If the system searches directly for the candidate's wording, it may unintentionally search for confirmation.
+Fourth, the response itself can influence retrieval. If the system searches with the response's own wording, it may mainly find sources that support that wording.
 
 Fifth, final evaluation data must remain independent from system tuning. A verifier that is adjusted after seeing final outcomes is harder to evaluate fairly.
 
@@ -68,11 +68,11 @@ The related literature addresses many parts of the problem.
 
 CulturalBench and BLEnD provide cultural knowledge benchmarks. NormAd evaluates cultural adaptability. SafeWorld studies geo-diverse safety and legal standards. CultureLLM and ValuesRAG attempt to improve culturally aligned generation. CARB focuses on the cultural awareness of reward models.
 
-However, the literature does not directly provide the exact evaluation layer investigated here: a standalone post-hoc verifier that combines explicit cultural dimensions, bounded external evidence, a structural separation between evidence construction and final candidate comparison, abstention, frozen retrieval artifacts, and complete traceability for one arbitrary prompt--response pair.
+However, the literature does not directly provide the exact evaluation layer investigated here: a standalone post-hoc verifier that combines explicit cultural dimensions, bounded external evidence, a clear separation between evidence collection and final response checking, abstention, frozen retrieval artifacts, and complete traceability for one arbitrary prompt--response pair.
 
 This is the gap that Vericult is designed to explore.
 
-The innovation claimed by this thesis is therefore not retrieval by itself, not the use of an LLM judge by itself, and not the existence of a cultural rubric by itself. It is the emph{ordered, inspectable verification architecture}: a response is decomposed into material cultural targets; externally checkable targets are converted into neutral questions; evidence is gathered without the candidate response after that point; the resulting memo is frozen before comparison; unresolved evidence can lead to abstention; and the complete chain is preserved for replay and error analysis. This combination turns cultural evaluation from a single opaque score into a sequence of auditable decisions.
+The innovation claimed by this thesis is therefore not retrieval by itself, not the use of an LLM judge by itself, and not the existence of a cultural rubric by itself. It is the \emph{ordered and inspectable verification process}: a response is decomposed into material cultural targets; externally checkable targets are converted into neutral questions; evidence is gathered without the response after that point; the resulting memo is frozen before comparison; unresolved evidence can lead to abstention; and the complete chain is preserved for replay and error analysis. This combination turns cultural evaluation from a single opaque score into a sequence of auditable decisions.
 
 The thesis does not claim that these design choices are automatically better than existing evaluators. They are implemented as a testable architecture. The final experiment then examines how the architecture behaves on 360 fixed responses and how its decisions can be interpreted.
 
@@ -133,7 +133,7 @@ Vericult takes a fixed prompt and response and evaluates them independently from
 
 After neutral questions have been generated, the evidence engine no longer receives the response or target object. It receives only the questions and validated prompt context.
 
-This does not eliminate search-engine bias, and the question generator can still transmit framing. It does provide a concrete structural separation between evidence gathering and candidate comparison.
+This does not eliminate search-engine bias, and the question generator can still transmit framing. It does provide a concrete structural separation between evidence gathering and response comparison.
 
 \subsection{Explicit Uncertainty and Reproducibility}
 
@@ -186,7 +186,7 @@ The experiment can be summarized as:
 \begin{figure}[ht]
 \centering
 \begin{tikzpicture}[node distance=7mm and 10mm, every node/.style={font=\small}]
-\node[flowwide] (prompts) {360 frozen prompts\\PLT120 + External120 + Redteam120};
+\node[flowwide] (prompts) {360 frozen prompts\\PLT120 + External120 + ExternalRedteam120};
 \node[flowwide, below=of prompts] (generator) {One frozen GPT-OSS response per prompt};
 \node[flowbox, below left=12mm and 20mm of generator] (vericult) {Vericult\\LIVE $\rightarrow$ audit $\rightarrow$ REPLAY};
 \node[flowbox, below=12mm of generator] (rm) {Independent\\Skywork reward model};
