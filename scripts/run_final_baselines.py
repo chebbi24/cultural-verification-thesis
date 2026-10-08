@@ -10,9 +10,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import sys
 from pathlib import Path
+from typing import Literal
 
 import requests
 from dotenv import load_dotenv
@@ -79,7 +81,14 @@ Return the label and a short rationale."""
 
 
 class DirectDecision(Record):
-    label: str
+    label: Literal[
+        "culturally_appropriate",
+        "partially_culturally_appropriate",
+        "culturally_inappropriate",
+        "insufficient_evidence",
+        "not_culturally_applicable",
+        "not_assessable",
+    ]
     rationale: str = Field(min_length=1)
 
 
@@ -159,7 +168,7 @@ def evaluate_one(row, baseline, evaluator, execution_id, protocol_hash, rubric=N
     try:
         if baseline == "reward-model":
             score = float(evaluator.score(row["prompt"], row["response"]))
-            if not __import__("math").isfinite(score):
+            if not math.isfinite(score):
                 raise ValueError("Non-finite reward score")
             result["rm_raw_score"] = score
         else:
