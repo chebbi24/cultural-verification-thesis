@@ -1,0 +1,24 @@
+\chapter{Related Work and Research Gap}
+\label{chap:related}
+
+\section{Cultural Evaluation Benchmarks}
+BLEnD evaluates everyday cultural knowledge across languages and communities \parencite{myung2024blend}. CulturalBench studies challenging cultural knowledge questions \parencite{chiu2025culturalbench}. NormAd studies adaptation to social norms \parencite{rao2025normad}. These benchmarks show different ways to operationalize cultural capability, but they do not directly provide a post-hoc evidence pipeline for arbitrary generated responses.
+
+\section{CARB}
+CARB studies cultural awareness in reward models and is relevant because Vericult is compared conceptually with preference-based evaluation \parencite{zhang2026carb}. CARB and Vericult do not use the same task design. CARB evaluates reward-model behavior under its benchmark protocol; Vericult evaluates one fixed prompt--response pair.
+
+\placeholder{SOURCE AUDIT: insert CARB exact benchmark composition, domains, model set and reported numerical findings from the original paper.}
+
+Published CARB percentages must not be presented as head-to-head results against Vericult unless both systems are evaluated under a directly comparable protocol.
+
+\section{Cultural Adaptation}
+CultureLLM studies adaptation of language models to cultural differences \parencite{li2024culturellm}. Its goal is to change generator behavior. Vericult instead leaves the generator unchanged and evaluates the produced response.
+
+\section{Geo-Diverse Safety and Plural Values}
+SafeWorld studies geographically diverse safety alignment \parencite{yin2024safeworld}. Work on pluralistic alignment argues that legitimate human differences should not always be collapsed into one global preference \parencite{sorensen2024pluralistic}. These ideas are relevant when cultural questions concern values, minority perspectives, or identity.
+
+\section{General Evaluators}
+RewardBench provides a framework for evaluating reward models \parencite{lambert2025rewardbench}. MT-Bench and Chatbot Arena are important references for LLM-based judging \parencite{zheng2023judging}. Their published scores are not directly comparable to the 360-item Vericult experiment.
+
+\section{Research Gap}
+The literature contains cultural benchmarks, cultural adaptation methods, reward models, direct LLM judges, and retrieval-based approaches. The design tested here combines post-hoc single-response evaluation, explicit cultural dimensions, selective external evidence, separation between evidence collection and response comparison, abstention, frozen evidence snapshots, and diagnostic traces. This combination is evaluated empirically; no novelty-priority claim is made without further literature evidence.
