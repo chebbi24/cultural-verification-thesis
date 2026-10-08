@@ -12,6 +12,7 @@ import csv
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -22,6 +23,7 @@ from dotenv import load_dotenv
 from cultverify import Config, CulturalVerifier
 from cultverify.llm import HTTPModel
 from cultverify.retrieval import TavilyRetriever
+from cultverify.trace import digest
 
 SCHEMA_VERSION = "final-vericult-single-v1"
 FINAL_CORPUS_ORDER = ("plt120", "external120", "redteam120")
@@ -245,6 +247,12 @@ def verify_runtime_manifest(path: Path, manifest: dict[str, Any], config_path: P
         raise RuntimeError("Runtime manifest was captured for different generated datasets")
     if not runtime.get("verifier_model", {}).get("digest"):
         raise RuntimeError("Runtime manifest does not contain a frozen verifier model identity")
+    if runtime.get("execution_id") != experiment_identity(manifest):
+        raise RuntimeError("Runtime manifest belongs to a different code/input/config freeze")
+    if runtime["verifier_model"].get("provider") != manifest["vericult"]["provider"]:
+        raise RuntimeError("Runtime verifier provider differs from the frozen manifest")
+    if runtime["verifier_model"].get("requested_id") != manifest["vericult"]["backbone"]:
+        raise RuntimeError("Runtime verifier model differs from the frozen manifest")
 
 
 def verify_evidence_manifest(path: Path) -> None:
@@ -261,19 +269,131 @@ def verify_evidence_manifest(path: Path) -> None:
             raise RuntimeError(f"Frozen LIVE trace changed or is missing: {trace_path}")
 
 
-def load_completed(path: Path, mode: str) -> set[str]:
+def experiment_identity(manifest: dict[str, Any]) -> str:
+    """Stable identity of code, inputs, model choice and config for safe resumption."""
+    payload = {
+        "experiment_id": manifest["experiment_id"],
+        "freeze_code_commit": manifest["freeze_code_commit"],
+        "config_sha256": manifest["vericult"]["config_sha256"],
+        "semantic_datasets": {
+            name: manifest["dataset"]["corpora"][name]["semantic_sha256"] for name in FINAL_CORPUS_ORDER
+        },
+        "provider": manifest["vericult"]["provider"],
+        "model": manifest["vericult"]["backbone"],
+    }
+    return sha256_text(json.dumps(payload, sort_keys=True, separators=(",", ":")))
+
+
+def validate_frozen_model(config: Config, manifest: dict[str, Any]) -> None:
+    """Disallow silent model/endpoint changes via environment overrides."""
+    if config.verifier_model_provider != manifest["vericult"]["provider"]:
+        raise RuntimeError("Effective verifier provider differs from the frozen manifest")
+    if config.verifier_model_id != manifest["vericult"]["backbone"]:
+        raise RuntimeError("Effective verifier model differs from the frozen manifest")
+    if config.verifier_model_provider == "l3s" and config.l3s_api_url != manifest["vericult"]["api_endpoint"]:
+        raise RuntimeError("Effective L3S endpoint differs from the frozen manifest")
+
+
+def read_checkpoint_records(path: Path) -> list[dict[str, Any]]:
+    """Recover only a torn final JSONL write, keeping a complete backup."""
     if not path.exists():
-        return set()
-    completed: set[str] = set()
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
+        return []
+    records = []
+    with path.open("rb+") as handle:
+        while True:
+            start = handle.tell()
+            raw = handle.readline()
+            if not raw:
+                break
+            if not raw.strip():
+                continue
+            try:
+                record = json.loads(raw)
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                if not raw.endswith(b"\\n") and handle.tell() == os.fstat(handle.fileno()).st_size:
+                    backup = path.with_name(path.name + ".interrupted.bak")
+                    if backup.exists():
+                        raise RuntimeError(f"Checkpoint recovery backup already exists: {backup}") from exc
+                    shutil.copy2(path, backup)
+                    handle.truncate(start)
+                    break
+                raise RuntimeError(f"Corrupt non-final JSONL record in {path}") from exc
+            if not isinstance(record, dict):
+                raise RuntimeError(f"Non-object JSONL checkpoint record in {path}")
+            records.append(record)
+            if not raw.endswith(b"\\n"):
+                handle.write(b"\\n")
+    return records
+
+
+def _completed_trace_is_valid(record: dict[str, Any], row: dict[str, str]) -> bool:
+    path_text = record.get("trace_path")
+    if not isinstance(path_text, str) or not path_text:
+        return False
+    try:
+        trace = json.loads(Path(path_text).read_text(encoding="utf-8"))
+        return (
+            trace.get("mode") == record["mode"]
+            and trace.get("run_id") == record.get("run_id")
+            and trace.get("prompt_hash") == digest(row["prompt"])
+            and trace.get("response_hash") == digest(row["response"])
+            and trace.get("result", {}).get("status") == "completed"
+        )
+    except (OSError, ValueError, TypeError):
+        return False
+
+
+def load_completed(
+    path: Path,
+    mode: str,
+    *,
+    execution_id: str | None = None,
+    rows_by_id: dict[str, dict[str, str]] | None = None,
+) -> set[str]:
+    """Only skip the most recent valid completion under the exact current freeze."""
+    latest = {}
+    for record in read_checkpoint_records(path):
+        if record.get("mode") == mode and record.get("item_id"):
+            latest[record["item_id"]] = record
+
+    completed = set()
+    for item_id, record in latest.items():
+        if record.get("status") != "completed":
             continue
-        record = json.loads(line)
-        if record.get("mode") == mode and record.get("status") == "completed":
-            item_id = record.get("item_id")
-            if item_id:
-                completed.add(item_id)
+        if execution_id is not None:
+            row = (rows_by_id or {}).get(item_id)
+            if (
+                row is None
+                or record.get("execution_id") != execution_id
+                or record.get("prompt_sha256") != row["prompt_sha256"]
+                or record.get("response_sha256") != row["response_sha256"]
+                or not _completed_trace_is_valid(record, row)
+            ):
+                continue
+        completed.add(item_id)
     return completed
+
+
+def execute_item(verifier, row: dict[str, str], mode: str, execution_id: str) -> dict[str, Any]:
+    """Isolate unanticipated candidate exceptions without swallowing interrupts."""
+    try:
+        record = summarize(row, mode, verifier.verify(row["prompt"], row["response"]))
+    except Exception as exc:
+        # Do not persist raw exception bodies: provider exceptions could expose request data.
+        record = {
+            "schema_version": SCHEMA_VERSION,
+            "mode": mode,
+            "corpus": row["corpus"],
+            "item_id": row["item_id"],
+            "prompt_sha256": row["prompt_sha256"],
+            "response_sha256": row["response_sha256"],
+            "status": "failed",
+            "run_id": None,
+            "trace_path": None,
+            "errors": [f"unhandled:{type(exc).__name__}"],
+        }
+    record["execution_id"] = execution_id
+    return record
 
 
 def summarize(row: dict[str, str], mode: str, result) -> dict[str, Any]:
@@ -376,11 +496,20 @@ def main(argv: list[str] | None = None) -> int:
     trace_root = Path(values["trace_directory"]).parent
     values["trace_directory"] = str(trace_root / args.mode.lower())
     config = Config.model_validate(values)
+    validate_frozen_model(config, manifest)
+    runtime_model = json.loads(args.runtime_manifest.read_text(encoding="utf-8"))["verifier_model"]
+    if config.verifier_model_provider == "l3s" and runtime_model.get("api_url") != config.l3s_api_url:
+        raise RuntimeError("Runtime L3S endpoint differs from the effective verifier config")
     verifier = build_verifier(config)
+    execution_id = experiment_identity(manifest)
 
     output = args.output or Path(f"artifacts/final_experiment/results/vericult_{args.mode.lower()}.jsonl")
     output.parent.mkdir(parents=True, exist_ok=True)
-    completed = set() if args.no_resume else load_completed(output, args.mode)
+    completed = set() if args.no_resume else load_completed(
+        output, args.mode, execution_id=execution_id, rows_by_id={row["item_id"]: row for row in rows}
+    )
+    if args.no_resume and output.is_file() and output.stat().st_size:
+        raise RuntimeError("--no-resume requires an empty/new --output; refusing to append duplicate results")
 
     failures = 0
     with output.open("a", encoding="utf-8") as handle:
@@ -390,8 +519,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"[{item_id}] already completed; skipping", flush=True)
                 continue
             print(f"[{index}/{len(rows)}] [{item_id}] {args.mode} starting", flush=True)
-            result = verifier.verify(row["prompt"], row["response"])
-            record = summarize(row, args.mode, result)
+            record = execute_item(verifier, row, args.mode, execution_id)
             handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
             handle.flush()
             os.fsync(handle.fileno())
