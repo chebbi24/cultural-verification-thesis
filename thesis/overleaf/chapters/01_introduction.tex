@@ -72,6 +72,8 @@ However, the literature does not directly provide the exact evaluation layer inv
 
 This is the gap that Vericult is designed to explore.
 
+The innovation claimed by this thesis is therefore not retrieval by itself, not the use of an LLM judge by itself, and not the existence of a cultural rubric by itself. It is the emph{ordered, inspectable verification architecture}: a response is decomposed into material cultural targets; externally checkable targets are converted into neutral questions; evidence is gathered without the candidate response after that point; the resulting memo is frozen before comparison; unresolved evidence can lead to abstention; and the complete chain is preserved for replay and error analysis. This combination turns cultural evaluation from a single opaque score into a sequence of auditable decisions.
+
 The thesis does not claim that these design choices are automatically better than existing evaluators. They are implemented as a testable architecture. The final experiment then examines how the architecture behaves on 360 fixed responses and how its decisions can be interpreted.
 
 \section{Research Questions}
@@ -170,6 +172,12 @@ The final design therefore changed in three important ways:
 \end{enumerate}
 
 The old human labels remain in the repository for development provenance but are not reused as labels for the new responses.
+
+\section{Innovation Boundary}
+
+The contribution should also be read with a clear boundary. Vericult does not train a new cultural language model, does not replace human cultural expertise, and does not claim to discover a universally correct culture label. It is an evaluation layer placed after generation. Its scientific question is whether evidence-grounded decomposition and explicit uncertainty make cultural assessment more transparent and diagnostically useful.
+
+This boundary is important when interpreting later comparisons. A reward model can be useful even though it does not expose source evidence, and a direct LLM judge can be correct without retrieval. Vericult's distinctive claim is not that these systems are invalid; it is that culturally situated judgments benefit from an architecture in which factual support, contextual variation, and the final normative assessment can be inspected separately.
 
 \section{Final Experiment at a Glance}
 
