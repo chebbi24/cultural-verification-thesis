@@ -21,7 +21,7 @@ Reward models are useful because they compress complicated preference informatio
 
 A reward score should not be confused with evidence. A score can tell us that one response is preferred by the model, but it does not necessarily tell us which cultural statement is wrong or which source supports the decision. The model may have learned useful cultural patterns from training data, but the evidence is implicit.
 
-This difference is central to the thesis comparison. The Skywork reward model is used as an independent baseline. It is not fed into Vericult, and Vericult does not try to imitate its score. The goal is to compare two different evaluation styles: learned preference scoring and explicit evidence-grounded verification.
+This difference matters for the comparison. Skywork is an independent baseline. Its score never enters Vericult. The thesis compares learned preference scoring with evidence-grounded verification.
 
 \section{LLM-as-a-Judge}
 
@@ -31,7 +31,7 @@ Zheng et al. study this approach with MT-Bench and Chatbot Arena \parencite{zhen
 
 Position bias is especially easy to understand. If two answers are shown in the order A then B, a judge may prefer a different answer than when the same texts are shown as B then A. Wang et al. demonstrate that response order can significantly change LLM evaluator results and propose calibration methods to reduce the effect \parencite{wang2024fair}.
 
-For a single-response task, position bias is less important than in pairwise ranking, but other problems remain. A direct judge can still rely on its internal knowledge, overlook an unsupported factual claim, or produce a confident explanation that is difficult to audit. It is therefore a useful baseline for Vericult: it shows what can be achieved by asking a model to judge cultural appropriateness directly, without an explicit retrieval and evidence pipeline.
+Position bias matters less when only one response is judged, but other problems remain. A direct judge can rely on internal knowledge, miss an unsupported claim, or give a confident explanation that is hard to check. This makes it a useful baseline for Vericult.
 
 \section{Culture as a Contextual Construct}
 
@@ -45,7 +45,7 @@ These findings support three assumptions in this thesis.
 
 First, explicit context should be preferred over inference. If a prompt says that the user is visiting a Japanese family, that information can be used. If the prompt only gives a person's name, the verifier should not infer nationality, religion, or ethnicity from it.
 
-Second, cultural variation must remain visible. A practice can be common without being universal. The phrase "people often do X" has a different meaning from "everyone must do X". Vericult therefore asks not only for baseline evidence but also for evidence about scope and variation.
+Second, the system must keep cultural variation visible. A practice can be common without being universal. The phrase "people often do X" is different from "everyone must do X". For this reason, Vericult asks about both the practice itself and its scope.
 
 Third, cultural claims can have different epistemic status. A statement about a law can often be checked against an official source. A statement about common greeting behavior may require linguistic or community evidence. A moral value judgment may have no single factual source that can settle it.
 
@@ -61,7 +61,7 @@ This also does not mean that every cultural practice is treated as morally accep
 
 \section{Descriptive Practices, Norms, Rules, and Values}
 
-A recurring source of cultural errors is the failure to distinguish between different kinds of claims. The verifier therefore uses four conceptual distinctions throughout the pipeline.
+Cultural errors often come from mixing different kinds of claims. The verifier keeps these types separate throughout the pipeline.
 
 \subsection{Descriptive Practice}
 
@@ -85,7 +85,7 @@ This distinction motivates D05, which separates legal and institutional constrai
 
 A value statement concerns what is good, fair, acceptable, or desirable. Evidence can describe which values are common in a population, but a survey cannot automatically prove that one moral position is correct.
 
-Pluralistic alignment research makes this distinction important. Sorensen et al. argue that AI systems may need to represent multiple reasonable perspectives rather than collapse them into one average preference \parencite{sorensen2024pluralistic}.
+Pluralistic alignment research supports this distinction. Sorensen et al. argue that AI systems may need to represent multiple reasonable perspectives rather than collapse them into one average preference \parencite{sorensen2024pluralistic}.
 
 \section{Evidence-Grounded Evaluation}
 
@@ -115,7 +115,7 @@ The public Vericult score follows the same idea. If any applicable dimension abs
 
 A web-based verifier has a reproducibility problem: the same search can return different results tomorrow. Websites change, search rankings change, and pages disappear.
 
-Vericult therefore has two execution modes.
+Vericult has two execution modes.
 
 In LIVE mode, the system performs real retrieval and stores the exact evidence snapshots. It also stores the question/query schedule used for each target.
 
