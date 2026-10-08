@@ -25,7 +25,7 @@ This difference is central to the thesis comparison. The Skywork reward model is
 
 \section{LLM-as-a-Judge}
 
-Another common evaluation method is to use a language model directly as a judge. The judge receives an instruction that defines the evaluation task together with one or more candidate responses. It then produces a label, score, ranking, or explanation.
+Another common evaluation method is to use a language model directly as a judge. The judge receives an instruction that defines the evaluation task together with one or more responses. It then produces a label, score, ranking, or explanation.
 
 Zheng et al. study this approach with MT-Bench and Chatbot Arena \parencite{zheng2023judging}. In their experiments, strong LLM judges can agree with human preference judgments at a high rate. The paper also identifies several limitations, including position bias, verbosity bias, self-enhancement bias, and reasoning limitations.
 
@@ -97,7 +97,7 @@ This separation has two motivations.
 
 The first is auditability. If the verifier says that a claim is contradicted, the trace should contain the questions, search query, retrieved documents, evidence quotations, memo, and comparison result.
 
-The second is bias control. If the full response remains visible during retrieval, the system may search for evidence that confirms or attacks the exact candidate wording. Vericult therefore creates neutral questions first and sends only those questions and explicit prompt context into the evidence engine.
+The second is bias control. If the full response remains visible during retrieval, the system may search for evidence that confirms or attacks the exact response wording. Vericult therefore creates neutral questions first and sends only those questions and explicit prompt context into the evidence engine.
 
 The method is not perfectly blind. The question generator sees the target before the blind boundary begins. This limitation is reported directly rather than hidden.
 
