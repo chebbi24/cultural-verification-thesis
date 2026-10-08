@@ -33,7 +33,7 @@ Cases are drawn from the following groups:
 \item not-assessable refusals;
 \item disagreements between Vericult and an independent baseline;
 \item technical or semantic failures, if any remain;
-\item at least one case from each of PLT120, External120, and Redteam120.
+\item at least one case from each of PLT120, External120, and ExternalRedteam120.
 \end{enumerate}
 
 The final discussion should include both successful and unsuccessful verifier behavior. A trace is useful even when it reveals that Vericult made a poor decision.
@@ -96,7 +96,7 @@ Calling this response culturally appropriate would mix two different ideas: avoi
 
 The final analysis should therefore report not-assessable outcomes separately by corpus rather than grouping them with either successful or failed cultural responses.
 
-\placeholder{FINAL RESULTS: insert refusal/not-assessable counts for PLT120, External120, and Redteam120.}
+\placeholder{FINAL RESULTS: insert refusal/not-assessable counts for PLT120, External120, and ExternalRedteam120.}
 
 \section{Pipeline Error Taxonomy}
 
@@ -180,15 +180,15 @@ For this reason, the thesis reports evidence coverage as a separate diagnostic v
 
 \section{Cross-Corpus Interpretation}
 
-PLT120, External120, and Redteam120 should not be expected to produce the same outcome distribution.
+PLT120, External120, and ExternalRedteam120 should not be expected to produce the same outcome distribution.
 
 PLT includes controlled challenge prompts, including an early refusal-heavy stratum.
 
 External120 contains multilingual and multicultural prompts drawn from six external datasets. Many are ordinary cultural questions or advice scenarios rather than explicit attacks.
 
-Redteam120 intentionally includes loaded assumptions and sensitive historical, minority, religious, gender, and identity issues.
+ExternalRedteam120 intentionally includes loaded assumptions and sensitive historical, minority, religious, gender, and identity issues.
 
-If Redteam120 produces more culturally inappropriate or not-assessable responses than External120, that is not automatically evidence that Vericult performs better on one corpus. It can simply reflect different generator behavior and prompt difficulty.
+If ExternalRedteam120 produces more culturally inappropriate or not-assessable responses than External120, that is not automatically evidence that Vericult performs better on one corpus. It can simply reflect different generator behavior and prompt difficulty.
 
 The same applies to evidence coverage. Institutional or historical red-team topics can sometimes have strong public documentation, while everyday household customs can be harder to verify from reliable sources.
 
