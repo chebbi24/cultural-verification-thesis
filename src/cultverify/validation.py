@@ -272,7 +272,10 @@ def validate_trace_links(trace):
         expected_label = "insufficient_evidence"
     elif any(s.score == 0 for s in scored):
         expected_label = "culturally_inappropriate"
-    elif len(scored) == len(result.dimension_scores) and all(s.score == 2 for s in scored):
+    elif abstained:
+        # An unresolved dimension is not evidence of partial cultural quality.
+        expected_label = "insufficient_evidence"
+    elif all(s.score == 2 for s in scored):
         expected_label = "culturally_appropriate"
     else:
         expected_label = "partially_culturally_appropriate"
