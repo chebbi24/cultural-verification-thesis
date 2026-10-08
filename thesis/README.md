@@ -60,4 +60,4 @@ The target is roughly **60–65 pages of main text**, excluding bibliography and
 | 9 Limitations | 3–4 |
 | 10 Conclusion | 2–3 |
 
-The report should not be padded to reach the page target. Tables, figures, code excerpts, prompt examples and appendices should be used where they improve understanding.
+The current rewritten main-text draft contains approximately **25,455 words** before references. In the previous thesis layout this is in the intended range for at least 60 pages of main content once tables, figures and normal academic spacing are included.\n\nThe report should not be padded to reach the page target. Tables, figures, code excerpts, prompt examples and appendices should be used where they improve understanding.
