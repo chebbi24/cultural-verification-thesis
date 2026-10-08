@@ -45,3 +45,10 @@ These placeholders must be filled from the archived final outputs after LIVE, ev
 - Semantic verifier freeze: `099e4116a809ee004c1cdea04d1bcc2a14e7d142`
 - Final experiment ID: `thesis-final-v4-360x1`
 - Primary Vericult result mode: `REPLAY`
+
+
+## Writing style for the final pass
+
+Keep the report at Bachelor-thesis level. Use simple English and short, direct sentences. Prefer concrete descriptions of what the code or experiment does over abstract wording. Do not add inflated novelty claims, marketing language, or phrases that sound more certain than the evidence supports. Keep technical terms only when they are needed and define them before use.
+
+This style also applies when the final results are inserted.
