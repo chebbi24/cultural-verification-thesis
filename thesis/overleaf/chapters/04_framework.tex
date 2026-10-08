@@ -58,6 +58,59 @@ Adilazuarda et al. show that culture in LLM research is represented through a mi
 
 The final D01--D10 scheme is the researcher's synthesis of these concerns. It is therefore important not to say that a particular paper "defines" D01 or D07. The literature motivates the need to cover these areas; the exact boundaries and names are implementation decisions made in this thesis.
 
+
+\section{From Prior Research to D01--D10}
+
+The ten dimensions were not copied from one benchmark and they are not presented as ten statistically independent cultural factors. They are a synthesis intended to cover the recurring kinds of cultural information and failure modes represented in the literature reviewed in Chapter~\ref{chap:related}. Table~\ref{tab:dimension-derivation} makes this derivation explicit.
+
+\begin{longtable}{p{0.07\textwidth}p{0.27\textwidth}p{0.28\textwidth}p{0.28\textwidth}}
+\caption{Literature-to-rubric derivation of the D01--D10 framework.}
+\label{tab:dimension-derivation} \\
+\toprule
+ID & Main construct & Research motivation & Why it is separate in Vericult \\
+\midrule
+\endfirsthead
+\toprule
+ID & Main construct & Research motivation & Why it is separate in Vericult \\
+\midrule
+\endhead
+D01 & Everyday life and material culture & Everyday cultural knowledge is a central object in BLEND and CulturalBench \parencite{myung2024blend,chiu2025culturalbench}. & A response can know broad values but still give wrong advice about food, clothing, hospitality, celebrations, or ordinary practices. \\
+D02 & Language, discourse and pragmatics & Cultural NLP surveys treat language and culturally situated linguistic behavior as a major component of cultural capability \parencite{adilazuarda2024culture,liu2025culturally}. & Linguistic appropriateness can fail even when factual cultural knowledge is correct; register, address forms, dialect and implied meaning therefore need their own dimension. \\
+D03 & Social etiquette and interpersonal norms & NormAd directly studies culturally situated social norms and etiquette \parencite{rao2025normad}. & Interpersonal expectations such as greetings, invitations, boundaries and public conduct are different from factual knowledge and from formal law. \\
+D04 & Values, ethics and moral pluralism & Pluralistic alignment and culture-focused model research show that values can differ legitimately across groups and individuals \parencite{sorensen2024pluralistic,li2024culturellm}. & A verifier must distinguish misrepresentation of values from ordinary factual mistakes and avoid converting majority preferences into moral unanimity. \\
+D05 & Law, policy and institutional rules & Geo-diverse safety work makes formal legal and institutional differences visible across jurisdictions \parencite{yin2024safeworld}. & Formal obligations require different evidence from informal customs. Conflating the two can directly mislead users. \\
+D06 & Religion, ritual and taboo & Cultural surveys include religion, belief and ritual among recurring cultural factors \parencite{adilazuarda2024culture,liu2025culturally}. & Religious practice often has internal diversity, sacred meaning and explicit prohibitions that are not adequately represented as generic etiquette. \\
+D07 & Family, kinship, gender and generations & Cultural adaptation and cultural-NLP research repeatedly include family roles, gender expectations and social relationships as culturally varying contexts \parencite{li2024culturellm,liu2025culturally}. & Advice about family authority, partnership, care or gender can be harmful when stereotyped; these relations deserve explicit visibility. \\
+D08 & Work, education and civic participation & Cultural behavior also appears in institutional and role-based settings rather than only private life \parencite{adilazuarda2024culture,liu2025culturally}. & Professional hierarchy, classroom interaction and civic participation can require norms distinct from family or casual social behavior. \\
+D09 & Cultural heritage, history, arts and collective memory & Cultural benchmarks and surveys include heritage, historical knowledge, arts and culturally salient events as parts of cultural competence \parencite{chiu2025culturalbench,adilazuarda2024culture}. & Historical memory can make a statement inappropriate even when its literal factual content is not obviously false. \\
+D10 & Identity, diversity and intergroup relations & Cultural evaluation and pluralistic alignment emphasize representation across groups and the risk of flattening minority or regional identities \parencite{sorensen2024pluralistic,liu2025culturally}. & Stereotyping, identity inference and majority-default assumptions cut across topics and therefore need an explicit intergroup dimension. \\
+\bottomrule
+\end{longtable}
+
+The matrix should be read as a design justification, not as a claim that each cited paper defines the corresponding Vericult dimension. The cited research motivates coverage of those phenomena; the exact ten-part decomposition is this thesis's operational synthesis.
+
+\section{Cultural Knowledge Is Not Cultural Appropriateness}
+
+A central distinction in this thesis is between knowing a culturally relevant fact and using that knowledge appropriately. Cultural benchmarks often test whether a model can identify a correct fact or socially accepted option. Vericult instead evaluates the complete generated response in context.
+
+\begin{table}[ht]
+\centering
+\caption{Difference between cultural knowledge and response-level cultural appropriateness.}
+\label{tab:knowledge-vs-appropriateness}
+\begin{tabularx}{\textwidth}{p{0.20\textwidth}X X}
+\toprule
+Case & Cultural knowledge & Cultural appropriateness \\
+\midrule
+Regional greeting & The model knows that Moin is associated especially with northern Germany. & The response still fails if it tells a user that Moin is the equally natural default everywhere in Germany without regional qualification. \\
+Food tradition & The model correctly identifies a Bavarian dish or celebration. & The response can still be inappropriate if it treats pork or alcohol as obligatory for every visitor. \\
+Religious practice & The model names a genuine ritual or dietary rule. & The response can still essentialize a diverse religious community by implying that every member practices identically. \\
+Institutional rule & The model correctly describes a formal rule. & The response can still mislead if it presents the rule as a cultural preference, applies it to the wrong jurisdiction, or ignores relevant exceptions. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+This distinction explains why Vericult does not stop after fact checking. Evidence can establish that a proposition is supported, but the dimension scorer must still ask whether the response's framing, recommendation, level of certainty, and treatment of variation are appropriate for the prompt.
+
 \section{The Ten Dimensions}
 
 Table~\ref{tab:dimensions} summarizes the runtime dimensions.
