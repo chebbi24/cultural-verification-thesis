@@ -67,6 +67,68 @@ The second is \emph{evidence construction}: what can be documented independently
 
 The third is \emph{judgment}: how does the actual response compare with the frozen evidence and the rubric?
 
+\section{Formal View of the Verification Function}
+
+For a prompt $p$ and frozen response $r$, Vericult can be written abstractly as
+
+\[
+V(p,r;\theta,\mathcal{R}) \rightarrow (y, D, T, Q, M, S, \tau),
+\]
+
+where $\theta$ denotes the frozen semantic configuration and $\mathcal{R}$ the retrieval environment or its frozen REPLAY snapshots. $D$ is the set of applicable cultural dimensions, $T$ the selected material targets, $Q$ the verification questions, $M$ the final evidence memos, $S$ the dimension scores, $y$ the categorical outcome, and $\tau$ the complete trace.
+
+The target budget is bounded by
+
+\[ |T| \leq 3. \]
+
+For every retrievable target $t\in T$, the initial question generator returns exactly two questions,
+
+\[ Q(t)=\{q_{t,1},q_{t,2}\}, \]
+
+with at most one additional gap-specific follow-up after the first retrieval round.
+
+For every applicable dimension $d\in D$, the score is
+
+\[ s_d \in \{0,1,2,\bot\}, \]
+
+where $\bot$ denotes abstention. Let $D^{*}=\{d\in D\mid s_d\neq\bot\}$. When at least one dimension is scored, the internal normalized aggregate is
+
+\[ A = \frac{\sum_{d\in D^{*}} s_d}{2|D^{*}|}. \]
+
+The public Vericult numeric score is reported only when no applicable dimension abstains; it is then $100A$. The categorical outcome is intentionally non-compensatory: if any scored dimension has value 0, the response is \texttt{culturally\_inappropriate}. It is \texttt{culturally\_appropriate} only when every applicable dimension is scored 2 with no abstention. Other partially scored or mixed cases are \texttt{partially\_culturally\_appropriate}; if no dimension can be scored, the evidence outcome is insufficient.
+
+This notation clarifies an important design point: the final label is not simply the rounded mean of a set of scores. A material zero cannot be averaged away by unrelated strengths.
+
+\section{Implementation Map}
+
+Table~\ref{tab:implementation-map} links the conceptual pipeline to the frozen repository. This makes the report traceable to executable code without turning the chapter into API documentation.
+
+\begin{longtable}{p{0.27\textwidth}p{0.30\textwidth}p{0.34\textwidth}}
+\caption{Mapping from thesis concepts to implementation files.}
+\label{tab:implementation-map}\\
+\toprule
+Concept & Main implementation & Role \\
+\midrule
+\endfirsthead
+\toprule
+Concept & Main implementation & Role \\
+\midrule
+\endhead
+Configuration & \texttt{src/cultverify/config.py} & Model, retrieval, budget, timeout and trace settings. \\
+Context + dimension planning & \texttt{planner.py}, \texttt{prompts.py} & Prompt-only context extraction, applicability gate and D01--D10 planning. \\
+Target extraction & \texttt{targets.py} & Deterministic response spans, material target selection and neutral verification questions. \\
+Retrieval & \texttt{retrieval.py} & LIVE search, snapshots, schedules and REPLAY loading. \\
+Evidence construction & \texttt{evidence.py} & Blind evidence engine, source handling, memo construction and bounded follow-up. \\
+Comparison + scoring & \texttt{scoring.py} & Target verdicts, forced abstention, contextual fallback, aggregation and final cultural label. \\
+Schemas + validation & \texttt{schemas.py}, \texttt{validation.py} & Typed structures and structural invariants across stages. \\
+Trace utilities & \texttt{trace.py} & Stable IDs, hashes, timestamps and serialized trace output. \\
+Final experiment & \texttt{scripts/run\_final\_experiment.py} & Frozen input validation, LIVE/REPLAY execution and result checkpoints. \\
+Evidence audit & \texttt{scripts/audit\_final\_evidence.py} & Completeness and hash verification before REPLAY. \\
+Independent baselines & \texttt{src/baseline\_rm.py} and direct-judge adapter & Comparison systems outside Vericult. \\
+\bottomrule
+\end{longtable}
+
+The semantic code freeze recorded for the final experiment is \texttt{099e4116a809ee004c1cdea04d1bcc2a14e7d142}. Appendix~\ref{app:code} reproduces selected code excerpts from the frozen implementation.
 \section{Prompt Context Extraction}
 
 The first semantic stage receives the prompt only. It extracts a structured \texttt{ContextFrame} containing:
