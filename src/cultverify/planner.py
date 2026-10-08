@@ -30,6 +30,7 @@ def plan_prompt(session, prompt, rubric):
     )
     if not applicability.applicable:
         return context, DimensionPlan(dimensions=(), reasoning=applicability.reason)
+
     def require_dimensions(plan):
         # Applicability was already established independently from the prompt.
         # An empty plan is therefore structurally contradictory, not a negative
