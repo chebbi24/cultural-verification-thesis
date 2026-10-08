@@ -20,7 +20,7 @@ Completed in the manuscript:
 - Verified related-work section and bibliography.
 - Detailed D01–D10 framework.
 - Full Vericult methodology with code excerpts from the frozen repository.
-- PLT120, External120 and Redteam120 methodology and concrete prompt examples.
+- PLT120, External120 and ExternalRedteam120 methodology and concrete prompt examples.
 - Frozen generator/verifier configuration and semantic hashes.
 - LIVE → audit/freeze → REPLAY protocol.
 - Result-independent discussion and error-analysis framework.
