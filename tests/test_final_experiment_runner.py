@@ -16,10 +16,12 @@ from scripts.run_final_experiment import (
     experiment_identity,
     expected_item_ids,
     load_completed,
+    load_final_rows,
     read_checkpoint_records,
     read_generated_rows,
     semantic_dataset_sha256,
     sha256_file,
+    validate_freeze_files,
     validate_frozen_model,
     verify_evidence_manifest,
     verify_runtime_manifest,
@@ -432,3 +434,34 @@ assert callable(preflight.experiment_identity)
         capture_output=True,
         text=True,
     )
+
+
+def test_real_frozen_360_input_contract():
+    """Validate the actual checked-in input hashes, not only small fixtures."""
+    root = Path(__file__).resolve().parents[1]
+    manifest = json.loads((root / "experiments/final_manifest.json").read_text(encoding="utf-8"))
+    config_path = root / "experiments/final_vericult_config.json"
+    hashes = validate_freeze_files(manifest, config_path)
+    rows = load_final_rows(manifest, "all")
+    assert len(rows) == 360
+    assert len({row["item_id"] for row in rows}) == 360
+    assert len(hashes) == 3
+    assert all(hashes[name] == manifest["dataset"]["corpora"][name]["semantic_sha256"] for name in hashes)
+
+
+def test_direct_launch_of_all_final_scripts():
+    """Catch script-mode import errors before users run full experiments."""
+    root = Path(__file__).resolve().parents[1]
+    for path in (
+        "scripts/preflight_final_experiment.py",
+        "scripts/run_final_experiment.py",
+        "scripts/audit_final_evidence.py",
+        "scripts/run_final_baselines.py",
+    ):
+        subprocess.run(
+            [sys.executable, path, "--help"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
