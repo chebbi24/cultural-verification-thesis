@@ -2,13 +2,13 @@
   "schema_version": "thesis-final-v4-single-response",
   "experiment_id": "thesis-final-v4-360x1",
   "pipeline_version": "cultverify-1.1.0",
-  "freeze_code_commit": "24f2b1ea4bacb4f152e94b42fe3e3dd1c6fdca3f",
+  "freeze_code_commit": "e451ff40b50bf1a91a30175c1885d1660a87e51c",
   "validation": {
-    "status": "unit_ci_passed_live_plt002_plt003_passed_plt001_timeout_preflight_pending",
+    "status": "unit_ci_passed_direct_script_preflight_fixed_local_preflight_pending",
     "local_live_smoke_required": true,
     "ci_workflow": "Verifier tests",
-    "note": "Launch-safety and classification regressions passed CI (158 tests passed, 1 skipped; compile, lint and format passed). PLT002 and PLT003 completed LIVE with expected classifications. PLT001 still exhibits a provider ReadTimeout in dimension planning and must be treated as an execution failure, not a cultural verdict. Capture a fresh matching runtime preflight before official LIVE. Never reuse results from an older code/input freeze.",
-    "github_actions_run_id": 37713592159,
+    "note": "CI success (preflight direct-script regression added, 159 tests passed, 1 skipped; compile, Ruff lint, Ruff format). PLT002 and PLT003 LIVE completed with expected classifications before this import-only correction; PLT001 L3S timeout unresolved. Fresh local preflight required before final LIVE.",
+    "github_actions_run_id": 37713891461,
     "required_status": "success"
   },
   "dataset": {
