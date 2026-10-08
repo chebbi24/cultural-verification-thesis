@@ -28,7 +28,7 @@ All semantic stages in the final experiment use one configured backbone:
 
 The provider is the L3S OpenAI-compatible endpoint. Temperature is fixed to 0. There is no model fallback in the final configuration.
 
-The use of one backbone is important for interpretability. If context extraction used one model, target selection another, and scoring a third, errors would be harder to attribute. It would also introduce additional model-selection decisions. The final architecture therefore uses one semantic backbone while keeping retrieval as a separate external component.
+Using one backbone makes the system easier to analyse. If each stage used a different model, it would be harder to locate the source of an error. The final verifier therefore uses one semantic backbone, while retrieval remains a separate external component.
 
 The generator is different from the verifier. Responses are produced in advance by \texttt{gpt-oss:120b-mxfp4}. This separation follows the supervisor's requirement that the verifier should not simply be the same model evaluating its own output source.
 
@@ -179,7 +179,7 @@ Not every prompt that mentions a place or group requires cultural evaluation. A 
 
 The applicability gate therefore asks whether culturally situated reasoning is materially required. If the answer is no, the final outcome is \texttt{not\_culturally\_applicable} and D01--D10 scoring is skipped.
 
-This distinction became important during development. Earlier versions could spend retrieval and scoring calls on prompts whose cultural context was incidental.
+During development, this gate prevented the system from spending retrieval and scoring calls on prompts where culture was only incidental.
 
 \section{Prompt-Level Dimension Planning}
 
@@ -197,11 +197,11 @@ The final verifier therefore has a separate response-assessability gate. It rece
 
 This is not the same as \texttt{culturally\_appropriate}. A refusal may avoid a harmful statement, but it does not demonstrate that the model can answer the cultural question appropriately.
 
-This distinction is also useful in analysis because refusal behavior can then be reported by corpus.
+It also lets the thesis report refusals separately for each corpus.
 
 \section{Deterministic Response Spans}
 
-The material-target stage must quote the response exactly. Asking a generative model to reproduce a long exact quotation can fail for trivial formatting reasons. The implementation therefore gives ownership of the text to Python.
+The target stage needs exact response text. A language model can change spacing or punctuation when it copies a sentence. To avoid this problem, Python keeps the source text and the model selects span IDs.
 
 The response is split into deterministic sentence-like spans. The semantic model selects only span IDs.
 
@@ -326,7 +326,7 @@ def evaluate(
     )
 \end{lstlisting}
 
-This does not make the evidence objectively unbiased. Search engines and source availability have their own biases. The design only enforces a structural rule: after neutral questions have been formed, evidence synthesis cannot directly inspect the candidate response.
+This does not make the evidence unbiased. Search engines and available sources can still be biased. The rule is narrower: after the questions are formed, evidence synthesis cannot inspect the response directly.
 
 \section{Query Rewriting}
 
@@ -450,7 +450,7 @@ if digest(memo) != before:
     raise ValueError("Frozen memo changed")
 \end{lstlisting}
 
-This is one of the main methodological differences from a direct LLM judge. The model cannot rewrite the evidence memo after seeing that it would otherwise contradict the candidate.
+This differs from a direct LLM judge. The model cannot rewrite the evidence memo after seeing the response comparison.
 
 \section{Target Comparison}
 
@@ -667,7 +667,7 @@ These mechanisms improve traceability and reproducibility, but they do not guara
 
 \section{Complete Illustrative Walkthrough}
 
-The following example is deliberately illustrative and is \emph{not} one of the 360 final traces. Its purpose is to show how information changes form between stages without implying an empirical result.
+The following example is illustrative. It is not one of the 360 final traces. It only shows how information moves through the pipeline.
 
 \textbf{Illustrative prompt:}
 
@@ -758,11 +758,11 @@ This distinction reduces unnecessary search. It also prevents the verifier from 
 
 \section{Candidate Blindness: Exact Boundary}
 
-The term candidate-blind needs a precise explanation. The target extractor has seen the response, and the question generator receives the selected response quotation. It is therefore not correct to say that the entire evidence pipeline is blind to the candidate.
+The term candidate-blind needs a clear boundary. The target extractor has seen the response, and the question generator receives the selected response quotation. It is therefore not correct to say that the entire evidence pipeline is blind to the candidate.
 
 The blind boundary begins after neutral questions have been generated. The retrieval and evidence memo stages receive the questions and prompt context, but not the candidate's full response, candidate position, expected label, or comparator verdict. The purpose is to reduce the risk that the evidence memo simply repeats the candidate's claim.
 
-This design does not guarantee neutrality. A poorly phrased question could still carry the target's assumptions into search. The question stage is therefore itself a possible source of bias and is included in the trace review.
+This rule does not guarantee neutral evidence. A poorly written question can still carry the target's assumptions into search. For this reason, the question stage is also checked during trace review.
 
 \begin{figure}[ht]
 \centering
@@ -813,4 +813,4 @@ The trace is important because a final verdict can be wrong for different reason
 
 A trace-based review should therefore follow the pipeline in order. It should ask: Was the relevant context present? Were the dimensions appropriate? Was the target materially important? Were the questions neutral? Did retrieval find independent evidence? Did the memo quote it accurately? Was the comparison justified? Did the final score follow the rubric?
 
-This diagnostic sequence is a central practical benefit of the framework. It also supports error analysis without treating the verifier's own explanation as ground truth.
+This sequence helps locate where an error started. It also avoids treating the verifier's own explanation as ground truth.
