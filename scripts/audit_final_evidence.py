@@ -8,8 +8,12 @@ import json
 from pathlib import Path
 from typing import Any
 
-from scripts.run_final_experiment import experiment_identity, load_final_rows
 from cultverify.trace import digest
+
+try:
+    from scripts.run_final_experiment import experiment_identity, load_final_rows
+except ModuleNotFoundError:
+    from run_final_experiment import experiment_identity, load_final_rows
 
 
 FINAL_CORPUS_ORDER = ("plt120", "external120", "redteam120")
