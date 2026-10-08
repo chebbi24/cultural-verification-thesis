@@ -10,7 +10,7 @@ This makes cultural evaluation difficult. A response can be grammatically correc
 
 Current research confirms that culture is not one simple variable. Adilazuarda et al. show that work on culture in LLMs uses many different proxies, including language, nationality, values, customs, and other semantic domains \parencite{adilazuarda2024culture}. Liu et al. similarly describe culture as a multi-part concept and show that culturally aware NLP covers knowledge, language, values, social groups, and adaptation \parencite{liu2025culturally}.
 
-This thesis therefore does not treat nationality as a complete cultural label. A culturally relevant prompt can instead contain a region, religion, language variety, institution, family role, workplace relationship, historical topic, or identity group.
+This thesis does not use nationality as a complete cultural label. A prompt may instead refer to a region, religion, language variety, institution, family role, workplace relationship, historical topic, or identity group.
 
 \section{Why Existing Evaluation Is Not Enough}
 
@@ -30,7 +30,7 @@ The practical question in this thesis is different:
 A model has already produced one response. Can that response be checked in a transparent way for cultural appropriateness?
 \end{quote}
 
-The output should ideally explain not only the final judgment but also what cultural dimensions were relevant, which response claims were checked, what evidence was retrieved, where variation exists, and where the verifier did not have enough basis to decide.
+The output should show more than the final label. It should show the relevant dimensions, the claims that were checked, the evidence that was found, and any point where the system did not have enough information.
 
 \section{Problem Statement}
 
@@ -72,7 +72,7 @@ However, the literature does not directly provide the exact evaluation layer inv
 
 This is the gap that Vericult is designed to explore.
 
-The innovation claimed by this thesis is therefore not retrieval by itself, not the use of an LLM judge by itself, and not the existence of a cultural rubric by itself. It is the \emph{ordered and inspectable verification process}: a response is decomposed into material cultural targets; externally checkable targets are converted into neutral questions; evidence is gathered without the response after that point; the resulting memo is frozen before comparison; unresolved evidence can lead to abstention; and the complete chain is preserved for replay and error analysis. This combination turns cultural evaluation from a single opaque score into a sequence of auditable decisions.
+The contribution is not retrieval alone, an LLM judge alone, or a cultural rubric alone. The contribution is how these parts are ordered. Vericult selects important response targets, turns checkable targets into neutral questions, gathers evidence without the response, freezes the evidence, and only then compares the response with it. If the evidence is too weak, the system can abstain. The trace keeps each step for later review.
 
 The thesis does not claim that these design choices are automatically better than existing evaluators. They are implemented as a testable architecture. The final experiment then examines how the architecture behaves on 360 fixed responses and how its decisions can be interpreted.
 
@@ -96,7 +96,7 @@ This question uses the diagnostic information that a scalar evaluator does not e
 
 \item[RQ4] \textbf{Where a valid common reference is available, how do Vericult's judgments compare with an independent reward model and a direct LLM judge?}
 
-This question places Vericult next to simpler or more established evaluator types. It is deliberately conditional because automated systems disagreeing with each other does not establish which one is correct.
+This question places Vericult next to simpler or more established evaluator types. It is conditional because disagreement between automated systems does not tell us which system is correct.
 
 \end{description}
 
@@ -163,7 +163,7 @@ That stage was useful for developing the rubric, target extraction, ranking beha
 
 The supervisor also emphasized that the verifier should be evaluated on responses from a stronger and consistent generator and that the verifier backbone should be strong enough for the task.
 
-The final design therefore changed in three important ways:
+The final design changed in three ways:
 
 \begin{enumerate}
 \item Best-of-4 is replaced by one response per prompt.
