@@ -512,3 +512,82 @@ The generated responses, semantic backbone, rubric, target budget, retrieval lim
 If a software bug is found after the freeze, the correction must be documented as a new run rather than silently changing the original result.
 
 This policy separates development from evaluation and reduces the risk of adjusting the verifier to look better on the final data.
+
+
+\section{Why the Generator Is Kept Fixed}
+
+Using one generator for all three corpora avoids mixing cultural difficulty with differences in generation models. If one dataset were answered by a small model and another by a stronger model, a difference in verifier outcomes could be caused by either the prompts or the model. The final design avoids this particular confound by generating one response per prompt with the same model and sampling settings.
+
+The design does not eliminate all sources of variation. The prompts differ in language, length, difficulty, and topic. A single generator can also behave differently across languages. Therefore, corpus-level differences describe the frozen sample, not the inherent difficulty of an entire culture or language.
+
+\section{Three Corpus Roles}
+
+PLT120 contains researcher-designed prompts intended to expose problems in cultural handling. The first 30 items originated during earlier development, while the remaining 90 form a later challenge expansion. Keeping this provenance visible matters because early prompts may have influenced design decisions, even though their final GPT-OSS responses were newly generated. PLT120 is not treated as a fully independent external benchmark.
+
+External120 contains 20 selected prompts from each of six public sources: CARE, Community Alignment, PLURAL, PACT, ThaiCLI, and PRISM. The original source metadata is stored per row. These examples provide variation in cultural setting and language. They should not be described as a random sample of each original benchmark. The final input includes the generated GPT-OSS response rather than a released reference answer.
+
+Redteam120 contains externally grounded cultural challenge prompts. The prompt construction draws on public source material about issues such as cultural identity, minority rights, religious practice, historical memory, and institutional expectations. A public source used to motivate a prompt is not automatically the correct answer to that prompt. The verifier must still examine the generated response and its claims.
+
+\section{Why the Dataset Is Not a Balanced Accuracy Test}
+
+The corpora have different construction goals. PLT120 and Redteam120 emphasize challenging cases, whereas External120 includes more ordinary cultural questions. This design is useful for stress-testing failure modes, but the overall percentage of inappropriate responses should not be interpreted as the expected failure rate of a model in everyday use.
+
+Likewise, a refusal on a red-team prompt may be desirable from a safety perspective while still being a non-answer for cultural-content evaluation. The experiment reports these cases separately. This prevents a high refusal rate from artificially improving an appropriateness score.
+
+\section{Input Validation}
+
+Each generated CSV has a canonical item ID sequence. The final runner requires the expected columns and rejects empty prompts or responses. It checks that the model and sampling settings match the manifest and verifies each prompt and response against its stored SHA-256 digest.
+
+The experiment uses a semantic dataset digest rather than hashing the raw CSV bytes. A CSV can represent the same text with different newline or quoting conventions. The semantic digest hashes a canonical JSON representation of the ordered item IDs, prompt hashes, response hashes, and generator settings. This preserves the scientific input while avoiding false differences caused by serialization.
+
+The frozen semantic SHA-256 values are:
+
+\begin{longtable}{p{0.22\textwidth}p{0.70\textwidth}}
+\toprule
+Corpus & Semantic SHA-256\\
+\midrule
+PLT120 & \texttt{febf9cf570b31e2f1a1ca5ee61466d6d8618fb7bd8d008a127b6cf6eb80214aa}\\
+External120 & \texttt{9d2c0e58afb89d2641adc549d7cfaff5eba9d45d549f728d6cba664778811a96}\\
+Redteam120 & \texttt{b0e8f9e81b4020bce0a5355790f511f9efaddc65944eddbdb072bbb2afb5989d}\\
+\bottomrule
+\end{longtable}
+
+\section{Leakage and Contamination Controls}
+
+Evidence retrieval must not return the benchmark's own reference answer as if it were an independent cultural source. The final configuration therefore excludes the thesis repository and known external benchmark hosting locations. The domain \texttt{huggingface.co} is excluded because five of the External120 sources are hosted there. The \texttt{UpstageAI/ThaiCLI\_H6} repository is also excluded.
+
+These exclusions reduce one form of leakage but do not guarantee complete independence. A benchmark question or its answer could be copied elsewhere on the public web. The thesis therefore treats retrieval leakage as a risk to audit, not as a solved problem.
+
+The Redteam120 provenance sources remain generally eligible as evidence because they are public source documents used to motivate new questions, rather than repositories of released benchmark answers. This is a deliberate distinction. Source relevance, independence, and scope must still be evaluated for each retrieved claim.
+
+\section{Evidence Freeze Audit}
+
+LIVE produces one result record and a detailed trace per item. The evidence audit requires 360 completed LIVE records and the expected trace set. It checks referenced snapshots and creates a manifest of hashes for the LIVE results, traces, and evidence artifacts.
+
+REPLAY verifies that frozen manifest before running. It uses the same prompts and generated responses and cannot silently retrieve new evidence. If an artifact is missing or changed, the run should fail rather than substitute a different search result. This provides a clear boundary between evidence acquisition and primary reporting.
+
+\section{Analysis Denominators}
+
+Different quantities require different denominators. Outcome percentages use the number of completed REPLAY records. A dimension's score distribution uses the number of responses where that dimension was applicable, not the entire dataset. Evidence sufficiency uses the number of retrievable targets with completed evidence memos. A corpus comparison uses the number of completed records within that corpus.
+
+For a count \(n_c\) of responses with outcome \(c\), and \(N\) completed responses, the observed share is
+\[
+\widehat{p}_c = \frac{n_c}{N}.
+\]
+This is a descriptive statistic for the fixed dataset. It should not be presented as a population estimate without a justified sampling model.
+
+For a dimension \(d\), let \(A_d\) be the set of responses where that dimension is applicable and \(S_d\) the subset with a non-abstaining score. The dimension abstention rate is
+\[
+a_d = \frac{|A_d|-|S_d|}{|A_d|},
+\]
+when \(|A_d|>0\). The same rule applies when calculating dimension-specific score percentages: the denominator must be stated explicitly.
+
+\section{Qualitative Trace Review}
+
+Aggregate counts alone cannot establish why a verdict was produced. The qualitative analysis should inspect examples from several outcome classes and corpora. For each case, the reviewer checks the original prompt and response, the selected dimensions, material targets, neutral questions, retrieved sources, evidence memo, target verdicts, and final score rationale.
+
+The analysis should identify the earliest stage where an unsupported assumption or failure appears. For example, a wrong cultural score might result from an incorrect initial context frame rather than the final scoring prompt. Reporting this distinction is one of the practical benefits of keeping structured traces.
+
+\section{Research Integrity}
+
+The code, rubric, model settings, and dataset are frozen before the final evaluation. A failed execution may be retried with the same semantics after an infrastructure problem is corrected. The prompt, response, source exclusions, target budget, and scoring rules must not be adjusted after looking at final outcomes. If a later experiment changes any of these elements, it is a new run and must be labeled as such.
