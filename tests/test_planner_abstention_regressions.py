@@ -7,8 +7,11 @@ import pytest
 from cultverify.llm import SemanticSession, StageError
 from cultverify.planner import plan_prompt
 from cultverify.schemas import (
-    ContextFrame, CulturalApplicability, DimensionApplicability,
-    DimensionPlan, DimensionScore,
+    ContextFrame,
+    CulturalApplicability,
+    DimensionApplicability,
+    DimensionPlan,
+    DimensionScore,
 )
 from cultverify.scoring import cultural_appropriateness, vericult_score
 
@@ -85,6 +88,7 @@ class ScriptedLLM:
 
 def test_semantic_session_retries_contradictory_plan():
     from cultverify.config import Config
+
     config = Config(verifier_model_id="test", retry_count=1)
     empty = '{"dimensions":[],"reasoning":"D02 primary"}'
     valid = '{"dimensions":[{"dimension_id":"D02","role":"primary","reason":"Cultural pragmatics"}],"reasoning":"D02"}'
@@ -108,7 +112,9 @@ def test_semantic_session_fails_closed_after_invalid_retry():
     session = SemanticSession(llm, config)
     with pytest.raises(StageError, match="invalid output after bounded retry"):
         session.call(
-            "dimension_planner_v1", {}, DimensionPlan,
+            "dimension_planner_v1",
+            {},
+            DimensionPlan,
             lambda plan: (_ for _ in ()).throw(ValueError("empty dimensions")) if not plan.dimensions else None,
         )
 
@@ -117,10 +123,13 @@ def test_timeout_retries_then_succeeds_without_semantic_repair():
     import requests
     from cultverify.config import Config
     config = Config(verifier_model_id="test", retry_count=1, transport_retry_count=1)
-    llm = ScriptedLLM(config, [
-        requests.Timeout("simulated provider timeout"),
-        '{"dimensions":[{"dimension_id":"D02","role":"primary","reason":"Relevant"}],"reasoning":"Material"}',
-    ])
+    llm = ScriptedLLM(
+        config,
+        [
+            requests.Timeout("simulated provider timeout"),
+            '{"dimensions":[{"dimension_id":"D02","role":"primary","reason":"Relevant"}],"reasoning":"Material"}',
+        ],
+    )
 
     def complete(**kwargs):
         outcome = next(llm.sequence)
