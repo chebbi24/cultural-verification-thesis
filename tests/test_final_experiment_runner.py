@@ -1,6 +1,8 @@
 import csv
 import hashlib
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -404,3 +406,29 @@ def test_evidence_audit_uses_actual_semantic_hash_key_and_execution_identity(tmp
     assert audit["execution_id"] == eid
     assert audit["n_items"] == 6
     assert audit["dataset_sha256"]["plt120"]["semantic_sha256"] == corpora["plt120"]["semantic_sha256"]
+
+
+def test_preflight_script_mode_exposes_both_freeze_helpers():
+    """Reproduce python scripts/preflight_final_experiment.py import fallback."""
+    code = """
+import builtins
+
+original_import = builtins.__import__
+
+def force_script_mode(name, *args, **kwargs):
+    if name == "scripts.run_final_experiment":
+        raise ModuleNotFoundError("Forced direct-script fallback")
+    return original_import(name, *args, **kwargs)
+
+builtins.__import__ = force_script_mode
+import preflight_final_experiment as preflight
+assert callable(preflight.validate_frozen_model)
+assert callable(preflight.experiment_identity)
+"""
+    subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=Path(__file__).resolve().parents[1] / "scripts",
+        check=True,
+        capture_output=True,
+        text=True,
+    )
