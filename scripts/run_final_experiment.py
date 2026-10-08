@@ -310,7 +310,7 @@ def read_checkpoint_records(path: Path) -> list[dict[str, Any]]:
             try:
                 record = json.loads(raw)
             except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-                if not raw.endswith(b"\\n") and handle.tell() == os.fstat(handle.fileno()).st_size:
+                if not raw.endswith(b"\n") and handle.tell() == os.fstat(handle.fileno()).st_size:
                     backup = path.with_name(path.name + ".interrupted.bak")
                     if backup.exists():
                         raise RuntimeError(f"Checkpoint recovery backup already exists: {backup}") from exc
@@ -321,8 +321,8 @@ def read_checkpoint_records(path: Path) -> list[dict[str, Any]]:
             if not isinstance(record, dict):
                 raise RuntimeError(f"Non-object JSONL checkpoint record in {path}")
             records.append(record)
-            if not raw.endswith(b"\\n"):
-                handle.write(b"\\n")
+            if not raw.endswith(b"\n"):
+                handle.write(b"\n")
     return records
 
 
