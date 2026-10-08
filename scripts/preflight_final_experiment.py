@@ -28,9 +28,11 @@ try:
 except ModuleNotFoundError:
     from run_final_experiment import (
         assert_frozen_checkout,
+        experiment_identity,
         load_final_rows,
         sha256_file,
         validate_freeze_files,
+        validate_frozen_model,
     )
 
 
