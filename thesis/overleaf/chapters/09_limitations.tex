@@ -1,23 +1,301 @@
 \chapter{Threats to Validity and Limitations}
 \label{chap:limitations}
 
+Vericult is designed to make cultural evaluation more inspectable, but the architecture does not remove the underlying difficulty of the task. This chapter separates limitations of the cultural construct, dataset, semantic model, retrieval system, comparison protocol, and reproducibility process.
+
 \section{Construct Validity}
-D01--D10 are an operational design, not a complete theory of culture. The dimensions overlap and other decompositions are possible.
 
-\section{Source and Retrieval Limitations}
-Search engines may over-represent widely published, English-language or institutional sources. Lived practices may be documented less clearly than formal rules. Evidence sufficiency is still a model judgment about retrieved documents.
+The first limitation concerns what the thesis means by cultural appropriateness.
 
-\section{Model Dependence}
-One semantic backbone performs several stages. Early errors can propagate. Temperature zero reduces but does not eliminate model variation.
+D01--D10 are an operational framework created for this project. The dimensions are informed by literature on cultural knowledge, social norms, plural values, cultural adaptation, safety, and culturally aware NLP, but the exact ten-category organization is a research design choice.
 
-\section{Dataset Limitations}
-The 360 cases are selected from external sources and researcher-designed prompts. They are not a representative sample of all cultures or all LLM use cases.
+There is no evidence that all cultural concerns can be divided into ten independent dimensions.
 
-\section{Human Evaluation Limitations}
-The older five-person annotation study refers to different Best-of-4 responses. It can be reported as development history but not as final ground truth for the new 360 responses.
+The dimensions also overlap. A religious meal can involve everyday material culture, social etiquette, and religious practice. A workplace form of address can involve pragmatics and professional setting. A historical monument can involve heritage and identity at the same time.
 
-\section{Reproducibility Limitations}
-Frozen evidence improves repeatability, but provider implementations and external services can change. Reproduction requires exact code, configuration, hashes and saved artifacts.
+The prompt planner tries to choose the smallest sufficient set, but there is no perfect objective boundary between dimensions.
 
-\section{Ethical Limitations}
-A cultural verifier can reinforce stereotypes if it turns majority tendencies into rules. Its decisions should be treated as inspectable assessments, not authority over cultural identity, religion or values.
+A second construct problem is that cultural appropriateness itself can be contested. Two people from the same community may disagree about whether advice is respectful, modern, traditional, or appropriate. This is not always annotation noise. It can represent genuine pluralism.
+
+The verifier therefore should not be interpreted as measuring an objective latent variable called "true culture." It implements a documented rubric and evidence process.
+
+\section{Cultural Essentialism Risk}
+
+A system built to evaluate culture can accidentally reproduce cultural stereotypes.
+
+This risk appears in several forms.
+
+First, retrieval may surface pages that describe national traits too broadly.
+
+Second, the semantic backbone can already contain stereotypes learned during pre-training.
+
+Third, even a correct statement about a common practice can become essentialist when phrased without scope.
+
+Fourth, benchmark metadata such as country or cultural group can encourage the evaluator to reason from labels instead of the specific situation.
+
+Vericult addresses this through explicit-context extraction, variation questions, D10, and instructions not to infer identity from names. These safeguards reduce the risk but do not eliminate it.
+
+A trace may still contain an overgeneralized evidence memo, especially when source material itself is broad.
+
+\section{Source Availability and Representation}
+
+The public web does not represent all cultures equally.
+
+Highly digitized institutions, widely spoken languages, and countries with large English-language web footprints are easier to retrieve than small communities, oral traditions, local dialects, or practices documented mainly in non-indexed sources.
+
+This creates a structural problem for evidence-grounded cultural verification: low evidence coverage can reflect web visibility rather than lack of cultural validity.
+
+For example, an official legal procedure may have a clear government page, while an intergenerational household practice may be documented only in ethnography, community sources, or local-language media.
+
+The source classifier does not solve this asymmetry. It can identify a source type, but it cannot create missing community representation.
+
+The final evidence-coverage results must therefore be interpreted partly as a property of retrieval availability.
+
+\section{Search-Engine Bias}
+
+Vericult uses Tavily as the retrieval interface in LIVE mode. Search ranking is outside the thesis implementation.
+
+The search engine can affect which viewpoints are retrieved, which languages dominate, and which pages appear in the top results. The configured top-k of three makes the process efficient but also limits source diversity.
+
+A different search provider could produce different evidence even for the same neutral question.
+
+The LIVE/REPLAY mechanism addresses reproducibility after retrieval has occurred. It does not prove that the LIVE retrieval was complete or unbiased.
+
+\section{Source-Quality Limitations}
+
+Source type is not the same as correctness.
+
+An official source can accurately describe law but poorly represent lived experience.
+
+An academic paper can be rigorous but outdated or limited to one sample.
+
+A community source can provide valuable first-hand perspective while being difficult to generalize.
+
+A commercial source can sometimes contain accurate practical information.
+
+Vericult therefore avoids one universal numerical source-quality score. The memo is instructed to consider source suitability for the question.
+
+This still leaves judgment to the semantic backbone. Misclassification or overconfidence is possible.
+
+\section{Evidence-Memo Limitations}
+
+Evidence grounding in Vericult depends on a model-generated memo.
+
+The memo must cite exact support quotations, which provides an important audit constraint. However, a quotation can exist while the interpretation remains too broad.
+
+For example, a source saying that a practice is common in one region does not justify a memo stating that it is standard across the whole country.
+
+Validation can check citation existence more easily than semantic entailment.
+
+The final trace analysis must therefore inspect both the memo and the underlying quotations in selected cases.
+
+\section{Question-Leakage Limitation}
+
+The evidence engine is candidate-blind only after verification-question generation.
+
+The question generator receives the target's exact response quote, epistemic type, and dimensions. It can therefore transfer framing from the candidate into the neutral question.
+
+A question may be structurally valid and still be subtly biased.
+
+This is a known limitation of the design and should not be hidden behind the term candidate-blind.
+
+A stronger future design could use additional question-neutrality checks, adversarial paraphrases, or multiple independently generated verification questions.
+
+\section{Material-Target Budget}
+
+The maximum of three material targets makes evaluation tractable but creates a coverage limitation.
+
+Long GPT-OSS responses can contain many factual claims, recommendations, and examples. If four or five different cultural problems are present, the target extractor must prioritize.
+
+A missed material target can lead to an overly positive final judgment even if every selected target is handled correctly.
+
+The \texttt{targets\_truncated} field records when the extractor reports that additional material units could not fit the budget, but it cannot guarantee that the most important omitted claim is known.
+
+This is a trade-off between depth and computational cost.
+
+\section{Semantic Backbone Dependence}
+
+The final verifier uses one semantic backbone for context extraction, applicability, planning, target selection, question generation, source classification, memo synthesis, comparison, and scoring.
+
+Using one model improves consistency and simplifies interpretation, but it also creates correlated errors.
+
+If the model misunderstands a cultural concept during planning, the same model family can carry that misunderstanding into later stages.
+
+External retrieval provides independent information, but the semantic model still decides how to summarize and use it.
+
+The thesis therefore evaluates Vericult as a complete system built around this backbone, not as a model-independent algorithm.
+
+\section{Temperature and Determinism}
+
+The verifier temperature is fixed to 0. This reduces stochasticity but does not guarantee bitwise identical outputs.
+
+Server implementations, model revisions, numerical kernels, request handling, and infrastructure can still affect generation.
+
+REPLAY freezes evidence, not every semantic token.
+
+A strict reproducibility claim should therefore be limited to code, configuration, frozen inputs, and evidence artifacts rather than promising identical semantic outputs on every future server.
+
+\section{Generator Dependence}
+
+All final responses come from one generator, GPT-OSS 120B.
+
+This is a strength for experimental consistency because the corpora are not mixed across generators.
+
+It is also a limitation for external validity.
+
+A different generator may produce shorter answers, more refusals, different factual errors, or different types of stereotypes. Vericult's observed outcome distribution is therefore partly a property of GPT-OSS responses.
+
+The thesis should not generalize the exact final percentages to all LLMs.
+
+A future experiment could apply the same frozen verifier to several generators while keeping prompts fixed.
+
+\section{Dataset Construction}
+
+The 360-item dataset is diverse but not statistically representative of all cultural LLM interactions.
+
+PLT120 is researcher-designed.
+
+External120 is selected from six public datasets rather than randomly sampled from the global distribution of user questions.
+
+Redteam120 intentionally over-samples culturally challenging and sensitive cases.
+
+These corpora serve evaluation goals rather than population estimation.
+
+The final percentage of culturally inappropriate responses should therefore be read as "within this frozen challenge corpus," not as an estimate of how often GPT-OSS is culturally inappropriate in everyday use.
+
+\section{External120 Selection Effects}
+
+External120 improves diversity but inherits properties from its six source datasets.
+
+CARE, Community Alignment, PLURAL, PACT, ThaiCLI, and PRISM were built for different research goals. Their prompts differ in language, length, cultural metadata, and task style.
+
+Selecting exactly 20 from each source creates balanced source representation but not natural-world frequency.
+
+The common GPT-OSS generator removes one major inconsistency: final responses are generated under the same model and sampling setup. It does not make the underlying prompts homogeneous.
+
+\section{Red-Team Construction Effects}
+
+Red-team prompts deliberately contain loaded assumptions or invite problematic framing.
+
+This is useful for stress testing but can increase refusal rates and culturally inappropriate outcomes compared with ordinary user prompts.
+
+A strong safety-aligned generator may refuse overt red-team cases, which shifts the verifier task from cultural scoring to assessability.
+
+For this reason, the thesis reports Redteam120 separately from External120 and does not merge every outcome into one general performance claim.
+
+\section{Language Coverage}
+
+External120 includes multilingual material, but the complete 360-pair dataset is not evenly distributed across world languages.
+
+The semantic backbone may also have different capabilities across languages.
+
+Retrieval can compound the issue if local-language sources are harder to find or rank.
+
+Per-language analysis is therefore descriptive where sample sizes are small. The thesis should not claim equal cross-lingual validity without a dedicated balanced language study.
+
+\section{Human Reference Limitations}
+
+The previous human study involved five students and the old PLT Best-of-4 candidates.
+
+It is valuable as development evidence but has two limitations for the final study.
+
+First, the annotator pool was small and not intended to represent every culture covered by the prompts.
+
+Second, the evaluated texts are not the final GPT-OSS responses.
+
+Therefore, those labels are not reused as final gold labels.
+
+If no new human reference is collected for the 360 final responses, the thesis cannot make strong claims about final classification accuracy against humans.
+
+This limitation should remain explicit even if automated baselines agree strongly with Vericult.
+
+\section{Baseline Limitations}
+
+The Skywork reward model and direct LLM judge do not have the same architecture as Vericult.
+
+Skywork produces a reward signal learned from preference data.
+
+The direct judge evaluates with one model call and no retrieval.
+
+Vericult produces a structured evidence-grounded outcome.
+
+Mapping these outputs into a common comparison can introduce additional assumptions.
+
+A raw reward score, for example, does not have a natural universal boundary between culturally appropriate and inappropriate.
+
+Any threshold or normalization used in final analysis must therefore be documented rather than chosen after seeing the result.
+
+\section{No Direct CARB Accuracy Comparison}
+
+CARB is highly relevant prior work, but its published accuracy cannot be compared directly with the final Vericult percentages.
+
+CARB uses Best-of-N preference sets and measures whether a reward model ranks the culturally appropriate chosen response over rejected responses \parencite{zhang2026carb}.
+
+The final Vericult experiment evaluates one prompt--response pair and produces a categorical assessment.
+
+A direct numerical statement such as "Vericult is X percentage points better than CARB" would therefore be methodologically invalid without reproducing a comparable task.
+
+CARB is used for motivation and conceptual comparison instead.
+
+\section{Temporal Validity}
+
+Cultural practices, laws, institutions, and public terminology can change.
+
+A recommendation that is appropriate today may become outdated.
+
+The temporal problem is especially important for D05, where laws and procedures can change, and for contemporary identity language.
+
+LIVE retrieval helps access current information at experiment time, but frozen REPLAY evidence later becomes historical evidence.
+
+The experiment date is therefore part of the reproducibility record.
+
+\section{Ethical Limits of Automated Cultural Verification}
+
+An automated cultural verifier can be misused.
+
+It should not be treated as an authority deciding whether a person is authentically German, Brazilian, Muslim, Ainu, queer, or part of any other identity.
+
+It should not be used to enforce majority customs against minorities.
+
+It should not replace local expertise in high-stakes legal, medical, political, or religious disputes.
+
+The intended role is narrower: inspect an LLM response, identify relevant cultural concerns, provide evidence where possible, and expose uncertainty.
+
+Human review remains important when consequences are high or when the cultural issue is contested.
+
+\section{Internal Validity}
+
+The experiment includes several controls intended to improve internal validity:
+
+\begin{itemize}
+\item one fixed generator for all final responses;
+\item frozen prompt and response hashes;
+\item one verifier backbone;
+\item frozen configuration and code revision;
+\item no human labels during inference;
+\item leakage exclusions;
+\item evidence freeze before primary REPLAY analysis;
+\item checkpointed outputs and complete traces.
+\end{itemize}
+
+These controls reduce accidental variation. They do not remove semantic-model errors or dataset-selection effects.
+
+\section{External Validity}
+
+The final study demonstrates behavior on 360 fixed cases.
+
+Generalization beyond these cases depends on whether future prompts resemble the covered settings and whether the same evidence infrastructure remains available.
+
+The strongest external-validity claim is therefore modest: the architecture can be applied to arbitrary prompt--response text in principle, but the empirical quality observed in the thesis is established only for the frozen evaluation set.
+
+\section{Summary of Limitations}
+
+The main limitations can be grouped into three levels.
+
+At the construct level, culture is plural and D01--D10 is an operational simplification.
+
+At the system level, retrieval, evidence synthesis, target budgets, and the semantic backbone can all fail.
+
+At the evaluation level, the dataset is selected rather than representative and the old human labels do not apply to final responses.
+
+These limitations are not reasons to avoid cultural evaluation. They define the boundary of what the thesis can validly claim from the final results.
