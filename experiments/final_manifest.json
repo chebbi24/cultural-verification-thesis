@@ -2,13 +2,13 @@
   "schema_version": "thesis-final-v4-single-response",
   "experiment_id": "thesis-final-v4-360x1",
   "pipeline_version": "cultverify-1.1.0",
-  "freeze_code_commit": "099e4116a809ee004c1cdea04d1bcc2a14e7d142",
+  "freeze_code_commit": "24f2b1ea4bacb4f152e94b42fe3e3dd1c6fdca3f",
   "validation": {
-    "status": "unit_ci_passed_pending_live_smoke_and_preflight",
+    "status": "unit_ci_passed_live_plt002_plt003_passed_plt001_timeout_preflight_pending",
     "local_live_smoke_required": true,
     "ci_workflow": "Verifier tests",
-    "note": "Unit tests, compile, Ruff lint, and Ruff format passed on the semantic freeze commit. Final LIVE must not start until the credential-gated live smoke and local preflight also pass.",
-    "github_actions_run_id": 37701437713,
+    "note": "Launch-safety and classification regressions passed CI (158 tests passed, 1 skipped; compile, lint and format passed). PLT002 and PLT003 completed LIVE with expected classifications. PLT001 still exhibits a provider ReadTimeout in dimension planning and must be treated as an execution failure, not a cultural verdict. Capture a fresh matching runtime preflight before official LIVE. Never reuse results from an older code/input freeze.",
+    "github_actions_run_id": 37713592159,
     "required_status": "success"
   },
   "dataset": {
@@ -94,7 +94,8 @@
     "contextual_fallback_policy": "only evidence-unresolved context_dependent_recommendation targets may use contextual fallback to judge observable cultural handling; unresolved external facts/descriptive norms may abstain",
     "public_score_policy": "vericult_score is null whenever any applicable dimension abstains; exact internal aggregation remains available in traces",
     "api_endpoint": "https://inference.kbs.uni-hannover.de/v1/chat/completions",
-    "credentials": "L3S_API_KEY from local .env; never committed"
+    "credentials": "L3S_API_KEY from local .env; never committed",
+    "partial_abstention_policy": "If any dimension abstains, label insufficient_evidence unless a scored dimension has a material score-0 cultural failure; all-2 observed scores with an abstention are not partially inappropriate."
   },
   "leakage_controls": {
     "thesis_repository": "chebbi24/cultural-verification-thesis",
