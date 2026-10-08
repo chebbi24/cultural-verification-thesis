@@ -1,42 +1,401 @@
 \chapter{Results}
 \label{chap:results}
 
-This chapter is intentionally structured before final numbers are inserted. Every value must be calculated from archived final outputs.
+This chapter contains the quantitative results of the frozen final experiment. Its structure and denominators are fixed in advance. Numerical values are inserted only from the archived LIVE, audit, REPLAY, and baseline outputs.
 
-\section{Run Completion}
+\section{Experiment Completion}
+
+The first result is operational completeness. A culturally meaningful result cannot be claimed for an item whose pipeline failed technically.
+
 \begin{table}[ht]
 \centering
-\caption{Final experiment completion.}
-\begin{tabular}{l l}
+\caption{Completion of the final 360-pair experiment.}
+\label{tab:completion}
+\begin{tabular}{l r r}
 \toprule
-Measure & Value \\
+Stage & Completed & Missing/failed \\
 \midrule
-Expected prompt--response pairs & 360 \\
-Completed LIVE pairs & \placeholder{LIVE COMPLETED COUNT} \\
-Audited evidence records & \placeholder{EVIDENCE AUDIT COUNT} \\
-Completed REPLAY pairs & \placeholder{REPLAY COMPLETED COUNT} \\
-Unresolved execution failures & \placeholder{FAILURE COUNT} \\
+Expected fixed pairs & 360 & 0 \\
+LIVE & \placeholder{FINAL RESULTS: LIVE COMPLETED} & \placeholder{FINAL RESULTS: LIVE FAILED} \\
+Evidence audit & \placeholder{FINAL RESULTS: AUDITED} & \placeholder{FINAL RESULTS: AUDIT FAILED} \\
+REPLAY & \placeholder{FINAL RESULTS: REPLAY COMPLETED} & \placeholder{FINAL RESULTS: REPLAY FAILED} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\section{Final Outcome Distribution}
-\placeholder{INSERT REPLAY OUTCOME COUNTS AND PERCENTAGES, INCLUDING ALL ACTUAL LABELS AND DENOMINATORS.}
+The final text should state whether all 360 items completed, whether any failures were retried, and whether the evidence manifest validated before REPLAY.
 
-\section{Dimension-Level Results}
-\placeholder{INSERT D01--D10 SELECTION COUNTS, SCORE DISTRIBUTIONS AND ABSTENTIONS.}
+\placeholder{FINAL RESULTS: INSERT COMPLETION PARAGRAPH WITH EXACT ITEM IDs FOR ANY UNRESOLVED FAILURES.}
 
-\section{Evidence Coverage}
-\placeholder{INSERT RETRIEVABLE TARGET COUNT, SUFFICIENT, CONFLICTING AND INSUFFICIENT MEMO COUNTS, AND EVIDENCE COVERAGE.}
+\section{Final Vericult Outcome Distribution}
 
-\section{Corpus Comparison}
-\placeholder{INSERT PLT120 / EXTERNAL120 / REDTEAM120 TABLE.}
+The primary categorical result is the REPLAY cultural-appropriateness outcome.
 
-\section{Baseline Results}
-\placeholder{INSERT FINAL SINGLE-RESPONSE SKYWORK AND DIRECT-JUDGE RESULTS IF COMPLETED.}
+\begin{table}[ht]
+\centering
+\caption{Final REPLAY outcome distribution.}
+\label{tab:outcome-distribution}
+\begin{tabular}{l r r}
+\toprule
+Outcome & Count & Share of 360 \\
+\midrule
+Culturally appropriate & \placeholder{FINAL RESULTS: N} & \placeholder{FINAL RESULTS: PERCENT} \\
+Partially culturally appropriate & \placeholder{FINAL RESULTS: N} & \placeholder{FINAL RESULTS: PERCENT} \\
+Culturally inappropriate & \placeholder{FINAL RESULTS: N} & \placeholder{FINAL RESULTS: PERCENT} \\
+Insufficient evidence & \placeholder{FINAL RESULTS: N} & \placeholder{FINAL RESULTS: PERCENT} \\
+Not culturally applicable & \placeholder{FINAL RESULTS: N} & \placeholder{FINAL RESULTS: PERCENT} \\
+Not assessable & \placeholder{FINAL RESULTS: N} & \placeholder{FINAL RESULTS: PERCENT} \\
+\midrule
+Total completed & \placeholder{FINAL RESULTS: TOTAL} & 100\% \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-\section{Runtime and Failures}
-\placeholder{INSERT TRACE-BASED RUNTIME, MODEL CALLS, RETRIEVAL CALLS AND FAILURE CATEGORIES.}
+The outcome shares are calculated as
 
-\section{Summary}
-\placeholder{WRITE ONLY AFTER ALL ABOVE TABLES ARE VERIFIED.}
+\begin{equation}
+p_k = \frac{n_k}{N_{completed}},
+\end{equation}
+
+where (n_k) is the number of responses in outcome class (k) and (N_{completed}) is the number of completed REPLAY items.
+
+If (N_{completed}=360), percentages may be described as shares of the full frozen corpus. Otherwise, the missing technical items must be stated separately.
+
+\placeholder{FINAL RESULTS: INSERT INTERPRETATION OF TABLE~\ref{tab:outcome-distribution}.}
+
+\section{Assessability}
+
+Two outcomes occur before normal cultural scoring: \texttt{not\_culturally\_applicable} and \texttt{not\_assessable}.
+
+The culturally applicable count is:
+
+\begin{equation}
+N_{applicable} = N_{completed} - N_{not_culturally_applicable}.
+\end{equation}
+
+Among culturally applicable prompts, the substantive assessability rate is:
+
+\begin{equation}
+A = \frac{N_{applicable} - N_{not_assessable}}{N_{applicable}}.
+\end{equation}
+
+\placeholder{FINAL RESULTS: INSERT APPLICABILITY AND ASSESSABILITY VALUES, INCLUDING REFUSAL-HEAVY CORPUS DIFFERENCES.}
+
+\section{Outcome Distribution by Corpus}
+
+Because the three corpora have different construction goals, their outcome distributions are reported separately.
+
+\begin{table}[p]
+\centering
+\caption{REPLAY outcomes by corpus. Counts are shown within each 120-item corpus.}
+\label{tab:outcomes-by-corpus}
+\small
+\begin{tabularx}{\textwidth}{X r r r}
+\toprule
+Outcome & PLT120 & External120 & Redteam120 \\
+\midrule
+Culturally appropriate &
+\placeholder{FINAL RESULTS: N} &
+\placeholder{FINAL RESULTS: N} &
+\placeholder{FINAL RESULTS: N} \\
+Partially culturally appropriate &
+\placeholder{FINAL RESULTS: N} &
+\placeholder{FINAL RESULTS: N} &
+\placeholder{FINAL RESULTS: N} \\
+Culturally inappropriate &
+\placeholder{FINAL RESULTS: N} &
+\placeholder{FINAL RESULTS: N} &
+\placeholder{FINAL RESULTS: N} \\
+Insufficient evidence &
+\placeholder{FINAL RESULTS: N} &
+\placeholder{FINAL RESULTS: N} &
+\placeholder{FINAL RESULTS: N} \\
+Not culturally applicable &
+\placeholder{FINAL RESULTS: N} &
+\placeholder{FINAL RESULTS: N} &
+\placeholder{FINAL RESULTS: N} \\
+Not assessable &
+\placeholder{FINAL RESULTS: N} &
+\placeholder{FINAL RESULTS: N} &
+\placeholder{FINAL RESULTS: N} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\placeholder{FINAL RESULTS: INSERT CORPUS-LEVEL INTERPRETATION WITHOUT TREATING THE THREE CORPORA AS IID SAMPLES FROM ONE POPULATION.}
+
+\section{Dimension Applicability}
+
+D01--D10 are selected only when they are material to the prompt. The first dimension-level quantity is therefore the number of times each dimension is planned.
+
+\begin{table}[p]
+\centering
+\caption{Dimension selection frequency in final REPLAY traces.}
+\label{tab:dimension-selection}
+\begin{tabular}{l r r}
+\toprule
+Dimension & Selected count & Share of culturally applicable items \\
+\midrule
+D01 Everyday life and material culture & \placeholder{FINAL RESULTS: N} & \placeholder{FINAL RESULTS: PERCENT} \\
+D02 Language, discourse and pragmatics & \placeholder{FINAL RESULTS: N} & \placeholder{FINAL RESULTS: PERCENT} \\
+D03 Social etiquette and interpersonal norms & \placeholder{FINAL RESULTS: N} & \placeholder{FINAL RESULTS: PERCENT} \\
+D04 Values, ethics and moral pluralism & \placeholder{FINAL RESULTS: N} & \placeholder{FINAL RESULTS: PERCENT} \\
+D05 Law, policy and institutional rules & \placeholder{FINAL RESULTS: N} & \placeholder{FINAL RESULTS: PERCENT} \\
+D06 Religion, ritual and taboo & \placeholder{FINAL RESULTS: N} & \placeholder{FINAL RESULTS: PERCENT} \\
+D07 Family, kinship, gender and generations & \placeholder{FINAL RESULTS: N} & \placeholder{FINAL RESULTS: PERCENT} \\
+D08 Work, education and civic participation & \placeholder{FINAL RESULTS: N} & \placeholder{FINAL RESULTS: PERCENT} \\
+D09 Heritage, history, arts and collective memory & \placeholder{FINAL RESULTS: N} & \placeholder{FINAL RESULTS: PERCENT} \\
+D10 Identity, diversity and intergroup relations & \placeholder{FINAL RESULTS: N} & \placeholder{FINAL RESULTS: PERCENT} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The rows do not sum to the number of items because one prompt can select more than one dimension.
+
+\section{Dimension Score Distribution}
+
+For each selected dimension, scores are reported using that dimension's own selected count as denominator.
+
+\begin{table}[p]
+\centering
+\caption{D01--D10 score and abstention counts.}
+\label{tab:dimension-scores}
+\small
+\begin{tabular}{l r r r r r}
+\toprule
+Dimension & Score 0 & Score 1 & Score 2 & Abstain & Total selected \\
+\midrule
+D01 & \placeholder{R} & \placeholder{R} & \placeholder{R} & \placeholder{R} & \placeholder{R} \\
+D02 & \placeholder{R} & \placeholder{R} & \placeholder{R} & \placeholder{R} & \placeholder{R} \\
+D03 & \placeholder{R} & \placeholder{R} & \placeholder{R} & \placeholder{R} & \placeholder{R} \\
+D04 & \placeholder{R} & \placeholder{R} & \placeholder{R} & \placeholder{R} & \placeholder{R} \\
+D05 & \placeholder{R} & \placeholder{R} & \placeholder{R} & \placeholder{R} & \placeholder{R} \\
+D06 & \placeholder{R} & \placeholder{R} & \placeholder{R} & \placeholder{R} & \placeholder{R} \\
+D07 & \placeholder{R} & \placeholder{R} & \placeholder{R} & \placeholder{R} & \placeholder{R} \\
+D08 & \placeholder{R} & \placeholder{R} & \placeholder{R} & \placeholder{R} & \placeholder{R} \\
+D09 & \placeholder{R} & \placeholder{R} & \placeholder{R} & \placeholder{R} & \placeholder{R} \\
+D10 & \placeholder{R} & \placeholder{R} & \placeholder{R} & \placeholder{R} & \placeholder{R} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\placeholder{FINAL RESULTS: INSERT THE MAIN DIMENSION PATTERNS AND AVOID OVER-INTERPRETING SMALL CELLS.}
+
+\section{Material Targets}
+
+The target extractor can select at most three targets per assessable response.
+
+Report:
+
+\begin{itemize}
+\item total material targets;
+\item mean and median targets per assessable response;
+\item number of responses with target truncation;
+\item counts by epistemic type;
+\item number and share of retrieval-appropriate targets.
+\end{itemize}
+
+\begin{table}[ht]
+\centering
+\caption{Final material-target distribution.}
+\label{tab:target-types}
+\begin{tabular}{l r}
+\toprule
+Target type & Count \\
+\midrule
+External fact & \placeholder{FINAL RESULTS: N} \\
+Descriptive cultural norm & \placeholder{FINAL RESULTS: N} \\
+Context-dependent recommendation & \placeholder{FINAL RESULTS: N} \\
+Response-internal quality & \placeholder{FINAL RESULTS: N} \\
+Non-verifiable value statement & \placeholder{FINAL RESULTS: N} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\placeholder{FINAL RESULTS: INSERT TARGET-COUNT AND TRUNCATION ANALYSIS.}
+
+\section{Evidence Sufficiency}
+
+Evidence sufficiency is evaluated at target level, not response level.
+
+\begin{table}[ht]
+\centering
+\caption{Final evidence-memo sufficiency for retrieval-appropriate targets.}
+\label{tab:evidence-sufficiency}
+\begin{tabular}{l r r}
+\toprule
+Final memo state & Count & Share of retrievable targets \\
+\midrule
+Sufficient & \placeholder{FINAL RESULTS: N} & \placeholder{FINAL RESULTS: PERCENT} \\
+Conflicting & \placeholder{FINAL RESULTS: N} & \placeholder{FINAL RESULTS: PERCENT} \\
+Insufficient & \placeholder{FINAL RESULTS: N} & \placeholder{FINAL RESULTS: PERCENT} \\
+\midrule
+Total retrieval-appropriate targets & \placeholder{FINAL RESULTS: N} & 100\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The target-level evidence-coverage measure is:
+
+\begin{equation}
+C_E =
+\frac{
+N_{sufficient} + N_{conflicting}
+}{
+N_{retrieval_appropriate}
+}.
+\end{equation}
+
+Conflicting evidence counts as covered because substantive evidence exists even though it does not support one simple conclusion.
+
+\placeholder{FINAL RESULTS: INSERT EVIDENCE COVERAGE AND THE MAIN SOURCES OF INSUFFICIENCY.}
+
+\section{Follow-Up Retrieval}
+
+The pipeline can issue at most one follow-up question per target when the initial memo is conflicting or insufficient.
+
+Report:
+
+\begin{itemize}
+\item number of targets receiving a follow-up;
+\item proportion of follow-ups that changed the final sufficiency state;
+\item corpus and dimension patterns where useful.
+\end{itemize}
+
+\placeholder{FINAL RESULTS: INSERT FOLLOW-UP RETRIEVAL STATISTICS.}
+
+\section{Target Verdicts}
+
+After evidence freezing, each retrieval-appropriate target receives supported, contradicted, mixed, or insufficient.
+
+\begin{table}[ht]
+\centering
+\caption{Target-comparison verdicts in final REPLAY.}
+\label{tab:target-verdicts}
+\begin{tabular}{l r r}
+\toprule
+Verdict & Count & Share \\
+\midrule
+Supported & \placeholder{FINAL RESULTS: N} & \placeholder{FINAL RESULTS: PERCENT} \\
+Contradicted & \placeholder{FINAL RESULTS: N} & \placeholder{FINAL RESULTS: PERCENT} \\
+Mixed & \placeholder{FINAL RESULTS: N} & \placeholder{FINAL RESULTS: PERCENT} \\
+Insufficient & \placeholder{FINAL RESULTS: N} & \placeholder{FINAL RESULTS: PERCENT} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A contradicted target is not automatically a culturally inappropriate response. The dimension scorer still judges material cultural relevance.
+
+\section{Abstention}
+
+Abstention is reported both at response level and dimension level.
+
+Response-level quantities include:
+
+\begin{itemize}
+\item responses with at least one abstained dimension;
+\item responses whose public \texttt{vericult\_score} is therefore null;
+\item responses ending in \texttt{insufficient\_evidence}.
+\end{itemize}
+
+\placeholder{FINAL RESULTS: INSERT ABSTENTION COUNTS AND EXPLAIN THE DIFFERENCE BETWEEN PARTIAL SCORING AND FULL INSUFFICIENCY.}
+
+\section{Public Vericult Score}
+
+For fully scored assessable responses, report the distribution of the 0--100 Vericult score.
+
+Suggested descriptive quantities are median, interquartile range, minimum, maximum, and corpus medians.
+
+Do not assign artificial numeric values to not-applicable, not-assessable, or abstained responses.
+
+\placeholder{FINAL RESULTS: INSERT PUBLIC SCORE DISTRIBUTION FOR THE VALID SUBSET ONLY.}
+
+\section{LIVE Versus REPLAY}
+
+LIVE and REPLAY use the same fixed prompt--response pairs. REPLAY uses frozen evidence but re-executes semantic model stages.
+
+The comparison should report:
+
+\begin{itemize}
+\item number of items with the same final outcome;
+\item number whose final outcome changed;
+\item whether changed cases are concentrated in particular stages;
+\item whether any evidence snapshot changed (it should not after successful audit).
+\end{itemize}
+
+\placeholder{FINAL RESULTS: INSERT LIVE/REPLAY STABILITY ANALYSIS.}
+
+\section{Skywork Reward-Model Baseline}
+
+The final Skywork single-response output should report raw reward-score statistics on the same frozen 360 pairs.
+
+If a categorical mapping is introduced, define it before reporting label agreement and document the mapping in Chapter~\ref{chap:experiment}.
+
+\begin{table}[ht]
+\centering
+\caption{Skywork comparison on the final frozen response set.}
+\label{tab:skywork}
+\begin{tabular}{l l}
+\toprule
+Quantity & Result \\
+\midrule
+Completed items & \placeholder{FINAL RESULTS} \\
+Median reward & \placeholder{FINAL RESULTS} \\
+Interquartile range & \placeholder{FINAL RESULTS} \\
+Correlation with fully scored Vericult score, if justified & \placeholder{FINAL RESULTS} \\
+Categorical agreement, if a valid mapping exists & \placeholder{FINAL RESULTS} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\placeholder{FINAL RESULTS: INSERT ONLY THE COMPARISON THAT THE FINAL BASELINE DESIGN SUPPORTS.}
+
+\section{Direct LLM Judge Baseline}
+
+The direct judge evaluates the same prompt--response pairs without external retrieval.
+
+\begin{table}[ht]
+\centering
+\caption{Direct-judge comparison on the final response set.}
+\label{tab:direct-judge}
+\begin{tabular}{l l}
+\toprule
+Quantity & Result \\
+\midrule
+Completed items & \placeholder{FINAL RESULTS} \\
+Exact label agreement with Vericult & \placeholder{FINAL RESULTS} \\
+Agreement excluding not-applicable/not-assessable, if justified & \placeholder{FINAL RESULTS} \\
+Human-grounded accuracy, only if final matching labels exist & \placeholder{FINAL RESULTS OR N/A} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\placeholder{FINAL RESULTS: INSERT DIRECT-JUDGE RESULTS AND CLEARLY DISTINGUISH AGREEMENT FROM ACCURACY.}
+
+\section{Efficiency}
+
+The final traces and runner logs can support descriptive efficiency analysis.
+
+\begin{table}[ht]
+\centering
+\caption{Final Vericult efficiency summary.}
+\label{tab:efficiency}
+\begin{tabular}{l l}
+\toprule
+Quantity & Value \\
+\midrule
+Total LIVE wall time & \placeholder{FINAL RESULTS} \\
+Total REPLAY wall time & \placeholder{FINAL RESULTS} \\
+Median per-item runtime & \placeholder{FINAL RESULTS} \\
+Total semantic calls & \placeholder{FINAL RESULTS} \\
+Total retrieval calls & \placeholder{FINAL RESULTS} \\
+Supported monetary cost & \placeholder{FINAL RESULTS OR UNAVAILABLE} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Missing billing information is reported as unavailable rather than reconstructed from guessed provider prices.
+
+\section{Quantitative Summary}
+
+\placeholder{FINAL RESULTS: WRITE THE FINAL 1--2 PAGE QUANTITATIVE SUMMARY AFTER ALL TABLES HAVE BEEN GENERATED FROM THE ARCHIVED OUTPUTS. STATE DENOMINATORS AND DO NOT INTRODUCE NEW METRICS AFTER SEEING THE RESULTS.}
