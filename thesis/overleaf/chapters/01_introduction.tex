@@ -185,20 +185,22 @@ The experiment can be summarized as:
 
 \begin{figure}[ht]
 \centering
-\fbox{\parbox{0.9\textwidth}{\centering
-360 fixed prompts \\
-\(downarrow\) \\
-One GPT-OSS response per prompt \\
-\(downarrow\) \\
-Vericult LIVE evidence acquisition \\
-\(downarrow\) \\
-Evidence audit and freeze \\
-\(downarrow\) \\
-Vericult REPLAY on the same evidence \\
-\(downarrow\) \\
-Outcome, evidence, dimension, and trace analysis
-}}
-\caption{Final thesis experiment in simplified form.}
+\begin{tikzpicture}[node distance=7mm and 10mm, every node/.style={font=\small}]
+\node[flowwide] (prompts) {360 frozen prompts\\PLT120 + External120 + Redteam120};
+\node[flowwide, below=of prompts] (generator) {One frozen GPT-OSS response per prompt};
+\node[flowbox, below left=12mm and 20mm of generator] (vericult) {Vericult\\LIVE $\rightarrow$ audit $\rightarrow$ REPLAY};
+\node[flowbox, below=12mm of generator] (rm) {Independent\\Skywork reward model};
+\node[flowbox, below right=12mm and 20mm of generator] (judge) {Independent\\direct LLM judge};
+\node[flowwide, below=22mm of rm] (analysis) {Post-prediction analysis\\outcomes, evidence, dimensions, disagreements and traces};
+\draw[flowarrow] (prompts)--(generator);
+\draw[flowarrow] (generator)--(vericult);
+\draw[flowarrow] (generator)--(rm);
+\draw[flowarrow] (generator)--(judge);
+\draw[flowarrow] (vericult)--(analysis);
+\draw[flowarrow] (rm)--(analysis);
+\draw[flowarrow] (judge)--(analysis);
+\end{tikzpicture}
+\caption{Final research design. All evaluators receive the same frozen prompt--response pairs; the reward model and direct judge remain independent of Vericult.}
 \label{fig:experiment-overview}
 \end{figure}
 
