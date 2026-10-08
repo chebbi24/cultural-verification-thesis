@@ -1,12 +1,134 @@
 \chapter{Conclusion and Future Work}
 \label{chap:conclusion}
 
-This thesis presents Vericult, a standalone framework for evaluating cultural appropriateness in generated language-model responses. The central design idea is to separate explicit prompt context, evidence collection, and the later comparison of a response with that evidence. The system combines D01--D10 cultural dimensions, bounded retrieval, frozen evidence memos, explicit abstention, and structured traces.
+This thesis investigates whether cultural appropriateness in LLM outputs can be evaluated through a standalone, evidence-grounded verification layer. The work began from a simple observation: a response can be fluent, helpful in tone, and generally plausible while still being poorly adapted to a cultural situation.
 
-The final empirical study uses 360 fixed prompt--response pairs and reports REPLAY as the primary Vericult execution after LIVE evidence acquisition and audit.
+The problem is not limited to factual knowledge. Cultural appropriateness can involve language register, social etiquette, legal rules, religious practices, family expectations, historical memory, values, and identity. These areas also contain variation. A common practice is not automatically a universal rule, and a majority value is not automatically the only legitimate position.
 
-\placeholder{INSERT VERIFIED FINAL FINDINGS AND DIRECT ANSWERS TO RQ1--RQ4.}
+\section{Research Summary}
 
-The work does not assume that culture has one universally correct answer or that a retrieved source settles every cultural question. Its contribution is methodological and diagnostic: it provides a concrete way to expose the evidence and uncertainty behind a cultural assessment.
+The first contribution of the thesis is the D01--D10 operational framework. It organizes cultural concerns into ten dimensions while keeping legal rules, social norms, values, religion, history, and identity distinguishable.
 
-Future work could include larger human-reference studies on the exact final responses, stronger multilingual retrieval, community-informed source selection, alternative semantic backbones, and controlled ablations of individual pipeline components.
+The second contribution is Vericult itself. The final verifier accepts one prompt and one response. It extracts explicit context, determines cultural applicability, plans relevant dimensions, checks response assessability, selects material response targets, and retrieves evidence only for targets that are externally checkable.
+
+For each retrievable target, the system generates a baseline question and a variation question. After this point, the evidence engine receives only the neutral questions and prompt-derived context. Retrieved evidence is summarized into a memo, with at most one additional follow-up search if the first round remains insufficient or conflicting.
+
+The evidence memo is frozen before the target is compared against it. The final scorer then assigns D01--D10 scores of 0, 1, 2, or abstain and produces one of six single-response outcomes.
+
+The third contribution is the reproducibility design. LIVE mode acquires evidence. An audit validates and hashes the resulting evidence and traces. REPLAY then uses the frozen evidence with no live-search fallback. The final thesis treats REPLAY as the primary Vericult execution.
+
+The fourth contribution is the final 360-pair evaluation set. It combines PLT120, External120, and Redteam120. Every prompt receives one response from the same frozen GPT-OSS generator. This creates a consistent single-response evaluation task across custom, external, and red-team prompts.
+
+\section{Answers to the Research Questions}
+
+The exact answers below are completed from the frozen result tables after REPLAY and baseline execution.
+
+\paragraph{RQ1: Final cultural-appropriateness outcomes.}
+\placeholder{FINAL RESULTS: summarize completion, assessability, the six Vericult outcome categories, and the main differences among PLT120, External120, and Redteam120.}
+
+\paragraph{RQ2: Evidence availability and abstention.}
+\placeholder{FINAL RESULTS: state target-level evidence coverage, conflicting/insufficient evidence, abstention behavior, and any clear corpus/dimension patterns.}
+
+\paragraph{RQ3: Diagnostic value and failure modes.}
+\placeholder{FINAL RESULTS: summarize the most important trace-backed success and failure modes, including at least one concrete example.}
+
+\paragraph{RQ4: Comparison with independent evaluators.}
+\placeholder{FINAL RESULTS: state only the comparison supported by the final Skywork/direct-judge runs and any valid common reference. Distinguish agreement from accuracy.}
+
+\section{What the Thesis Can Claim}
+
+The thesis can claim that Vericult implements a reproducible and inspectable cultural-verification architecture with explicit evidence and uncertainty boundaries.
+
+It can also claim the empirical behavior observed on the frozen 360-item dataset once those values are inserted into Chapter~\ref{chap:results}.
+
+The thesis does not claim that:
+
+\begin{itemize}
+\item D01--D10 is the only valid definition of culture;
+\item retrieved web evidence is culturally complete or unbiased;
+\item a model-generated evidence memo is equivalent to expert judgment;
+\item the verifier's output is objective ground truth;
+\item Vericult outperforms CARB on a directly comparable benchmark;
+\item automated-system agreement is the same as human-grounded accuracy.
+\end{itemize}
+
+Keeping these boundaries explicit is part of the contribution. Cultural evaluation is a difficult and partly subjective task. A verifier should make uncertainty easier to inspect rather than hiding it behind a confident scalar score.
+
+\section{Future Work}
+
+Several extensions follow directly from the limitations identified in Chapter~\ref{chap:limitations}.
+
+\subsection{Human Evaluation of the Exact Final Responses}
+
+The most important next step is a human study on the same frozen GPT-OSS responses.
+
+A stronger annotation design would recruit annotators with relevant linguistic or cultural familiarity for the cases they evaluate, rather than asking every annotator to judge every culture. The study should preserve disagreement instead of forcing consensus when legitimate perspectives differ.
+
+This would allow a more direct estimate of human agreement for Vericult, the reward model, and the direct LLM judge.
+
+\subsection{Multiple Verifier Backbones}
+
+The current thesis freezes one Qwen3.6 backbone. Future work could run the same evidence snapshots through several semantic backbones.
+
+This would help separate architectural benefits from model-specific ability. If different models reach similar target verdicts when given the same frozen evidence, confidence in the pipeline design would increase.
+
+\subsection{Ablation Studies}
+
+The current thesis evaluates the complete architecture. A larger study could remove individual components:
+
+\begin{itemize}
+\item no external retrieval;
+\item no variation question;
+\item no candidate-blind boundary;
+\item no evidence freeze;
+\item no abstention;
+\item fewer or more material targets;
+\item direct scoring without target comparison.
+\end{itemize}
+
+The differences would show which parts contribute most to useful decisions and which mainly add cost.
+
+\subsection{Multilingual Retrieval}
+
+A multilingual verifier should search in the language most likely to contain high-quality local evidence.
+
+The current retrieval design can use question text derived from multilingual prompts, but a dedicated multilingual retrieval strategy could generate parallel local-language and English queries, detect source-language imbalance, and prioritize local institutions or community sources.
+
+\subsection{Community-Aware Source Selection}
+
+Future work could explicitly model who is speaking in a source.
+
+Official institutions, researchers, commercial travel sites, and community organizations can describe the same practice differently.
+
+Instead of treating source type only as provenance metadata, a richer evidence model could preserve perspective and represent disagreements between institutional and lived-experience sources.
+
+\subsection{Question-Neutrality Checks}
+
+The candidate-blind boundary begins after verification-question generation. This leaves a possible framing channel.
+
+A stronger verifier could generate questions independently multiple times, test them for presuppositions, or ask a second model to rewrite them without seeing the target wording.
+
+\subsection{Interactive Verification}
+
+The current pipeline produces an evaluation trace for developers and researchers.
+
+A user-facing system could expose only the most useful parts:
+
+\begin{itemize}
+\item the final cultural outcome;
+\item which dimensions mattered;
+\item the one or two response claims that drove the decision;
+\item short supporting or conflicting evidence;
+\item a clear explanation of uncertainty;
+\item links to the underlying sources.
+\end{itemize}
+
+This would turn the thesis prototype into a practical cultural-verification interface without exposing the full internal trace.
+
+\section{Closing Remarks}
+
+Cultural alignment cannot be reduced to memorizing customs or matching one majority preference. It requires attention to context, variation, institutions, language, values, history, and identity.
+
+Vericult approaches this problem by making the evaluation process explicit. Instead of asking one model for a final cultural score and accepting the answer, it separates planning, evidence, comparison, and scoring and preserves the intermediate artifacts.
+
+Whether this added structure is worth its computational cost is ultimately an empirical question. The final results determine how well the system works on the frozen evaluation set. The broader contribution is the attempt to make cultural evaluation more transparent about what is known, what is inferred, and what remains uncertain.
