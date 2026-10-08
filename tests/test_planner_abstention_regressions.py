@@ -2,6 +2,7 @@
 
 These tests use no model API, retrieval, or human labels.
 """
+
 import pytest
 
 from cultverify.llm import SemanticSession, StageError
@@ -107,6 +108,7 @@ def test_semantic_session_retries_contradictory_plan():
 
 def test_semantic_session_fails_closed_after_invalid_retry():
     from cultverify.config import Config
+
     config = Config(verifier_model_id="test", retry_count=1)
     llm = ScriptedLLM(config, ['{"dimensions":[],"reasoning":"D02"}'] * 2)
     session = SemanticSession(llm, config)
@@ -122,6 +124,7 @@ def test_semantic_session_fails_closed_after_invalid_retry():
 def test_timeout_retries_then_succeeds_without_semantic_repair():
     import requests
     from cultverify.config import Config
+
     config = Config(verifier_model_id="test", retry_count=1, transport_retry_count=1)
     llm = ScriptedLLM(
         config,
