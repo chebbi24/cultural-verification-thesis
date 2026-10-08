@@ -514,8 +514,12 @@ def main(argv: list[str] | None = None) -> int:
 
     output = args.output or Path(f"artifacts/final_experiment/results/vericult_{args.mode.lower()}.jsonl")
     output.parent.mkdir(parents=True, exist_ok=True)
-    completed = set() if args.no_resume else load_completed(
-        output, args.mode, execution_id=execution_id, rows_by_id={row["item_id"]: row for row in rows}
+    completed = (
+        set()
+        if args.no_resume
+        else load_completed(
+            output, args.mode, execution_id=execution_id, rows_by_id={row["item_id"]: row for row in rows}
+        )
     )
     if args.no_resume and output.is_file() and output.stat().st_size:
         raise RuntimeError("--no-resume requires an empty/new --output; refusing to append duplicate results")
