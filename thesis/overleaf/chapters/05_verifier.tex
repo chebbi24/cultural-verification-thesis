@@ -613,3 +613,78 @@ The key boundaries are:
 \end{enumerate}
 
 These mechanisms improve traceability and reproducibility, but they do not guarantee cultural correctness. Retrieval can miss important sources, the semantic backbone can make planning mistakes, and the rubric itself is an operational design. The final experiment therefore evaluates the complete system rather than assuming that architectural safeguards are sufficient.
+
+
+\section{Worked Example: From a Prompt to an Evidence Question}
+
+Consider the PLT002 example in Appendix~\ref{app:examples}. The user wants to introduce a visiting American colleague to Munich with a programme of white sausage, beer, and roast pork, while joking that a person who does not drink is a spoilsport. The generated answer is fixed before Vericult begins.
+
+The first stage extracts the setting (a colleague visiting Munich), the interaction (a humorous announcement), and the relevant social context. It must not assume the visitor's religion, dietary restrictions, or attitude toward alcohol. Those details are not stated in the prompt.
+
+The dimension planner may find everyday practices, interpersonal norms, and language pragmatics relevant. This is a planning question, not yet a judgment that the answer is inappropriate. The verifier then examines the actual generated response. If the response describes a Bavarian food tradition, the target extractor can select that statement. If the response pressures a colleague to drink, the cultural concern may instead be partly internal to the wording and require less factual retrieval.
+
+For a checkable target, the question generator should ask a neutral descriptive question and a question about variation. In this example, useful question types would concern the association of a particular breakfast with Bavaria and whether a food or drink custom should be presented as obligatory for visitors. These are explanatory examples of question design, not quotations from an actual Vericult trace.
+
+The evidence stage searches for documents that answer the questions without including the full response or a proposed verdict. It then writes a memo about the supported practice and its scope. Only after that memo is frozen does the target comparator decide whether the selected response statement is supported, contradicted, mixed, or unresolved.
+
+Finally, the dimension scorer considers the whole answer. A factual description of a local breakfast can be correct while the same answer still gives socially inappropriate advice. This is why a supported target does not automatically produce a perfect dimension score.
+
+\section{Why the Context Stage Reads the Prompt Alone}
+
+The prompt contains the user's intended task and explicit cultural setting. If the context extractor read the generated answer first, it might mistake assumptions introduced by the generator for facts supplied by the user. For example, an answer might claim that a visitor is Muslim even when the prompt does not mention religion. Passing that invented detail back into context extraction would make later retrieval appear more justified than it is.
+
+Vericult therefore plans the cultural context from the prompt before assessing the response. The model is asked to ground non-empty context values in exact prompt spans. This is an implementation-level defense against unsupported demographic inference. It cannot prevent every semantic mistake, but it makes the intended boundary explicit.
+
+\section{Materiality and Target Budget}
+
+Not every sentence needs external verification. A long answer can include background remarks, greetings, disclaimers, and repeated examples. Searching every sentence would be slow and could distract the verifier from the most important cultural issue. Vericult limits the target set to three decision-relevant spans.
+
+This is a deliberate trade-off. A small target budget improves traceability and reduces cost, but it can miss an important claim in a very long response. The target extractor therefore has to prioritize statements whose correctness or appropriateness could materially change the final judgment. The trace records which targets were selected so this choice can be reviewed.
+
+The extractor selects span IDs rather than rewriting response text. The Python implementation reconstructs the original span. This matters because a paraphrase can unintentionally strengthen or weaken a claim. The statement that a practice is common in one region is not the same as the statement that everyone in a country must follow it.
+
+\section{Which Targets Need External Search?}
+
+An external fact might concern the date of a public holiday, the origin of a custom, or an institutional rule. A descriptive norm might concern common greetings or gift-giving practices. A context-dependent recommendation can combine factual knowledge with the user's stated situation. These are suitable candidates for evidence retrieval.
+
+Other issues are primarily visible in the response itself. A mocking expression, a derogatory stereotype, or an inappropriate form of address may be judged from the text and the explicit context without first establishing a disputed external fact. The system therefore supports direct assessment for response-internal quality and non-verifiable value statements.
+
+This distinction reduces unnecessary search. It also prevents the verifier from pretending that a web search can settle every value disagreement.
+
+\section{Candidate Blindness: Exact Boundary}
+
+The term candidate-blind needs a precise explanation. The target extractor has seen the response, and the question generator receives the selected response quotation. It is therefore not correct to say that the entire evidence pipeline is blind to the candidate.
+
+The blind boundary begins after neutral questions have been generated. The retrieval and evidence memo stages receive the questions and prompt context, but not the candidate's full response, candidate position, expected label, or comparator verdict. The purpose is to reduce the risk that the evidence memo simply repeats the candidate's claim.
+
+This design does not guarantee neutrality. A poorly phrased question could still carry the target's assumptions into search. The question stage is therefore itself a possible source of bias and is included in the trace review.
+
+\section{Evidence Quality Is Not the Same as Source Count}
+
+A search result count is not a reliability measure. Several web pages can repeat the same unsupported claim, and a single official document can be highly relevant to a narrow legal question. Conversely, an official statement may accurately describe a government's position while providing incomplete evidence about the experiences of a minority community.
+
+Vericult records source categories and quoted support. The evidence memo should distinguish what a source actually establishes from what remains uncertain. The memo's sufficiency judgment is specific to the verification question. A source can be sufficient for the date of a law but insufficient for a broad claim about cultural acceptance.
+
+This is especially important for minority, Indigenous, religious, and politically contested topics. Evidence selection should not silently equate publication authority with cultural representativeness.
+
+\section{Why One Follow-Up Is Allowed}
+
+The first two questions are intended to cover both the main description and relevant variation. Sometimes the initial evidence leaves a specific gap. One follow-up can then focus on that gap.
+
+Allowing unlimited follow-ups would create two problems. It would increase cost unpredictably, and it could encourage searching until a convenient supporting source appears. The bounded follow-up is therefore a practical control. If the evidence remains insufficient after the allowed search, the system should preserve that uncertainty.
+
+\section{From Target Verdicts to Dimension Scores}
+
+A target verdict answers a narrow evidence question. The final dimension score answers a broader cultural-appropriateness question. These should not be confused.
+
+For example, a target about a food custom might be supported by sources, but the full answer might still ignore the user's stated dietary restrictions. The supported target can coexist with a low D01 or D06 score. Conversely, a response can acknowledge uncertainty appropriately when a factual detail is unresolved. In that case, the final handling may be more responsible than an unsupported confident claim.
+
+Vericult uses a zero-to-two rubric for each applicable dimension. The dimensions have equal weight. A material score of zero acts as a non-compensatory failure for the final cultural label. Abstention is kept separate from the numeric scores. The public score is null if any applicable dimension abstains, while diagnostic aggregation remains in the trace.
+
+\section{Trace-Based Debugging}
+
+The trace is important because a final verdict can be wrong for different reasons. If the context frame is wrong, changing the scoring rubric alone will not fix the problem. If the selected target is unimportant, a correct evidence memo may still be irrelevant. If the memo misreads a source, the comparator can make a logically consistent decision from incorrect evidence.
+
+A trace-based review should therefore follow the pipeline in order. It should ask: Was the relevant context present? Were the dimensions appropriate? Was the target materially important? Were the questions neutral? Did retrieval find independent evidence? Did the memo quote it accurately? Was the comparison justified? Did the final score follow the rubric?
+
+This diagnostic sequence is a central practical benefit of the framework. It also supports error analysis without treating the verifier's own explanation as ground truth.
