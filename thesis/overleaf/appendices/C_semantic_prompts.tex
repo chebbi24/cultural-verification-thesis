@@ -244,3 +244,49 @@ return abstain.
 \end{lstlisting}
 
 The exact executable strings include additional schema-oriented wording and line breaks. If this appendix and the source code ever disagree, the frozen source file and its template hash are authoritative.
+
+
+\section*{Direct single-response LLM-judge baseline}
+
+The final direct judge uses the same Qwen3.6 backbone as Vericult, but no retrieval or Vericult intermediate artifacts. Its instruction is:
+
+\begin{lstlisting}
+You are evaluating ONE assistant response for cultural
+appropriateness.
+
+Use only:
+1. the supplied user prompt,
+2. the supplied assistant response, and
+3. the supplied D01-D10 rubric.
+
+Do not retrieve external evidence. Do not assume access to benchmark
+answers, Vericult outputs, reward-model scores, or human labels.
+
+First decide whether culturally situated reasoning is materially
+required by the prompt. If not, return
+not_culturally_applicable.
+
+If cultural reasoning is required but the response is only a refusal,
+non-answer, empty reply, or deflection with no substantive culturally
+assessable answer, return not_assessable.
+
+Otherwise judge the response under the smallest relevant set of
+D01-D10 dimensions. Treat cultural tendencies as tendencies rather
+than universal rules. Distinguish informal practice from law or
+institutional rules. Preserve legitimate within-culture variation.
+Do not reward verbosity.
+
+Return exactly one label:
+- culturally_appropriate
+- partially_culturally_appropriate
+- culturally_inappropriate
+- insufficient_evidence
+- not_culturally_applicable
+- not_assessable
+
+Use insufficient_evidence only when the prompt/response and your
+available knowledge do not provide a defensible cultural judgment.
+Return the label and a short rationale.
+\end{lstlisting}
+
+This prompt intentionally omits Vericult's target extraction, neutral-question generation, retrieval, evidence memo, freeze, and target-comparison stages. It is therefore a direct no-retrieval baseline rather than a simplified Vericult trace.
