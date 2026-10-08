@@ -1,0 +1,34 @@
+\chapter{Introduction}
+\section{Motivation}
+Large language models are now used for information seeking, writing assistance, workplace communication, education, and everyday advice. In many situations, response quality depends on more than grammar and factual correctness. A response may also need to fit a local social setting, religious practice, form of address, institutional procedure, or historically sensitive topic.
+
+A response can sound fluent and reasonable while still being culturally inappropriate. It may present a regional custom as a national rule, assume that all members of a religion follow the same practice, or use an unsuitable level of formality. Culture cannot be reduced to nationality. People within one country can differ by region, language, religion, generation, social group, and personal preference \parencite{adilazuarda2024culture,sorensen2024pluralistic}.
+
+\section{Problem Statement}
+This thesis studies the post-hoc evaluation of cultural appropriateness in a generated response. Given a prompt (p) and a response (r), the system should determine whether culturally situated reasoning is relevant, which cultural dimensions matter, whether important claims or recommendations can be checked against external evidence, and whether the final response is culturally appropriate for the stated context.
+
+General-purpose reward scores do not directly explain which cultural issue is present or what evidence supports the judgment. A direct LLM judge can explain its decision, but its reasoning may remain unsupported by external sources. Prior work has also reported evaluator effects in LLM-as-a-judge settings \parencite{zheng2023judging,wang2024fair}.
+
+\section{Research Questions}
+\begin{description}[leftmargin=1.5cm,style=nextline]
+\item[RQ1] What cultural-appropriateness outcomes does Vericult assign to the 360 fixed responses, and how often can it reach an assessable decision?
+\item[RQ2] How often does Vericult obtain sufficient external evidence for selected response targets, and how does evidence availability affect its decisions?
+\item[RQ3] What errors and limitations can be identified by examining the verifier's traces, dimensions, abstentions, and retrieval results?
+\item[RQ4] Where a valid common reference is available, how do Vericult's judgments compare with an independent reward model and a direct LLM judge?
+\end{description}
+
+\section{Contributions}
+\begin{itemize}
+\item a ten-dimensional operational framework for cultural appropriateness;
+\item a standalone verifier for one prompt--response pair;
+\item selective external evidence;
+\item a candidate-blind evidence stage after question generation;
+\item frozen evidence memos before target comparison;
+\item explicit abstention and evidence-coverage reporting;
+\item a LIVE/REPLAY mechanism;
+\item structured diagnostic traces;
+\item a final evaluation on 360 fixed prompt--response pairs.
+\end{itemize}
+
+\section{Thesis Structure}
+\Cref{chap:background} explains the foundations, \Cref{chap:related} reviews related work, \Cref{chap:framework} presents D01--D10, and \Cref{chap:verifier} describes Vericult. \Cref{chap:experiment} defines the final experiment. Results, discussion, limitations, and conclusions follow.
