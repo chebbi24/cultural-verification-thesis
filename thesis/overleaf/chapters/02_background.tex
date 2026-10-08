@@ -1,20 +1,147 @@
 \chapter{Background and Foundations}
 \label{chap:background}
 
-\section{Large Language Models and Alignment}
-Large language models generate text from patterns learned during training. Modern systems are commonly post-trained so their outputs better follow user instructions and human preferences. Reinforcement learning from human feedback is one established approach \parencite{ouyang2022training}. This thesis does not reproduce model training; it evaluates already generated responses.
+This chapter introduces the concepts needed to understand Vericult and the final experiment. It does not yet compare individual cultural benchmarks in detail; that is done in Chapter~\ref{chap:related}. The purpose here is to explain what an LLM evaluator does, how reward models and LLM judges differ from it, why cultural appropriateness is difficult to define, and why external evidence and abstention are useful.
 
-\section{Reward Models}
-A reward model receives a prompt and response and produces a preference-related score. Reward models are useful for ranking responses, but their scalar output does not itself provide source-grounded evidence for a cultural claim. In this thesis, the reward model is an independent comparison system rather than a component of Vericult.
+\section{Large Language Models and Alignment}
+
+Large language models generate text by predicting likely continuations from an input context. A base model can produce fluent language without reliably following a user's instruction. For this reason, modern LLM systems are usually post-trained after the initial language-model training.
+
+One influential example is InstructGPT. Ouyang et al. first use supervised demonstrations, then collect human preference rankings between model responses, train a reward model from those rankings, and finally optimize the model using reinforcement learning from human feedback \parencite{ouyang2022training}. The exact training recipe is not important for Vericult, because this thesis does not train its own generator. What matters is the basic idea: model behavior is shaped by an evaluation signal.
+
+The evaluation signal is never a complete description of all desirable behavior. A model can be helpful on average and still give an inappropriate answer in a particular cultural setting. For example, a response may correctly explain a general workplace practice but ignore a formal legal requirement in the user's country. Another answer may give factually plausible advice while assuming that every member of a religion follows the same rule.
+
+This is why cultural appropriateness is treated here as a separate evaluation problem. Vericult works after generation. It receives the prompt and the response and asks whether the response fits the explicitly stated cultural situation.
+
+\section{Preference Alignment and Reward Models}
+
+A reward model converts a prompt--response pair, or a comparison between responses, into a preference signal. During alignment training, this signal can guide optimization. During inference, it can also be used to choose between several responses.
+
+Reward models are useful because they compress complicated preference information into a score that is easy to optimize or rank. RewardBench shows that this is also a difficult evaluation problem in its own right. Its dataset contains prompt--chosen--rejected triples across chat, reasoning, and safety, and the benchmark examines how well reward models distinguish the preferred answer \parencite{lambert2025rewardbench}.
+
+A reward score should not be confused with evidence. A score can tell us that one response is preferred by the model, but it does not necessarily tell us which cultural statement is wrong or which source supports the decision. The model may have learned useful cultural patterns from training data, but the evidence is implicit.
+
+This difference is central to the thesis comparison. The Skywork reward model is used as an independent baseline. It is not fed into Vericult, and Vericult does not try to imitate its score. The goal is to compare two different evaluation styles: learned preference scoring and explicit evidence-grounded verification.
 
 \section{LLM-as-a-Judge}
-A direct LLM judge receives evaluation instructions together with the response to be judged. This approach is flexible and can produce explanations, but previous studies have shown sensitivity to presentation order and other evaluator effects \parencite{zheng2023judging,wang2024fair}. The direct judge is therefore treated as a separately frozen baseline.
 
-\section{Cultural Appropriateness}
-This thesis uses cultural appropriateness to mean how well a response handles the cultural concerns relevant to the explicit situation. A common tendency is not automatically a universal rule, a legal requirement is different from social etiquette, and a contested value question may have several defensible answers. Cultural-NLP research also cautions against treating countries or languages as homogeneous cultural units \parencite{adilazuarda2024culture,liu2025culturally}.
+Another common evaluation method is to use a language model directly as a judge. The judge receives an instruction that defines the evaluation task together with one or more candidate responses. It then produces a label, score, ranking, or explanation.
+
+Zheng et al. study this approach with MT-Bench and Chatbot Arena \parencite{zheng2023judging}. In their experiments, strong LLM judges can agree with human preference judgments at a high rate. The paper also identifies several limitations, including position bias, verbosity bias, self-enhancement bias, and reasoning limitations.
+
+Position bias is especially easy to understand. If two answers are shown in the order A then B, a judge may prefer a different answer than when the same texts are shown as B then A. Wang et al. demonstrate that response order can significantly change LLM evaluator results and propose calibration methods to reduce the effect \parencite{wang2024fair}.
+
+For a single-response task, position bias is less important than in pairwise ranking, but other problems remain. A direct judge can still rely on its internal knowledge, overlook an unsupported factual claim, or produce a confident explanation that is difficult to audit. It is therefore a useful baseline for Vericult: it shows what can be achieved by asking a model to judge cultural appropriateness directly, without an explicit retrieval and evidence pipeline.
+
+\section{Culture as a Contextual Construct}
+
+Defining cultural correctness as one fixed property would be misleading. Culture is not equivalent to nationality, and a country contains many communities, regions, languages, generations, religions, and social groups.
+
+Adilazuarda et al. review more than 90 papers on culture in LLM research and show that studies usually rely on cultural proxies instead of one shared definition \parencite{adilazuarda2024culture}. Some proxies are demographic, such as country or language. Others are semantic, such as food, norms, values, or social practices.
+
+Liu et al. also emphasize the wide range of elements that can be relevant to culturally aware NLP \parencite{liu2025culturally}. Their taxonomy is useful because it separates cultural content from the technical way a model is adapted or evaluated.
+
+These findings support three assumptions in this thesis.
+
+First, explicit context should be preferred over inference. If a prompt says that the user is visiting a Japanese family, that information can be used. If the prompt only gives a person's name, the verifier should not infer nationality, religion, or ethnicity from it.
+
+Second, cultural variation must remain visible. A practice can be common without being universal. The phrase "people often do X" has a different meaning from "everyone must do X". Vericult therefore asks not only for baseline evidence but also for evidence about scope and variation.
+
+Third, cultural claims can have different epistemic status. A statement about a law can often be checked against an official source. A statement about common greeting behavior may require linguistic or community evidence. A moral value judgment may have no single factual source that can settle it.
+
+\section{Cultural Appropriateness in This Thesis}
+
+The thesis uses the term \emph{cultural appropriateness} rather than \emph{cultural correctness}. The word appropriateness better reflects the fact that the target is a response in a situation, not a universal description of a culture.
+
+A response is culturally appropriate when it handles the relevant cultural dimensions accurately, respectfully, and with enough context for the situation. This includes avoiding material factual errors, avoiding misleading generalizations, respecting legitimate variation, distinguishing rules from preferences, and adapting recommendations to the user's stated setting.
+
+This definition does not mean that the verifier rewards conformity. A user can choose not to follow a common custom. A minority view can be legitimate even if most people in a region disagree. A response can therefore be appropriate while explaining that a practice is common but optional.
+
+This also does not mean that every cultural practice is treated as morally acceptable. Human rights, discrimination, coercion, and safety can be relevant to the judgment. D04 and D10 explicitly allow the system to distinguish plural values from dehumanizing or discriminatory framing.
+
+\section{Descriptive Practices, Norms, Rules, and Values}
+
+A recurring source of cultural errors is the failure to distinguish between different kinds of claims. The verifier therefore uses four conceptual distinctions throughout the pipeline.
+
+\subsection{Descriptive Practice}
+
+A descriptive practice states what people commonly do. Examples include how guests are often welcomed, which greeting is common in a region, or what food is traditional for a celebration. These statements can often be supported by cultural, linguistic, historical, or community sources.
+
+A descriptive practice should normally be phrased with uncertainty and scope. It may vary by household, generation, region, or individual preference.
+
+\subsection{Social Norm}
+
+A social norm concerns what behavior is generally expected or considered polite. For example, a workplace may have an informal expectation about punctuality or forms of address. Norms are stronger than simple frequencies but are still not automatically universal.
+
+NormAd is relevant here because it shows that models can struggle when they need to apply social norms to specific situations \parencite{rao2025normad}.
+
+\subsection{Formal Rule}
+
+A formal rule is grounded in law, policy, regulation, or an institutional procedure. A statement such as "you must register within a certain period" should be verified differently from "people usually prefer direct communication". Official and legal sources are more appropriate for the first case.
+
+This distinction motivates D05, which separates legal and institutional constraints from informal cultural expectations.
+
+\subsection{Value Statement}
+
+A value statement concerns what is good, fair, acceptable, or desirable. Evidence can describe which values are common in a population, but a survey cannot automatically prove that one moral position is correct.
+
+Pluralistic alignment research makes this distinction important. Sorensen et al. argue that AI systems may need to represent multiple reasonable perspectives rather than collapse them into one average preference \parencite{sorensen2024pluralistic}.
 
 \section{Evidence-Grounded Evaluation}
-Retrieval-augmented generation uses external documents to inform model outputs \parencite{lewis2020rag}. Vericult uses retrieval differently: the response already exists and selected claims or recommendations are checked against external evidence. Missing evidence is not treated as proof that a claim is false.
 
-\section{Reproducibility}
-Online search results can change. Vericult therefore separates LIVE retrieval from REPLAY evaluation. LIVE collects and stores evidence, while REPLAY uses the stored evidence without live fallback. This freezes the evidence basis, not every semantic model output.
+Retrieval-augmented generation is commonly used to improve model answers by giving the model external documents. Lewis et al. introduce RAG as a way to combine parametric model knowledge with retrieved non-parametric information \parencite{lewis2020rag}.
+
+Vericult uses retrieval for a different purpose. The generated response already exists. Retrieval is used only after material claims or recommendations have been selected. The retrieved documents are turned into an evidence memo, and only after that memo is frozen is the original response target compared against it.
+
+This separation has two motivations.
+
+The first is auditability. If the verifier says that a claim is contradicted, the trace should contain the questions, search query, retrieved documents, evidence quotations, memo, and comparison result.
+
+The second is bias control. If the full response remains visible during retrieval, the system may search for evidence that confirms or attacks the exact candidate wording. Vericult therefore creates neutral questions first and sends only those questions and explicit prompt context into the evidence engine.
+
+The method is not perfectly blind. The question generator sees the target before the blind boundary begins. This limitation is reported directly rather than hidden.
+
+\section{Evidence Sufficiency and Abstention}
+
+External evidence can be weak, contradictory, or missing. Cultural information is especially uneven on the public web. A local practice may be well documented in one language and barely documented in another. Community sources may describe lived experience that does not appear in official documents.
+
+For this reason, the verifier has an explicit abstention state. A dimension can be scored 0, 1, or 2 only when there is a defensible basis. If all relevant external targets remain unresolved, that dimension can abstain.
+
+Abstention is different from a score of 1. A score of 1 means the system has enough basis to conclude that the response is mixed, incomplete, or insufficiently adapted. Abstention means that the system does not have enough basis to reach that conclusion.
+
+The public Vericult score follows the same idea. If any applicable dimension abstains, the public 0--100 summary is suppressed. The trace still preserves the internal information, but the system avoids presenting a partially evidenced numeric score as fully comparable.
+
+\section{LIVE and REPLAY}
+
+A web-based verifier has a reproducibility problem: the same search can return different results tomorrow. Websites change, search rankings change, and pages disappear.
+
+Vericult therefore has two execution modes.
+
+In LIVE mode, the system performs real retrieval and stores the exact evidence snapshots. It also stores the question/query schedule used for each target.
+
+After LIVE finishes, the evidence audit checks that the expected traces and snapshots exist and records their hashes.
+
+In REPLAY mode, the system loads the stored schedule and evidence. There is no live-search fallback. This means the final semantic evaluation can be run again against the same evidence basis.
+
+REPLAY does not make the complete system bitwise deterministic. The semantic model is still called again, and provider implementation details can affect generation. The important point is narrower: the external evidence is fixed.
+
+\section{Evaluation Concepts Used Later}
+
+Several terms are used repeatedly in the experiment chapters.
+
+\paragraph{Assessability.}
+A prompt can be culturally relevant while the response is not assessable. For example, a pure refusal may contain no cultural claim or advice to score.
+
+\paragraph{Evidence coverage.}
+Evidence coverage measures how many retrieval-appropriate targets end with a memo that is not insufficient. It is a property of evidence availability, not a measure of cultural accuracy.
+
+\paragraph{Dimension coverage.}
+A response is evaluated only on the dimensions planned for that prompt. D01--D10 are not all forced onto every case.
+
+\paragraph{Failure.}
+A technical failure means the pipeline could not produce a structurally valid result. It is kept separate from cultural inappropriateness and from insufficient evidence.
+
+\paragraph{Reference label.}
+A reference label is an independently collected target used to evaluate system performance. The old five-person PLT Best-of-4 annotations do not apply to the new GPT-OSS responses and are therefore not used as final reference labels.
+
+These distinctions are necessary for interpreting the final result tables correctly. In particular, a high completion rate is not the same as high accuracy, and high evidence coverage is not proof that the final cultural judgment is correct.
