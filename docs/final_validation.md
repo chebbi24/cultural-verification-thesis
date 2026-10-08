@@ -2,9 +2,9 @@
 
 ## Authoritative semantic revision
 
-- Freeze code commit: `e451ff40b50bf1a91a30175c1885d1660a87e51c`
-- GitHub Actions "Verifier tests": run `37713891461`, **success**
-- Python 3.12: **159 tests passed, 1 skipped**
+- Freeze code commit: `024d6433fb38e589618e0a1abf8c7696b3a36c2c`
+- GitHub Actions "Verifier tests": run `37714423989`, **success**
+- Python 3.12: **166 tests passed, 1 skipped**
 - Compile, Ruff lint and Ruff format: **passed**
 - Manifest: `experiments/final_manifest.json`; config:
   `experiments/final_vericult_config.json`
@@ -40,6 +40,23 @@ above semantic freeze without establishing a new revision.
 - REPLAY checks its evidence execution identity and the frozen LIVE output hash.
 - Preflight and the runner reject silent model, provider or L3S endpoint changes.
 - Direct invocation of `python scripts/preflight_final_experiment.py` imports both frozen-model validation and execution-identity helpers, including the script-mode fallback. A regression subprocess test forces that import path.
+
+## Recent branch reconciliation and independent baselines
+
+The last-48-hour branch review compared `main`, `agent/final-experiment-ready`,
+`thesis/full-report-rewrite`, the external-120 archive, and the restored
+contextual-scoring/deterministic-span branches. The active branch retains the
+full latest common Vericult core and all subsequent planner, abstention,
+trace-validation and launch-safety fixes. No missing executable core verifier
+implementation was identified in those branches.
+
+The previous Skywork and direct-judge source entrypoints were built for
+Best-of-4; the 360x1 protocol required single-response adapters. These are
+now provided independently by `scripts/run_final_baselines.py`. Skywork returns
+raw scalar reward scores, while a no-retrieval direct L3S/Qwen judge returns
+one of the six final labels. Neither baseline touches Vericult or loads
+human labels. The adapters have deterministic mocked tests but **have not
+been exercised with the live L3S inference endpoint or a local Skywork GPU**.
 
 ## Required local steps before official LIVE
 
