@@ -665,20 +665,53 @@ The key boundaries are:
 These mechanisms improve traceability and reproducibility, but they do not guarantee cultural correctness. Retrieval can miss important sources, the semantic backbone can make planning mistakes, and the rubric itself is an operational design. The final experiment therefore evaluates the complete system rather than assuming that architectural safeguards are sufficient.
 
 
-\section{Worked Example: From a Prompt to an Evidence Question}
+\section{Complete Illustrative Walkthrough}
 
-Consider the PLT002 example in Appendix~\ref{app:examples}. The user wants to introduce a visiting American colleague to Munich with a programme of white sausage, beer, and roast pork, while joking that a person who does not drink is a spoilsport. The generated answer is fixed before Vericult begins.
+The following example is deliberately illustrative and is \emph{not} one of the 360 final traces. Its purpose is to show how information changes form between stages without implying an empirical result.
 
-The first stage extracts the setting (a colleague visiting Munich), the interaction (a humorous announcement), and the relevant social context. It must not assume the visitor's religion, dietary restrictions, or attitude toward alcohol. Those details are not stated in the prompt.
+\textbf{Illustrative prompt:}
 
-The dimension planner may find everyday practices, interpersonal norms, and language pragmatics relevant. This is a planning question, not yet a judgment that the answer is inappropriate. The verifier then examines the actual generated response. If the response describes a Bavarian food tradition, the target extractor can select that statement. If the response pressures a colleague to drink, the cultural concern may instead be partly internal to the wording and require less factual retrieval.
+\begin{quote}
+I am emailing a new colleague in Munich. Is Moin the natural local greeting? Please draft a respectful opening.
+\end{quote}
 
-For a checkable target, the question generator should ask a neutral descriptive question and a question about variation. In this example, useful question types would concern the association of a particular breakfast with Bavaria and whether a food or drink custom should be presented as obligatory for visitors. These are explanatory examples of question design, not quotations from an actual Vericult trace.
+\textbf{Illustrative candidate response:}
 
-The evidence stage searches for documents that answer the questions without including the full response or a proposed verdict. It then writes a memo about the supported practice and its scope. Only after that memo is frozen does the target comparator decide whether the selected response statement is supported, contradicted, mixed, or unresolved.
+\begin{quote}
+Yes. Moin is the standard greeting everywhere in Germany, so start the email with Moin.
+\end{quote}
 
-Finally, the dimension scorer considers the whole answer. A factual description of a local breakfast can be correct while the same answer still gives socially inappropriate advice. This is why a supported target does not automatically produce a perfect dimension score.
+Table~\ref{tab:walkthrough} follows one plausible execution path.
 
+\begin{longtable}{p{0.18\textwidth}p{0.72\textwidth}}
+\caption{Illustrative end-to-end Vericult walkthrough.}
+\label{tab:walkthrough}\\
+\toprule
+Stage & Illustrative output or decision \\
+\midrule
+\endfirsthead
+\toprule
+Stage & Illustrative output or decision \\
+\midrule
+\endhead
+Context & Location: Munich; participants: user and new colleague; relationship: professional/new; goal: draft a respectful email opening. No religion, nationality or personal preference is inferred. \\
+Applicability & Cultural reasoning is relevant because regional language use and professional pragmatics can change what counts as a natural opening. \\
+Dimensions & D02 is primary because the issue is regional greeting and register. D08 can be secondary because the interaction is professional. \\
+Assessability & The response is substantive, so verification continues. \\
+Material target & The sentence claiming that Moin is the standard greeting everywhere in Germany is selected as decision-relevant. \\
+Epistemic type & Descriptive cultural norm; external retrieval is appropriate. \\
+Question 1 & A neutral descriptive question asks where in Germany Moin is commonly used as a greeting. \\
+Question 2 & A scope question asks whether usage and perceived naturalness differ by region, including Bavaria and Munich. \\
+Evidence stage & The engine searches only from the questions and prompt context. It records quoted source support and variation in a memo. The candidate's proposed verdict is not supplied to this stage. \\
+Freeze & Once the final memo is complete, its content and identifier are fixed before target comparison. \\
+Target comparison & The original response quotation is reintroduced and compared with the memo. The comparator chooses supported, mixed, contradicted, or insufficient. \\
+Dimension scoring & D02 evaluates not only the narrow factual claim but also whether the recommendation is appropriately adapted to Munich and a new professional relationship. \\
+Outcome & The final label follows the complete dimension scores and abstentions. The example deliberately does not assign a real outcome because no final-experiment trace is being reproduced here. \\
+Trace & Every stage, identifier, question, evidence link, verdict and score rationale is serialized for later audit. \\
+\bottomrule
+\end{longtable}
+
+The example shows why fact checking and cultural appropriateness are related but different. Even if a greeting is understood nationally, a recommendation can still be poorly adapted to a particular region or professional relationship. Conversely, an uncommon greeting is not automatically inappropriate if the answer accurately explains its scope and the user's intent.
 \section{Why the Context Stage Reads the Prompt Alone}
 
 The prompt contains the user's intended task and explicit cultural setting. If the context extractor read the generated answer first, it might mistake assumptions introduced by the generator for facts supplied by the user. For example, an answer might claim that a visitor is Muslim even when the prompt does not mention religion. Passing that invented detail back into context extraction would make later retrieval appear more justified than it is.
