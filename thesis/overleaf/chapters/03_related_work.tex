@@ -35,7 +35,7 @@ Vericult takes a different position in the system architecture. It does not chan
 
 \section{Reward Models and RewardBench}
 
-Reward models usually assign a scalar value to a candidate answer. In pairwise evaluation, a higher score is treated as evidence that one answer is preferred. RewardBench evaluates reward models using chosen/rejected response pairs across tasks such as chat, safety, and reasoning \parencite{lambert2025rewardbench}. The benchmark highlights that reward-model performance depends on the kinds of comparisons included.
+Reward models usually assign a scalar value to a response. In pairwise evaluation, a higher score is treated as evidence that one answer is preferred. RewardBench evaluates reward models using chosen/rejected response pairs across tasks such as chat, safety, and reasoning \parencite{lambert2025rewardbench}. The benchmark highlights that reward-model performance depends on the kinds of comparisons included.
 
 M-RewardBench extends reward-model evaluation to multilingual settings \parencite{gureja2025mrewardbench}. Its published ACL 2025 study contains 2,870 preference instances across 23 languages and reports gaps between English and non-English performance. This is relevant because a high general reward score does not establish that a response handles local culture correctly.
 
@@ -53,7 +53,7 @@ The difference in evaluation units is important. CARB studies reward-model prefe
 
 Zheng et al.\ study LLM-based judges in MT-Bench and Chatbot Arena \parencite{zheng2023judging}. Wang et al.\ show that changing the order of responses can alter comparative judgments, a problem known as position bias \parencite{wang2024fair}. These studies motivate careful prompt design and clear separation of comparison systems.
 
-Vericult's final experiment evaluates one response at a time, so it does not have candidate-order bias within a Best-of-4 choice. It can still suffer from semantic judge bias, cultural blind spots, or overly confident reasoning. Its evidence stage and diagnostic traces are intended to make such errors easier to investigate, not to eliminate them automatically.
+Vericult's final experiment evaluates one response at a time, so it does not have response-order bias within a Best-of-4 choice. It can still suffer from semantic judge bias, cultural blind spots, or overly confident reasoning. Its evidence stage and diagnostic traces are intended to make such errors easier to investigate, not to eliminate them automatically.
 
 \section{Pluralism and the Limits of External Evidence}
 
