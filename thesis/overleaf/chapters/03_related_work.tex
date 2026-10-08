@@ -1,142 +1,91 @@
 \chapter{Related Work and Research Gap}
 \label{chap:related}
 
-This chapter reviews the work that is most relevant to Vericult. The goal is not to list every paper on cultural NLP. Instead, the chapter focuses on four questions: how previous work defines or measures culture, how cultural benchmarks are constructed, how cultural behavior is improved in language models, and how responses are evaluated by reward models or LLM judges. The final section explains the specific gap addressed by this thesis.
+\section{What Previous Research Actually Measures}
 
-\section{How Culture Is Represented in NLP Research}
+Cultural evaluation is not a single benchmark task. Some papers test knowledge of local customs, some test whether a model can recognize the acceptability of an action, and others study whether preferences or reward scores change across languages. These tasks are related, but they cannot be used interchangeably. A model can answer a factual multiple-choice question correctly and still produce inappropriate advice in a longer conversation.
 
-A first difficulty is that culture is not one variable. Adilazuarda et al. reviewed more than 90 papers that study culture in large language models and found that the papers usually operationalize culture through proxies rather than through one shared formal definition \parencite{adilazuarda2024culture}. Their survey separates demographic proxies, such as country or language, from semantic proxies, such as values, food, customs, or social concepts. It also points out that some cultural areas are studied much more often than others. This is important for the present thesis because it argues against treating a country label as sufficient cultural context.
+Two surveys are useful starting points. Adilazuarda et al.\ review work on cultural representation in LLMs and describe how researchers use demographic and semantic proxies to represent culture \parencite{adilazuarda2024culture}. Liu et al.\ propose a detailed taxonomy for culturally aware and adapted NLP, arguing that the field lacks one shared operational definition of culture \parencite{liu2025culturally}. This thesis does not claim that the D01--D10 rubric is a new universal definition. It is an engineering framework designed to organize response-level errors.
 
-Liu et al. take a related but more detailed approach. Their taxonomy surveys culturally aware and culturally adapted NLP and organizes the literature into elements that describe cultural knowledge, communication, values, practices, groups, and adaptation \parencite{liu2025culturally}. The paper is useful here for two reasons. First, it confirms that culture is multi-part and context dependent. Second, it shows that cultural NLP includes different technical goals: measuring knowledge, changing model behavior, adapting to users, and evaluating outputs. Vericult belongs mainly to the last category. It is not a culture-specific generator.
+\section{Everyday Cultural Knowledge: BLEND}
 
-These surveys also motivate one design choice in Vericult: the system does not use nationality as the only unit of culture. A prompt can instead contain a region, a religion, a language variety, a family relationship, a workplace setting, or another explicit cultural context. The verifier is instructed not to infer missing demographic information from names.
+BLEND is a benchmark of everyday cultural knowledge across different languages and regions \parencite{myung2024blend}. Its motivation is practical: information about ordinary celebrations, foods, school activities, or habits may be familiar to local people but under-represented in the web documents used for model training. Its questions make cultural knowledge measurable, but they do not necessarily show how a model uses that knowledge in a real user response.
 
-\section{Cultural Knowledge Benchmarks}
+For Vericult, the main lesson is that seemingly simple daily-life advice can depend on location and social context. This motivates D01 (everyday life and material culture) and the decision to retrieve external evidence only when the response contains a checkable statement. BLEND results are not used as Vericult results.
 
-Several recent benchmarks test whether models know culturally specific information. These benchmarks are important because they demonstrate that standard LLM evaluation can miss culture-specific errors.
+\section{Challenging Cultural Knowledge: CulturalBench}
 
-\subsection{BLEnD}
+CulturalBench contains 1,696 human-written and human-verified questions from 45 regions and 17 topics in its published ACL 2025 version \parencite{chiu2025culturalbench}. Five independent annotators verified each question. The paper reports 92.4\% human accuracy and a range of 28.7--61.5\% for the evaluated frontier models on its hard setup. It also describes problems with questions that admit multiple correct answers.
 
-BLEnD is a hand-crafted benchmark for everyday cultural knowledge \parencite{myung2024blend}. The benchmark contains approximately 52.6 thousand question--answer pairs covering 16 countries or regions and 13 languages. It includes both short-answer and multiple-choice formats. The authors deliberately focus on everyday knowledge that is often poorly represented in common web sources, such as food, celebrations, school activities, and daily practices.
+This last observation is particularly relevant here. If a cultural practice has regional or situational alternatives, a verifier should not reject a response merely because it differs from the first retrieved description. Vericult therefore includes scope and variation questions in the evidence stage.
 
-The paper reports a large difference in model performance between cultures with high and low online representation. For GPT-4, the maximum difference in the short-answer setting is 57.34 percentage points. The authors also find that local-language performance is not uniformly better: for some low-resource languages, English prompts produce stronger results. These observations show why a verifier should not assume that cultural knowledge is equally available across languages or regions.
+CulturalBench is primarily a question-answering benchmark. Vericult is not evaluated on the same published questions under the same protocol. Its scores must not be compared numerically with CulturalBench accuracy.
 
-BLEnD is still a benchmark of model knowledge. The correct answer is known in advance and the task is to answer benchmark questions. Vericult has a different input: an already generated free-form response that may contain several claims, recommendations, or value statements at the same time.
+\section{Social Norm Adaptation: NormAd}
 
-\subsection{CulturalBench}
+NormAd distinguishes between recognizing a social rule and applying it when the context is incomplete \parencite{rao2025normad}. Its NormAd-Eti benchmark contains approximately 2,600 social-etiquette situations from 75 countries. The paper reports that even with explicit relevant norms, the best evaluated models scored below 82\% while humans scored above 95\%. With more abstract values and country information, model performance was below 60\%, while human performance remained above 90\%.
 
-CulturalBench is a human-written and human-verified benchmark created through a Human--AI red-teaming process \parencite{chiu2025culturalbench}. It contains 1,696 questions from 45 global regions and covers 17 topics. Every question was verified by five independent annotators. The dataset was designed to include difficult and less represented cultural knowledge rather than relying only on automatically translated or web-derived questions.
+These results illustrate why a prompt that only names a country may be insufficient for a confident cultural judgment. Vericult first extracts explicit prompt context and includes an abstention option when the evidence is insufficient. The two systems nevertheless answer different questions: NormAd tests social acceptability judgments, while Vericult assesses generated answers.
 
-CulturalBench is especially relevant to the present work because it treats cultural evaluation as more than a language translation problem. Its prompts can require knowledge about etiquette, traditions, food, or other context-specific topics. However, like BLEnD, CulturalBench is primarily a benchmark of cultural knowledge. It does not provide a post-hoc evidence trace for an arbitrary generated answer.
+\section{Cultural Adaptation of Generators: CultureLLM}
 
-\subsection{NormAd}
+CultureLLM addresses cultural differences through training data augmentation and model adaptation \parencite{li2024culturellm}. The authors use World Values Survey seed data and train culturally adapted models. The NeurIPS 2024 paper reports experiments across 60 culture-related datasets and nine cultures. This is a generator-side approach: the aim is to make model outputs better before they are produced.
 
-NormAd changes the focus from cultural knowledge to cultural adaptability \parencite{rao2025normad}. NormAd-Eti contains about 2.6 thousand situational descriptions representing social-etiquette norms from 75 countries. The framework varies the amount and specificity of cultural information that is given to the model, ranging from broad values to explicit social norms.
+Vericult takes a different position in the system architecture. It does not change the generator or use its scores for post-training. It receives a fixed prompt and response and checks the response after generation. CultureLLM is therefore useful motivation but not a direct baseline.
 
-The authors report that the best tested LLMs remain below 82\% accuracy even when the relevant social norms are explicitly provided, while human performance is above 95\%. When models receive only abstract values and country information, performance drops below 60\%, while human accuracy remains above 90\%. The paper also reports stronger adaptability for English-centric cultures than for many Global South settings.
+\section{Reward Models and RewardBench}
 
-NormAd is close to Vericult in one important way: it emphasizes that knowing facts about a country is not enough. A model must apply cultural context to a concrete situation. The difference is that NormAd defines a benchmark task with known acceptability labels, while Vericult evaluates open-ended responses by decomposing them and using external evidence where possible.
+Reward models usually assign a scalar value to a candidate answer. In pairwise evaluation, a higher score is treated as evidence that one answer is preferred. RewardBench evaluates reward models using chosen/rejected response pairs across tasks such as chat, safety, and reasoning \parencite{lambert2025rewardbench}. The benchmark highlights that reward-model performance depends on the kinds of comparisons included.
 
-\section{Cultural Safety and Geo-Diverse Rules}
+M-RewardBench extends reward-model evaluation to multilingual settings \parencite{gureja2025mrewardbench}. Its published ACL 2025 study contains 2,870 preference instances across 23 languages and reports gaps between English and non-English performance. This is relevant because a high general reward score does not establish that a response handles local culture correctly.
 
-Safety is also culturally and geographically dependent. SafeWorld studies this problem directly \parencite{yin2024safeworld}. The final NeurIPS version contains 2,775 test queries grounded in human-verified cultural norms and legal policies from 50 countries and 493 regions or races. The benchmark evaluates contextual appropriateness, factual accuracy, and completeness.
+In the present thesis, Skywork is an independent comparator. Its raw score is not evidence for any particular factual or cultural claim, and it does not enter Vericult's scoring pipeline. A raw reward score also does not automatically have a calibrated threshold for cultural appropriateness. Any threshold or transformation must be declared before comparing results.
 
-SafeWorld is relevant for Vericult because it distinguishes cultural or legal context from generic safety behavior. A response can be safe in one jurisdiction or social setting and inappropriate in another. It also shows that formal rules and social expectations should not be merged. This distinction influenced the separation between D05, which covers law and institutional rules, and other dimensions such as D03 for etiquette and D04 for values.
+\section{CARB: Cultural Awareness in Reward Models}
 
-SafeWorld also trains a model using preference pairs, whereas Vericult does not train the generator. The verifier is a separate layer that can be applied after generation.
+The closest methodological motivation is the Cultural Awareness Reward modeling Benchmark (CARB), proposed by Zhang et al.\ \parencite{zhang2025carb}. The arXiv paper, first posted in September 2025, describes ten cultures and four cultural domains. It evaluates reward models on culture-related preferences and reports that some models rely on surface-level correlations rather than the cultural meaning of a response. The authors also propose Think-as-Locals to improve culture-aware reward modeling.
 
-\section{Cultural Adaptation of Generators}
+This thesis builds on the problem identified by CARB but not on its architecture. Vericult is neither CARB nor a hybrid of CARB and a reward model. Its central method is to select checkable response targets, gather and freeze independent evidence, and score cultural appropriateness using an explicit rubric.
 
-Another group of methods tries to improve the generator itself rather than evaluate its output.
+The difference in evaluation units is important. CARB studies reward-model preference behavior. Vericult's final experiment consists of 360 individual prompt--response pairs. No CARB score can be used as a direct head-to-head performance number unless both approaches are tested on a shared evaluation task with a common independent reference.
 
-\subsection{CultureLLM}
+\section{Direct LLM Judges and Evaluation Bias}
 
-CultureLLM uses the World Values Survey as seed data and applies semantic data augmentation to create culture-specific fine-tuning data \parencite{li2024culturellm}. The paper reports using 50 seed samples to build augmented training data and fine-tunes culture-specific models for nine cultures as well as one unified model. The authors evaluate the method on 60 culture-related datasets. They report improvements over GPT-3.5 and Gemini Pro in their experimental setting and performance comparable to or better than GPT-4 on some tested tasks.
+Zheng et al.\ study LLM-based judges in MT-Bench and Chatbot Arena \parencite{zheng2023judging}. Wang et al.\ show that changing the order of responses can alter comparative judgments, a problem known as position bias \parencite{wang2024fair}. These studies motivate careful prompt design and clear separation of comparison systems.
 
-The important point for this thesis is not the exact model ranking. CultureLLM demonstrates a generator-side solution: cultural information is used to change model behavior before the response is produced. Vericult instead keeps the generator and verifier independent. This allows the same verifier to inspect outputs from a different generator without retraining.
+Vericult's final experiment evaluates one response at a time, so it does not have candidate-order bias within a Best-of-4 choice. It can still suffer from semantic judge bias, cultural blind spots, or overly confident reasoning. Its evidence stage and diagnostic traces are intended to make such errors easier to investigate, not to eliminate them automatically.
 
-\subsection{ValuesRAG}
+\section{Pluralism and the Limits of External Evidence}
 
-ValuesRAG uses retrieval-augmented generation to provide culture- and demographic-related value information during generation \parencite{seo2025valuesrag}. The method builds value summaries from World Values Survey data and retrieves relevant summaries for a new input. The published study evaluates the approach on six regional datasets.
+Sorensen et al.\ argue for pluralistic alignment that recognizes disagreement and variation in human preferences \parencite{sorensen2024pluralistic}. This matters because cultural appropriateness is sometimes a factual question and sometimes a question about acceptable choices in a specific relationship or community.
 
-ValuesRAG is methodologically useful because it shows how retrieval can bring external cultural information into an LLM workflow. The role of retrieval is different in Vericult. ValuesRAG retrieves information to help the model generate a culturally aligned response. Vericult retrieves information to verify material parts of a response that already exists. This difference affects the architecture: Vericult must avoid allowing the response itself to steer the evidence stage toward confirming its own claims.
+For example, an institutional rule can be checked against an official source. A statement about what all members of a community prefer cannot normally be verified in the same way. The second claim may require a narrower description, acknowledgement of diversity, or abstention. Vericult's evidence memo therefore records scope and variation, not only whether a source contains a matching phrase.
 
-\section{Pluralistic Alignment}
+\section{Comparison of Research Approaches}
 
-Cultural appropriateness can involve disagreement rather than one correct answer. Sorensen et al. describe three forms of pluralistic alignment: Overton pluralism, steerable pluralism, and distributional pluralism \parencite{sorensen2024pluralistic}. Their main argument is that AI systems serving diverse users may need to represent multiple reasonable perspectives instead of collapsing them into a single average preference.
-
-This idea is important for the D04 dimension in Vericult. A common or majority value is not automatically treated as moral unanimity. It also motivates abstention and qualified scoring. If a response makes a strong value claim in a context where the evidence only shows plural views, the verifier should not convert the majority view into a universal rule.
-
-\section{Reward Models as Evaluators}
-
-Reward models are central to modern preference alignment. They convert prompt--response pairs or response comparisons into preference scores that can be used for training or selection. RewardBench provides a broad evaluation framework for reward models and contains prompt--chosen--rejected triples across chat, reasoning, and safety \parencite{lambert2025rewardbench}. The benchmark shows that reward-model evaluation is itself a research problem and that reward models can fail on factuality, refusal behavior, reasoning, and instruction following.
-
-A reward score is useful for ranking, but it does not normally expose an evidence chain showing why a cultural claim is true or false. This does not make reward models unsuitable. It means they solve a different evaluation problem. In this thesis, the Skywork reward model is therefore an independent baseline rather than part of Vericult.
-
-\section{CARB: Cultural Awareness of Reward Models}
-
-The work most directly related to the reward-model comparison is CARB, the Cultural Awareness Reward modeling Benchmark \parencite{zhang2026carb}. CARB was published at ICLR 2026 and evaluates reward models specifically for cultural awareness.
-
-CARB contains 8,576 Best-of-N preference sets across 10 cultures and four domains: cultural commonsense knowledge, cultural values, cultural safety, and cultural linguistics. A typical CARB item contains a prompt, one culturally appropriate chosen answer, and several rejected answers. The reward model succeeds if it gives the chosen answer a higher score than all rejected answers.
-
-The benchmark is designed to avoid a trivial chosen-versus-bad-answer task. The paper constructs rejected answers using multiple models and culture-mismatched or incorrect references. It also examines spurious correlations in reward-model behavior. One of the main findings is that reward models can rely on surface features or explicit cultural labels instead of deeper cultural reasoning. The paper further reports a positive relation between CARB performance and downstream multilingual cultural alignment.
-
-The authors propose Think-as-Locals to improve generative reward models. The approach asks a model to produce culturally grounded evaluation criteria before making a preference judgment, and trains this behavior with reinforcement learning from verifiable rewards.
-
-CARB is important to this thesis in three ways. First, it shows that general preference evaluation does not automatically imply cultural awareness. Second, its four domains helped motivate the need for more explicit cultural diagnosis. Third, it provides a strong reason to compare Vericult with a reward model.
-
-At the same time, CARB is not used as a numerical baseline in the final Vericult result table. Its primary task is Best-of-N preference selection, while the final thesis evaluates one fixed prompt--response pair at a time. Comparing percentages across the two different datasets would not be a valid head-to-head experiment. CARB therefore appears in the related-work and discussion chapters, while the independent Skywork model is run on the thesis data itself.
-
-\section{LLM-as-a-Judge}
-
-Using an LLM as an evaluator is attractive because it is flexible and does not require a separate classifier for every task. Zheng et al. introduced MT-Bench and Chatbot Arena and studied strong language models as judges \parencite{zheng2023judging}. They report that GPT-4-based judgments reached more than 80\% agreement with human preferences in their setting. The same work also discusses position bias, verbosity bias, self-enhancement bias, and reasoning limitations.
-
-Wang et al. study position bias more directly \parencite{wang2024fair}. Their experiments show that simply changing response order can change the evaluator's ranking. They propose calibration methods, including balanced position evaluation, to reduce this effect.
-
-These studies do not imply that an LLM judge is unusable. They show that the judge prompt and evaluation setup matter. The direct-judge baseline in this thesis is therefore kept independent from Vericult and its configuration is frozen before final comparison. It does not retrieve external evidence.
-
-\section{Comparison of the Main Related Approaches}
-
-Table~\ref{tab:related-work} summarizes the main differences.
-
-\begin{table}[p]
+\begin{table}[ht]
 \centering
-\caption{Representative work related to Vericult. Published metrics are reported only to describe the original studies, not as direct comparisons with this thesis.}
-\label{tab:related-work}
 \small
-\begin{tabularx}{\textwidth}{p{2.4cm} p{2.5cm} p{2.6cm} X}
+\caption{Comparison of relevant research directions.}
+\label{tab:prior-work}
+\begin{tabularx}{\textwidth}{l X X}
 \toprule
-Work & Main goal & Unit of evaluation & Relevance to this thesis \\
+Work & Main evaluation or intervention & Relation to Vericult\\
 \midrule
-BLEnD & Everyday cultural knowledge & QA across 16 countries/regions and 13 languages & Shows uneven cultural knowledge across regions and languages \\
-CulturalBench & Difficult cultural knowledge & 1,696 verified cultural questions & Demonstrates human-written, multi-region cultural benchmarking \\
-NormAd & Cultural adaptability & Social acceptability in 75 countries & Shows that applying norms to situations is difficult even when context is supplied \\
-SafeWorld & Geo-diverse safety & 2,775 culturally/legal grounded queries & Motivates separation of cultural and institutional context \\
-CultureLLM & Cultural adaptation & Fine-tuned culture-specific generators & Generator-side approach rather than post-hoc verification \\
-ValuesRAG & Cultural value alignment & Retrieval-supported generation & Uses retrieval to generate; Vericult uses retrieval to verify \\
-CARB & Cultural reward-model evaluation & 8,576 Best-of-N preference sets & Directly motivates culture-aware evaluator comparison \\
-RewardBench & General reward-model evaluation & Prompt--chosen--rejected triples & Positions the independent RM baseline \\
-LLM-as-a-Judge & General open-ended evaluation & Direct model judgment & Provides a simple no-retrieval baseline and known bias concerns \\
+BLEND & Everyday cultural question answering & Motivates knowledge checks\\
+CulturalBench & Challenging cultural knowledge questions & Motivates scope and multiple answers\\
+NormAd & Social acceptability in cultural situations & Motivates context and uncertainty\\
+CultureLLM & Cultural adaptation of generators & Different intervention point\\
+RewardBench & Pairwise reward-model evaluation & Explains reward baseline limits\\
+M-RewardBench & Multilingual reward-model preferences & Motivates language-aware comparison\\
+CARB & Culture-aware reward-model evaluation & Closest RM research motivation\\
+Vericult & Post-hoc evidence-grounded single response evaluation & Proposed method of this thesis\\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-\section{Research Gap}
+\section{Research Gap and Scope of the Contribution}
 
-The reviewed work covers many important pieces of the problem. CulturalBench and BLEnD test knowledge. NormAd tests cultural adaptability. SafeWorld combines cultural and legal safety. CultureLLM and ValuesRAG modify generation. CARB evaluates cultural awareness in reward models. LLM judges provide general-purpose evaluation.
+The contribution is not that no previous research has evaluated culture, used retrieval, or designed rubrics. The narrower gap addressed here is an inspectable post-hoc pipeline for one fixed response that combines explicit cultural dimensions, selected externally checkable targets, neutral verification questions, candidate-blind evidence collection after question generation, frozen evidence memos, abstention, and replayable traces.
 
-The remaining problem addressed by this thesis is narrower and practical: how can an already generated response be checked after generation in a way that exposes the cultural dimensions, evidence, uncertainty, and reasoning path behind the decision?
-
-Vericult is built around five requirements that follow from this gap.
-
-First, the verifier should be \emph{standalone}. It should not depend on the generator's hidden states, training process, a reward-model score, or a benchmark answer.
-
-Second, it should be \emph{diagnostic}. A single scalar score is not enough when the failure may concern language, etiquette, law, religion, history, identity, or another dimension.
-
-Third, it should be \emph{evidence-grounded where evidence is appropriate}. External facts, descriptive practices, and context-sensitive recommendations can often be investigated through documents. Pure value judgments and internal response properties should not be forced into web search.
-
-Fourth, evidence collection should be \emph{separated from final comparison}. The evidence stage should not see the full response after neutral questions have been formed, because direct access to the candidate could encourage confirmation or contradiction seeking.
-
-Fifth, uncertainty and reproducibility should be explicit. If evidence is insufficient, the verifier should be able to abstain. If evidence is collected online, the exact retrieval artifacts should be saved so that the final experiment can be replayed on a fixed evidence basis.
-
-These requirements lead directly to the Vericult architecture described in Chapters~\ref{chap:framework} and~\ref{chap:verifier}. They are design hypotheses, not proof of superiority. The final experiment tests how the resulting system behaves on the fixed 360-pair dataset.
+This is a methodological contribution. Whether it leads to better cultural decisions is an empirical question. The final experiment and its independent comparison systems are designed to study that question without assuming a positive outcome.
