@@ -1,0 +1,26 @@
+\chapter{Reproducibility Manifest}
+\begin{longtable}{p{0.34\textwidth} p{0.60\textwidth}}
+\toprule
+Field & Value \\
+\midrule
+Repository & \texttt{chebbi24/cultural-verification-thesis} \\
+Final experiment branch & \texttt{agent/final-experiment-ready} \\
+Thesis-writing branch & \texttt{thesis/full-report-rewrite} \\
+Evaluation size & 360 fixed prompt--response pairs \\
+Generator & \texttt{gpt-oss:120b-mxfp4} \\
+Generator temperature & 0.8 \\
+Generator top-p & 0.95 \\
+Generator max tokens & 1200 \\
+Verifier backbone & \texttt{vllm/qwen3.6:35b-a3b-fp8} \\
+Retriever & Tavily in LIVE mode \\
+Primary reported mode & REPLAY \\
+Maximum material targets & 3 \\
+Initial questions & 2 per retrievable target \\
+Maximum follow-up & 1 per target \\
+Frozen code commit & \placeholder{INSERT} \\
+Final config hash & \placeholder{INSERT} \\
+Evidence manifest hash & \placeholder{INSERT} \\
+Experiment dates & \placeholder{INSERT} \\
+Final REPLAY output hash & \placeholder{INSERT} \\
+\bottomrule
+\end{longtable}
