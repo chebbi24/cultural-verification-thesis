@@ -47,6 +47,10 @@ External benchmark domain exclusion & \texttt{huggingface.co} \\
 Excluded repositories & thesis repository; \texttt{UpstageAI/ThaiCLI\_H6} \\
 Skywork baseline model & \texttt{Skywork/Skywork-Reward-V2-Qwen3-4B} \\
 Skywork revision & \texttt{fd958fe} \\
+Direct judge backbone & \texttt{vllm/qwen3.6:35b-a3b-fp8} \\
+Direct judge temperature & 0 \\
+Direct judge retrieval & none \\
+Direct judge prompt & Appendix~\ref{app:semantic-prompts} \\
 CI workflow & Verifier tests \\
 CI run ID & \texttt{37701437713} \\
 CI semantic-freeze result & 143 passed, 1 skipped; compile and Ruff checks passed \\
