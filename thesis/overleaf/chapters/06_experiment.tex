@@ -427,16 +427,34 @@ Using the same backbone creates a controlled comparison: differences between the
 
 Direct-judge exact label agreement with Vericult is reported descriptively. It is called agreement rather than accuracy unless an independent human reference exists for the same final responses.
 
-\section{Human Annotation Boundary}
+\section{Development-Phase Human Annotation Study}
 
-The project contains a previous human study with five students. Each person evaluated 30 Best-of-4 items, producing 600 candidate-level 1--3 ratings and 150 best-response choices.
+The repository contains a real human annotation study from the earlier Best-of-4 phase. It is reported here as development provenance, not as ground truth for the final 360 GPT-OSS responses.
 
-Those annotations refer to the old Llama-3.2 candidate responses. They are not labels for the final GPT-OSS responses.
+Five students completed all 30 pilot prompts. Each prompt had four historical candidate responses, producing 120 candidate responses in total. The study therefore contains 600 candidate-level 1--3 appropriateness ratings and 150 Best-of-4 choices. Under the frozen majority rule, 17 of the 30 prompts had a unique winner with at least three of five votes, seven of these reached strong consensus with four or five votes, and 13 prompts remained ambiguous. The observed Fleiss' kappa for winner choices was 0.090494.
 
-Using them as final ground truth would be a data-identity error. The final manifest therefore marks them as development provenance only.
+\begin{table}[ht]
+\centering
+\caption{Development-phase human annotation study retained as provenance only.}
+\label{tab:pilot-human}
+\begin{tabular}{l r}
+\toprule
+Quantity & Value \\
+\midrule
+Annotators & 5 \\
+Prompts & 30 \\
+Historical candidates per prompt & 4 \\
+Candidate-level ratings & 600 \\
+Best-of-4 votes & 150 \\
+Prompts with unique $\geq 3/5$ majority winner & 17 \\
+Strong-consensus prompts ($4/5$ or $5/5$) & 7 \\
+Ambiguous prompts & 13 \\
+Winner Fleiss' $\kappa$ & 0.090494 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-If a final human reference is collected, annotators must evaluate the exact frozen GPT-OSS responses. Until then, the thesis does not report automated-system accuracy against humans for the 360 final pairs.
-
+The low agreement is informative because cultural appropriateness can contain genuine ambiguity and annotator variation. It is not evidence that the final verifier is correct. These annotations refer to older Llama-3.2 candidate responses and cannot be joined to the new GPT-OSS responses as human gold. For the final 360 items, accuracy against humans may only be reported if annotators evaluate the exact frozen responses.
 \section{Evaluation Quantities}
 
 The primary final analysis uses quantities that can be calculated directly from the archived Vericult outputs.
@@ -566,6 +584,27 @@ LIVE produces one result record and a detailed trace per item. The evidence audi
 
 REPLAY verifies that frozen manifest before running. It uses the same prompts and generated responses and cannot silently retrieve new evidence. If an artifact is missing or changed, the run should fail rather than substitute a different search result. This provides a clear boundary between evidence acquisition and primary reporting.
 
+\section{LIVE, Audit, and REPLAY as an Evidence-Control Procedure}
+
+Figure~\ref{fig:live-replay} shows what changes and what remains fixed across the primary execution stages.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[node distance=8mm and 12mm, every node/.style={font=\small}]
+\node[flowwide] (inputs) {Frozen 360 prompt--response pairs\\Frozen code + config};
+\node[flowwide, below left=of inputs] (live) {LIVE\\semantic stages + Tavily retrieval\\write traces and snapshots};
+\node[flowwide, below right=of inputs] (audit) {Evidence audit\\check records + links\\hash evidence artifacts};
+\node[flowwide, below=22mm of inputs] (replay) {REPLAY\\same inputs + frozen evidence\\no live-search fallback};
+\draw[flowarrow] (inputs)--(live);
+\draw[flowarrow] (live)--(audit);
+\draw[flowarrow] (audit)--(replay);
+\node[boundary, fit=(live)(audit), label={[font=\small]left:Evidence acquisition and freeze}] {};
+\end{tikzpicture}
+\caption{LIVE--audit--REPLAY protocol. REPLAY fixes the evidence basis but does not imply bit-for-bit deterministic semantic-model outputs.}
+\label{fig:live-replay}
+\end{figure}
+
+The design separates two reproducibility problems. External web evidence can change over time, so it is snapshotted and hashed. Semantic model execution can also vary, even at temperature zero, so the thesis does not claim deterministic inference beyond the frozen configuration and stored artifacts.
 \section{Analysis Denominators}
 
 Different quantities require different denominators. Outcome percentages use the number of completed REPLAY records. A dimension's score distribution uses the number of responses where that dimension was applicable, not the entire dataset. Evidence sufficiency uses the number of retrievable targets with completed evidence memos. A corpus comparison uses the number of completed records within that corpus.
