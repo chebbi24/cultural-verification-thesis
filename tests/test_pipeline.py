@@ -991,7 +991,7 @@ def test_partial_abstention_suppresses_public_score_without_swallowing_labels():
     partial = (score(2), score("abstain", "D01"))
     assert aggregate(partial) == 1.0
     assert vericult_score(partial) is None
-    assert cultural_appropriateness(partial) == "partially_culturally_appropriate"
+    assert cultural_appropriateness(partial) == "insufficient_evidence"
 
     decisive_negative = (score(0), score("abstain", "D01"))
     assert vericult_score(decisive_negative) is None
@@ -1234,7 +1234,7 @@ def test_invalid_batch_and_single_scoring_still_fail_cleanly(setup):
 
 def test_no_dimensions_no_search(setup):
     config, _, retriever, _ = setup
-    llm = FixtureLLM(config, overrides={"dimension_planner_v1": {"dimensions": [], "reasoning": "None applicable"}})
+    llm = FixtureLLM(config, overrides={"cultural_applicability_v1": {"applicable": False, "reason": "No cultural dimension applies"}})
     result = CulturalVerifier(llm=llm, retriever=retriever, config=config).verify(PROMPT, RESPONSE)
     assert result.status == "completed" and result.candidate_abstained and result.applicable_count == 0
     assert result.cultural_appropriateness == "not_culturally_applicable"
