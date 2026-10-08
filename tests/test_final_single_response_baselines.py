@@ -105,9 +105,12 @@ def test_baseline_resume_requires_matching_freeze_protocol_and_hashes(tmp_path, 
     assert load_baseline_completed(output, "reward-model", "freeze-abc", "protocol-abc", rows) == {"PLT001"}
     assert load_baseline_completed(output, "reward-model", "freeze-other", "protocol-abc", rows) == set()
     assert load_baseline_completed(output, "reward-model", "freeze-abc", "protocol-other", rows) == set()
-    assert load_baseline_completed(
-        output, "reward-model", "freeze-abc", "protocol-abc", [{**row, "response_sha256": "changed"}]
-    ) == set()
+    assert (
+        load_baseline_completed(
+            output, "reward-model", "freeze-abc", "protocol-abc", [{**row, "response_sha256": "changed"}]
+        )
+        == set()
+    )
     output.write_text(output.read_text() + json.dumps({**record, "status": "failed"}) + "\n")
     assert load_baseline_completed(output, "reward-model", "freeze-abc", "protocol-abc", rows) == set()
 
