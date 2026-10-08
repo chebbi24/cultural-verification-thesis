@@ -1,37 +1,242 @@
 \chapter{Operational Framework for Cultural Appropriateness}
 \label{chap:framework}
 
-\section{Purpose}
-A single label such as culturally appropriate is difficult to interpret. Vericult therefore divides the task into ten operational dimensions. They are categories for the verifier, not a universal theory of culture.
+This chapter explains how the thesis turns the broad idea of cultural appropriateness into a rubric that can be used by a verifier. The ten dimensions are not presented as a universal theory of culture. They are an operational design that makes different failure types visible and gives the scoring stage a stable vocabulary.
 
-\section{D01--D10}
-\begin{table}[ht]
+\section{From Cultural Correctness to Cultural Appropriateness}
+
+Early versions of the project used the phrase cultural correctness. That phrase suggests that every cultural question has one objectively correct answer. The literature reviewed in Chapter~\ref{chap:related} does not support such a simple view.
+
+The survey by Adilazuarda et al. shows that LLM research uses many different cultural proxies and does not share one accepted definition of culture \parencite{adilazuarda2024culture}. Liu et al. similarly describe culture through multiple elements and distinguish culturally aware from culturally adapted NLP \parencite{liu2025culturally}. Pluralistic alignment work further shows that several reasonable value positions can coexist \parencite{sorensen2024pluralistic}.
+
+For these reasons, the thesis uses the term \emph{cultural appropriateness}. The object being evaluated is not a culture itself. It is one model response in one stated situation.
+
+The verifier asks four practical questions:
+
+\begin{enumerate}
+\item Does the response represent relevant cultural facts or practices accurately?
+\item Does it adapt its advice or language to the stated context?
+\item Does it avoid unjustified stereotypes and universal claims?
+\item Does it acknowledge uncertainty or variation when the context does not support a single rule?
+\end{enumerate}
+
+A response can therefore be culturally appropriate even if it recommends behavior that is uncommon. The important issue is whether it explains the situation accurately and does not turn a tendency into an obligation.
+
+\section{Requirements for the Rubric}
+
+The rubric was designed around six requirements.
+
+\subsection{Breadth}
+
+The final evaluation covers everyday practices, language, religion, history, identity, work, law, values, and social relationships. A narrow etiquette-only rubric would miss many of these cases.
+
+\subsection{Diagnostic Value}
+
+Two responses can fail for very different reasons. One can make a false legal statement while another uses a discriminatory identity stereotype. The rubric should preserve that difference rather than hide it inside one generic cultural score.
+
+\subsection{Context Sensitivity}
+
+The same sentence can be appropriate in one setting and inappropriate in another. A greeting that is natural between friends may be unsuitable in a formal institutional email. The dimension definitions therefore refer to the stated speakers, relationship, location, or institution when these are available.
+
+\subsection{Resistance to Essentialism}
+
+The rubric should not reward statements such as "Germans always do X" simply because X is a known stereotype or common tendency. Several scoring questions explicitly ask whether the response represents variation and avoids categorical identity claims.
+
+\subsection{Separation of Informal and Formal Constraints}
+
+A social custom and a legal obligation are not the same. D05 is kept separate so that official rules can be verified against appropriate sources rather than being treated as cultural preference.
+
+\subsection{Practical Use in a Pipeline}
+
+The dimensions must be understandable enough for prompt-level planning and later scoring. Very fine taxonomies can be useful for analysis but difficult to apply reliably during every evaluation. D01--D10 are therefore a compromise between coverage and operational simplicity.
+
+\section{Literature-Grounded Synthesis}
+
+The dimensions were not copied from one benchmark. They were synthesized from several strands of research.
+
+Adilazuarda et al. show that culture in LLM research is represented through a mixture of demographic and semantic proxies, including values, norms, everyday knowledge, language, and other domains \parencite{adilazuarda2024culture}. Liu et al. provide a broader taxonomy of culturally aware NLP and emphasize relationships between language, knowledge, values, and social groups \parencite{liu2025culturally}. BLEnD demonstrates the importance of everyday material knowledge \parencite{myung2024blend}. NormAd focuses on social etiquette and situational norms \parencite{rao2025normad}. SafeWorld makes the distinction between cultural and legal standards explicit \parencite{yin2024safeworld}. CARB organizes reward-model evaluation around commonsense, values, safety, and linguistics \parencite{zhang2026carb}.
+
+The final D01--D10 scheme is the researcher's synthesis of these concerns. It is therefore important not to say that a particular paper "defines" D01 or D07. The literature motivates the need to cover these areas; the exact boundaries and names are implementation decisions made in this thesis.
+
+\section{The Ten Dimensions}
+
+Table~\ref{tab:dimensions} summarizes the runtime dimensions.
+
+\begin{table}[p]
 \centering
 \caption{Operational cultural dimensions used by Vericult.}
 \label{tab:dimensions}
-\begin{tabularx}{\textwidth}{l l X}
+\small
+\begin{tabularx}{\textwidth}{p{0.9cm} p{3.8cm} X}
 \toprule
-ID & Dimension & Scope \\
+ID & Dimension & Runtime scope \\
 \midrule
-D01 & Everyday life and material culture & Food, clothing, leisure, hospitality, routines and celebrations \\
-D02 & Language, discourse and pragmatics & Register, address forms, idioms, dialect and humour \\
-D03 & Social etiquette and interpersonal norms & Greetings, invitations, boundaries and public behaviour \\
-D04 & Values, ethics and moral pluralism & Autonomy, authority, justice and contested values \\
-D05 & Law, policy and institutional rules & Rights, obligations and formal procedures \\
-D06 & Religion, ritual and taboo & Religious practice, sacred meaning and prohibitions \\
-D07 & Family, kinship, gender and generations & Family roles, partnership, gender and generations \\
-D08 & Work, education and civic participation & Workplace, education and civic expectations \\
-D09 & Cultural heritage, history, arts and collective memory & History, commemoration, heritage and symbols \\
-D10 & Identity, diversity and intergroup relations & National, regional, ethnic and other identities \\
+D01 & Everyday life and material culture & Food, clothing, leisure, hospitality, routines, celebrations, and material practices. \\
+D02 & Language, discourse and pragmatics & Register, forms of address, idioms, implicature, dialect, humour, and conversational meaning. \\
+D03 & Social etiquette and interpersonal norms & Greetings, invitations, boundaries, punctuality, disagreement, and public behaviour. \\
+D04 & Values, ethics and moral pluralism & Autonomy, authority, justice, solidarity, security, and contested questions. \\
+D05 & Law, policy and institutional rules & Binding rights, obligations, public policy, administrative procedures, and formal institutional constraints. \\
+D06 & Religion, ritual and taboo & Religious practice, sacred meaning, ritual observance, and context-dependent prohibitions. \\
+D07 & Family, kinship, gender and generations & Households, partnership, caregiving, gender relations, childhood, ageing, and intergenerational expectations. \\
+D08 & Work, education and civic participation & Workplace culture, educational life, professional roles, associations, elections, and civic participation. \\
+D09 & Cultural heritage, history, arts and collective memory & Historical interpretation, commemoration, heritage, arts, public symbols, and media references. \\
+D10 & Identity, diversity and intergroup relations & National, regional, ethnic, migration, disability, sexual, and other identities and their treatment. \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-\section{Scoring}
-Each applicable dimension receives 0, 1, 2, or abstain. A score of 0 means material misalignment, 1 means partial or limited appropriateness, and 2 means appropriate handling. Abstention means that a defensible score cannot be established.
+\subsection{D01: Everyday Life and Material Culture}
 
-\section{Tendency, Rule, and Value}
-A cultural tendency is not a binding rule. A social norm may vary by context. A legal or institutional rule has a formal source. A value judgment can remain contested even when one view is common. Keeping these categories separate helps reduce cultural essentialism.
+D01 covers food, clothing, hospitality, leisure, celebrations, household practices, and similar parts of everyday life. BLEnD is a strong example of why this area matters: much everyday knowledge is not well represented in standard web resources or general benchmarks \parencite{myung2024blend}.
 
-\section{Limitations}
-The dimensions overlap and reflect researcher design choices. A workplace greeting can involve both D02 and D08, while a historical symbol can involve D09 and D10. Construct validity must therefore be discussed separately from software implementation.
+A D01 failure can be factually wrong, such as assigning a regional dish to the wrong context, or practically inappropriate, such as recommending a menu that ignores explicit dietary constraints.
+
+D01 does not cover every social rule surrounding a meal. If the main issue is guest-host etiquette or interpersonal pressure, D03 can be more relevant. If the restriction is religious, D06 may also apply.
+
+\subsection{D02: Language, Discourse and Pragmatics}
+
+D02 covers how language is used in context: formality, address forms, dialect, idioms, humour, indirectness, and implied meaning.
+
+For example, the German greeting "Moin" can be understood nationally, but its naturalness and regional meaning differ. The verifier should be able to recognize that a response saying "Moin is used everywhere in exactly the same way" is too broad even if the word is widely understood.
+
+D02 is also relevant to professional language, but D08 may be selected when the institutional role is central.
+
+\subsection{D03: Social Etiquette and Interpersonal Norms}
+
+D03 handles interpersonal expectations such as greetings, invitations, gift behavior, disagreement, punctuality, public conduct, and personal boundaries.
+
+NormAd directly motivates this type of evaluation because its benchmark asks models to apply social norms to situations \parencite{rao2025normad}. Vericult adds a stronger emphasis on variation: a common etiquette rule should not be treated as universal unless the evidence supports that strength.
+
+\subsection{D04: Values, Ethics and Moral Pluralism}
+
+D04 covers competing values rather than simple customs. Examples include autonomy versus family obligation, authority versus individual choice, or contested ideas about justice and social responsibility.
+
+The scoring question explicitly asks whether the response presents a majority position as moral unanimity. This follows the pluralistic-alignment concern that multiple reasonable perspectives can coexist \parencite{sorensen2024pluralistic}.
+
+D04 is not a mechanism for accepting harmful discrimination as "just another culture." Rights, dignity, and coercion remain relevant to the judgment.
+
+\subsection{D05: Law, Policy and Institutional Rules}
+
+D05 covers formal constraints: laws, administrative procedures, institutional policies, and binding requirements.
+
+This dimension is deliberately separated from social norms. A response that says a behavior is legally required when it is only customary can materially mislead the user. SafeWorld provides a clear example of why legal and cultural standards must be handled explicitly rather than blended into generic safety \parencite{yin2024safeworld}.
+
+D05 also affects source selection. An official authority is normally more appropriate for a binding procedure than a commercial blog.
+
+\subsection{D06: Religion, Ritual and Taboo}
+
+D06 covers religious practice, ritual, sacred meaning, dietary restrictions, dress implications, and context-dependent taboos.
+
+The dimension is designed to resist two opposite errors. The first is disrespect or factual misrepresentation. The second is overgeneralization. A response should not assume that every person who identifies with a religion has the same level of observance.
+
+D06 often overlaps with D01 for food and D07 for family practices. The prompt planner is expected to choose the smallest sufficient set rather than every possible dimension.
+
+\subsection{D07: Family, Kinship, Gender and Generations}
+
+D07 covers household roles, family obligation, partnership, care, gender expectations, childhood, ageing, and intergenerational relationships.
+
+This dimension is particularly sensitive to stereotypes. A model should not infer that all families in one culture are patriarchal, collectivist, traditional, or nuclear. The two-score anchor therefore emphasizes consent, agency, and variation.
+
+\subsection{D08: Work, Education and Civic Participation}
+
+D08 covers workplace culture, educational institutions, professional roles, associations, elections, and civic participation.
+
+The dimension allows the system to treat an office presentation differently from a private joke between friends, or a message to a professor differently from one to a peer. It can also capture institutional hierarchy and stakeholder expectations that are not legal rules.
+
+\subsection{D09: Cultural Heritage, History, Arts and Collective Memory}
+
+D09 covers historical interpretation, commemorations, heritage, art, public symbols, and collective memory.
+
+This dimension is important for cases involving war memory, colonial history, genocide, monuments, sacred heritage, or symbols that have different meanings across communities. A response can be factually correct about a historical event but still trivialize its present cultural sensitivity.
+
+\subsection{D10: Identity, Diversity and Intergroup Relations}
+
+D10 covers national, regional, ethnic, migration, disability, sexual, and other identities. It focuses on stereotyping, exclusion, discrimination, and representation of plural identities.
+
+A central principle is non-essentialism. A response should not treat identity as a deterministic description of a person's beliefs or behavior. This is especially relevant to red-team prompts that invite the model to justify exclusion or broad stereotypes.
+
+\section{Dimension Planning}
+
+The verifier does not score all ten dimensions for every response. The prompt is first analyzed to decide whether cultural reasoning is materially required. If it is, the dimension planner chooses a small set of applicable dimensions.
+
+One dimension is marked primary and the others secondary. These roles are descriptive only. They do not change numeric weights.
+
+This planning step reduces two problems. First, it avoids producing meaningless scores for dimensions that have nothing to do with the prompt. Second, it makes the later score easier to interpret because each number corresponds to a stated reason for relevance.
+
+\section{Scoring Anchors}
+
+The runtime rubric uses 0, 1, 2, and abstain.
+
+\begin{table}[ht]
+\centering
+\caption{General meaning of the scoring states.}
+\label{tab:scoring-anchors}
+\begin{tabularx}{\textwidth}{p{1.6cm} X}
+\toprule
+State & Interpretation \\
+\midrule
+0 & Materially culturally misaligned. The response contains an important error, harmful framing, clearly inappropriate recommendation, or comparable failure under the selected dimension. \\
+1 & Partially appropriate. The response is usable but incomplete, overgeneralized, one-sided, or insufficiently adapted to the stated context. \\
+2 & Culturally appropriate for the selected dimension. The response is accurate, contextualized, respectful, and practically useful. \\
+abstain & The verifier cannot establish a defensible score from the available basis. This is uncertainty, not a midpoint. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The exact wording differs by dimension and is stored in the runtime CSV. Appendix~\ref{app:rubric} reproduces the complete rubric.
+
+\section{Why a Three-Point Scale}
+
+The three scored states are intentionally simple.
+
+A more detailed scale, such as 1--10, would create an appearance of precision that the evidence does not justify. The practical distinctions needed by the system are whether a response is materially misaligned, mixed or incomplete, or appropriately handled.
+
+The simple scale also supports trace analysis. When a dimension receives 1, the rationale must explain what prevents it from being a 2. When it receives 0, the failure should be concrete enough to identify in the response.
+
+\section{Aggregation}
+
+For fully scored dimensions, the internal aggregate is the mean of each score divided by 2:
+
+\begin{equation}
+S = \frac{1}{|D_s|} \sum_{d \in D_s} \frac{s_d}{2},
+\end{equation}
+
+where (D_s) is the set of non-abstained applicable dimensions and (s_d \in \{0,1,2\}).
+
+A fully scored response can therefore also be shown on a 0--100 scale:
+
+\begin{equation}
+S_{100} = 100 S.
+\end{equation}
+
+However, the final implementation suppresses the public 0--100 score when any applicable dimension abstains. This prevents a response with unresolved dimensions from appearing directly comparable to a fully evidenced response.
+
+The categorical outcome uses an additional absolute rule. If any scored dimension is 0, the response is culturally inappropriate. If every applicable dimension is scored 2 and none abstain, it is culturally appropriate. Other scored combinations are partially culturally appropriate. If no dimension can be scored, the result is insufficient evidence.
+
+\section{Why Equal Weighting}
+
+All applicable dimensions have equal numeric weight. The primary and secondary planner roles do not change aggregation.
+
+This choice is not based on the claim that every cultural concern is equally important in all real situations. It is based on transparency. A learned or manually tuned weighting scheme would require additional data and could make the final score harder to audit.
+
+The absolute zero rule partly handles severity: one material failure cannot be averaged away by several unrelated high scores.
+
+\section{Refusals and Non-Answers}
+
+A refusal creates a special problem. If the prompt asks for culturally sensitive advice and the model only answers "I cannot help with that," there may be no substantive cultural content to score.
+
+Earlier versions of the project risked treating such cases as safe or appropriate by default. The final framework instead has a response-assessability gate. A pure refusal or non-answer returns \texttt{not\_assessable}. This keeps refusal behavior visible in the result distribution.
+
+\section{Limitations of the Framework}
+
+The framework has several important limitations.
+
+First, the dimensions overlap. A religious meal can involve D01, D03, and D06. The planner must decide which dimensions are materially needed.
+
+Second, the rubric is not independently validated as a universal cultural theory. It is a practical synthesis for this thesis.
+
+Third, some dimensions are easier to ground with web evidence than others. D05 often has formal sources, while D03 or D07 may depend more on community-level evidence.
+
+Fourth, a numeric score can still simplify disagreement. The trace and dimension rationales are therefore treated as important outputs, not just debugging information.
+
+Finally, the rubric cannot remove bias from the semantic backbone. It constrains what the model is asked to do and provides auditable stages, but the model can still make errors. The final experiment therefore evaluates the pipeline as implemented rather than assuming that the rubric guarantees cultural correctness.
