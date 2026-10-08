@@ -111,3 +111,46 @@ def test_semantic_session_fails_closed_after_invalid_retry():
             "dimension_planner_v1", {}, DimensionPlan,
             lambda plan: (_ for _ in ()).throw(ValueError("empty dimensions")) if not plan.dimensions else None,
         )
+
+
+def test_timeout_retries_then_succeeds_without_semantic_repair():
+    import requests
+    from cultverify.config import Config
+    config = Config(verifier_model_id="test", retry_count=1, transport_retry_count=1)
+    llm = ScriptedLLM(config, [
+        requests.Timeout("simulated provider timeout"),
+        '{"dimensions":[{"dimension_id":"D02","role":"primary","reason":"Relevant"}],"reasoning":"Material"}',
+    ])
+    original_complete = llm.complete
+
+    def complete(**kwargs):
+        outcome = next(llm.sequence)
+        llm.calls += 1
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+    llm.complete = complete
+    session = SemanticSession(llm, config)
+    result = session.call("dimension_planner_v1", {}, DimensionPlan)
+    assert result.dimensions[0].dimension_id == "D02"
+    assert llm.calls == 2
+    assert session.calls[0].error == "Timeout"
+
+
+def test_exhausted_transport_timeouts_remain_technical_failures():
+    import requests
+    from cultverify.config import Config
+    config = Config(verifier_model_id="test", transport_retry_count=1)
+    llm = ScriptedLLM(config, [requests.Timeout("simulated")] * 2)
+
+    def complete(**kwargs):
+        llm.calls += 1
+        raise next(llm.sequence)
+
+    llm.complete = complete
+    session = SemanticSession(llm, config)
+    with pytest.raises(StageError, match="dimension_planner_v1: transport Timeout"):
+        session.call("dimension_planner_v1", {}, DimensionPlan)
+    assert len(session.calls) == 2
+    assert all(call.error == "Timeout" for call in session.calls)
