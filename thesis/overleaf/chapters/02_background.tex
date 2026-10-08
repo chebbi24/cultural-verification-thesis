@@ -1,0 +1,20 @@
+\chapter{Background and Foundations}
+\label{chap:background}
+
+\section{Large Language Models and Alignment}
+Large language models generate text from patterns learned during training. Modern systems are commonly post-trained so their outputs better follow user instructions and human preferences. Reinforcement learning from human feedback is one established approach \parencite{ouyang2022training}. This thesis does not reproduce model training; it evaluates already generated responses.
+
+\section{Reward Models}
+A reward model receives a prompt and response and produces a preference-related score. Reward models are useful for ranking responses, but their scalar output does not itself provide source-grounded evidence for a cultural claim. In this thesis, the reward model is an independent comparison system rather than a component of Vericult.
+
+\section{LLM-as-a-Judge}
+A direct LLM judge receives evaluation instructions together with the response to be judged. This approach is flexible and can produce explanations, but previous studies have shown sensitivity to presentation order and other evaluator effects \parencite{zheng2023judging,wang2024fair}. The direct judge is therefore treated as a separately frozen baseline.
+
+\section{Cultural Appropriateness}
+This thesis uses cultural appropriateness to mean how well a response handles the cultural concerns relevant to the explicit situation. A common tendency is not automatically a universal rule, a legal requirement is different from social etiquette, and a contested value question may have several defensible answers. Cultural-NLP research also cautions against treating countries or languages as homogeneous cultural units \parencite{adilazuarda2024culture,liu2025culturally}.
+
+\section{Evidence-Grounded Evaluation}
+Retrieval-augmented generation uses external documents to inform model outputs \parencite{lewis2020rag}. Vericult uses retrieval differently: the response already exists and selected claims or recommendations are checked against external evidence. Missing evidence is not treated as proof that a claim is false.
+
+\section{Reproducibility}
+Online search results can change. Vericult therefore separates LIVE retrieval from REPLAY evaluation. LIVE collects and stores evidence, while REPLAY uses the stored evidence without live fallback. This freezes the evidence basis, not every semantic model output.
