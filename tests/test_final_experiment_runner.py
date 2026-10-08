@@ -221,8 +221,16 @@ def test_execution_identity_changes_with_freeze_revision():
 
 
 def test_final_provider_cannot_be_overridden_by_environment():
-    manifest = {"vericult": {"provider": "l3s", "backbone": "model-a", "api_endpoint": "https://server.test/v1/chat/completions"}}
-    frozen = Config(verifier_model_provider="l3s", verifier_model_id="model-a", l3s_api_url=manifest["vericult"]["api_endpoint"])
+    manifest = {
+        "vericult": {
+            "provider": "l3s",
+            "backbone": "model-a",
+            "api_endpoint": "https://server.test/v1/chat/completions",
+        }
+    }
+    frozen = Config(
+        verifier_model_provider="l3s", verifier_model_id="model-a", l3s_api_url=manifest["vericult"]["api_endpoint"]
+    )
     validate_frozen_model(frozen, manifest)
     with pytest.raises(RuntimeError, match="model differs"):
         validate_frozen_model(frozen.model_copy(update={"verifier_model_id": "model-b"}), manifest)
@@ -268,13 +276,15 @@ def test_resume_rejects_stale_or_missing_trace(tmp_path):
     }
     trace_path = tmp_path / "trace.json"
     trace_path.write_text(
-        json.dumps({
-            "run_id": "run-1",
-            "mode": "LIVE",
-            "prompt_hash": digest(row["prompt"]),
-            "response_hash": digest(row["response"]),
-            "result": {"status": "completed"},
-        }),
+        json.dumps(
+            {
+                "run_id": "run-1",
+                "mode": "LIVE",
+                "prompt_hash": digest(row["prompt"]),
+                "response_hash": digest(row["response"]),
+                "result": {"status": "completed"},
+            }
+        ),
         encoding="utf-8",
     )
     output = tmp_path / "results.jsonl"
@@ -348,35 +358,48 @@ def test_evidence_audit_uses_actual_semantic_hash_key_and_execution_identity(tmp
                 item_id = row["item_id"]
                 trace_path = tmp_path / f"{item_id}.json"
                 trace_path.write_text(
-                    json.dumps({
-                        "mode": "LIVE",
-                        "run_id": item_id,
-                        "prompt_hash": digest(row["prompt"]),
-                        "response_hash": digest(row["response"]),
-                        "result": {"trace_path": str(trace_path.resolve()), "evidence": []},
-                    }),
+                    json.dumps(
+                        {
+                            "mode": "LIVE",
+                            "run_id": item_id,
+                            "prompt_hash": digest(row["prompt"]),
+                            "response_hash": digest(row["response"]),
+                            "result": {"trace_path": str(trace_path.resolve()), "evidence": []},
+                        }
+                    ),
                     encoding="utf-8",
                 )
-                records.append({
-                    "mode": "LIVE",
-                    "status": "completed",
-                    "item_id": item_id,
-                    "execution_id": eid,
-                    "run_id": item_id,
-                    "trace_path": str(trace_path.resolve()),
-                    "prompt_sha256": row["prompt_sha256"],
-                    "response_sha256": row["response_sha256"],
-                })
+                records.append(
+                    {
+                        "mode": "LIVE",
+                        "status": "completed",
+                        "item_id": item_id,
+                        "execution_id": eid,
+                        "run_id": item_id,
+                        "trace_path": str(trace_path.resolve()),
+                        "prompt_sha256": row["prompt_sha256"],
+                        "response_sha256": row["response_sha256"],
+                    }
+                )
 
     live_path = tmp_path / "live.jsonl"
     live_path.write_text("".join(json.dumps(record) + "\n" for record in records), encoding="utf-8")
     output = tmp_path / "evidence_manifest.json"
-    assert audit_evidence_main([
-        "--manifest", str(manifest_path),
-        "--live-output", str(live_path),
-        "--evidence-dir", str(tmp_path / "no-evidence-required"),
-        "--output", str(output),
-    ]) == 0
+    assert (
+        audit_evidence_main(
+            [
+                "--manifest",
+                str(manifest_path),
+                "--live-output",
+                str(live_path),
+                "--evidence-dir",
+                str(tmp_path / "no-evidence-required"),
+                "--output",
+                str(output),
+            ]
+        )
+        == 0
+    )
     audit = json.loads(output.read_text())
     assert audit["execution_id"] == eid
     assert audit["n_items"] == 6
