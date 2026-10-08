@@ -2,9 +2,9 @@
 
 ## Authoritative semantic revision
 
-- Freeze code commit: `024d6433fb38e589618e0a1abf8c7696b3a36c2c`
-- GitHub Actions "Verifier tests": run `37714423989`, **success**
-- Python 3.12: **166 tests passed, 1 skipped**
+- Freeze code commit: `d9f63f195d0d79c1fc884567c16225b3f048a977`
+- GitHub Actions "Verifier tests": run `37714526309`, **success**
+- Python 3.12: **168 tests passed, 1 skipped**
 - Compile, Ruff lint and Ruff format: **passed**
 - Manifest: `experiments/final_manifest.json`; config:
   `experiments/final_vericult_config.json`
@@ -57,6 +57,8 @@ raw scalar reward scores, while a no-retrieval direct L3S/Qwen judge returns
 one of the six final labels. Neither baseline touches Vericult or loads
 human labels. The adapters have deterministic mocked tests but **have not
 been exercised with the live L3S inference endpoint or a local Skywork GPU**.
+The final CI also executes all four supported runner entrypoints with `--help`
+and verifies the actual checked-in 360-row corpus hashes, not just test fixtures.
 
 ## Required local steps before official LIVE
 
