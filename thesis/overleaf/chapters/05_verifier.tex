@@ -764,6 +764,27 @@ The blind boundary begins after neutral questions have been generated. The retri
 
 This design does not guarantee neutrality. A poorly phrased question could still carry the target's assumptions into search. The question stage is therefore itself a possible source of bias and is included in the trace review.
 
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[node distance=5mm, every node/.style={font=\small}]
+\node[flowwide] (response) {Response visible};
+\node[flowwide, below=of response] (target) {Target selection};
+\node[flowwide, below=of target] (question) {Neutral question generation};
+\node[flowwide, below=8mm of question] (retrieval) {Query rewriting + retrieval};
+\node[flowwide, below=of retrieval] (memo) {Evidence memo};
+\node[flowwide, below=of memo] (freeze) {Memo frozen};
+\node[flowwide, below=8mm of freeze] (compare) {Response target reintroduced\\Target comparison};
+\draw[flowarrow] (response)--(target);
+\draw[flowarrow] (target)--(question);
+\draw[flowarrow] (question)--(retrieval);
+\draw[flowarrow] (retrieval)--(memo);
+\draw[flowarrow] (memo)--(freeze);
+\draw[flowarrow] (freeze)--(compare);
+\node[boundary, fit=(retrieval)(memo)(freeze), label={[font=\small]right:Candidate-blind evidence stage}] {};
+\end{tikzpicture}
+\caption{Exact candidate-blindness boundary in Vericult. The target is visible while questions are formed; blindness begins for retrieval and memo construction and ends after the memo is frozen.}
+\label{fig:blind-boundary}
+\end{figure}
 \section{Evidence Quality Is Not the Same as Source Count}
 
 A search result count is not a reliability measure. Several web pages can repeat the same unsupported claim, and a single official document can be highly relevant to a narrow legal question. Conversely, an official statement may accurately describe a government's position while providing incomplete evidence about the experiences of a minority community.
