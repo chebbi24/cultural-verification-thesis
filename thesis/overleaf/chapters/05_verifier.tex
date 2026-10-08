@@ -1,78 +1,615 @@
 \chapter{The Proposed Vericult Verifier}
 \label{chap:verifier}
 
-\section{Design Objectives}
-Vericult is a standalone post-hoc evaluator. Human labels, reward-model scores, expected issues, and benchmark answers are not passed into the verifier. The system should use external evidence only where appropriate, preserve uncertainty, and leave enough trace information to inspect the final decision.
+This chapter describes the final Vericult implementation used in the thesis experiment. The code is frozen before the final 360-item run. The purpose of this chapter is not to document every Python function. Instead, it explains the scientific reason for each stage and shows the implementation mechanisms that enforce the intended boundaries.
 
-\section{Overall Pipeline}
+\section{Design Objectives}
+
+The final verifier was built around eight design objectives.
+
+\begin{enumerate}
+\item \textbf{Standalone evaluation.} The verifier receives only a prompt and one generated response. It does not need hidden states or training information from the generator.
+\item \textbf{No human-label leakage.} Human annotations, expected issues, and benchmark answers are excluded from runtime inference.
+\item \textbf{No reward-model leakage.} Reward-model scores are used only in the independent baseline.
+\item \textbf{Explicit context.} The verifier should not infer missing demographic facts from names or stereotypes.
+\item \textbf{Selective evidence.} Externally checkable claims should use retrieval; value statements and response-internal qualities should not be forced into search.
+\item \textbf{Bounded retrieval.} Search opportunity is limited so that one target cannot receive unlimited evidence gathering.
+\item \textbf{Abstention.} Missing evidence should remain visible instead of being converted into a confident midpoint score.
+\item \textbf{Auditability and replay.} The trace should preserve enough information to reconstruct how the final decision was reached, and web evidence should be frozen for later replay.
+\end{enumerate}
+
+\section{Final Semantic Backbone}
+
+All semantic stages in the final experiment use one configured backbone:
+
+\begin{center}
+\texttt{vllm/qwen3.6:35b-a3b-fp8}
+\end{center}
+
+The provider is the L3S OpenAI-compatible endpoint. Temperature is fixed to 0. There is no model fallback in the final configuration.
+
+The use of one backbone is important for interpretability. If context extraction used one model, target selection another, and scoring a third, errors would be harder to attribute. It would also introduce additional model-selection decisions. The final architecture therefore uses one semantic backbone while keeping retrieval as a separate external component.
+
+The generator is different from the verifier. Responses are produced in advance by \texttt{gpt-oss:120b-mxfp4}. This separation follows the supervisor's requirement that the verifier should not simply be the same model evaluating its own output source.
+
+\section{Overall Architecture}
+
+Figure~\ref{fig:pipeline} gives the simplified pipeline.
+
 \begin{figure}[ht]
 \centering
-\fbox{\parbox{0.93\textwidth}{\centering
-Prompt + Response \\
-\(\downarrow\) \\
-Context extraction and cultural-applicability gate \\
-\(\downarrow\) \\
+\fbox{\parbox{0.92\textwidth}{\centering
+Prompt + fixed response \\
+\(downarrow\) \\
+Prompt context extraction \\
+\(downarrow\) \\
+Cultural-applicability gate \\
+\(downarrow\) \\
 D01--D10 planning \\
-\(\downarrow\) \\
-Response assessability and material targets \\
-\(\downarrow\) \\
-Neutral verification questions \\
-\(\downarrow\) \\
-Candidate-blind retrieval, filtering, source classification and evidence memo \\
-\(\downarrow\) \\
-Optional follow-up and evidence freeze \\
-\(\downarrow\) \\
+\(downarrow\) \\
+Response-assessability gate \\
+\(downarrow\) \\
+Material target extraction \\
+\(downarrow\) \\
+Two neutral questions per retrievable target \\
+\(downarrow\) \\
+Candidate-blind query rewriting and retrieval \\
+\(downarrow\) \\
+Source classification and evidence memo \\
+\(downarrow\) \\
+At most one gap-specific follow-up \\
+\(downarrow\) \\
+Frozen evidence memo \\
+\(downarrow\) \\
 Target comparison \\
-\(\downarrow\) \\
-Dimension scoring, outcome and structured trace}}
-\caption{Simplified Vericult pipeline.}
+\(downarrow\) \\
+D01--D10 scoring and final outcome \\
+\(downarrow\) \\
+Structured trace
+}}
+\caption{Final single-response Vericult pipeline.}
 \label{fig:pipeline}
 \end{figure}
 
-\section{Context Extraction}
-The first semantic stage reads only the prompt and extracts explicitly stated context such as setting, participants, relationships, location, time, constraints, and user goal. Non-empty values require exact prompt spans. This prevents the verifier from inferring attributes such as religion or nationality from names.
+The architecture separates three kinds of work.
 
-\section{Cultural Applicability and Dimension Planning}
-The system first checks whether culturally situated reasoning is needed. A culture-related word alone is not sufficient. If the task is applicable, the planner chooses the smallest relevant set of D01--D10 dimensions. A primary label marks relevance, not higher weight.
+The first is \emph{planning}: what context and dimensions matter?
+
+The second is \emph{evidence construction}: what can be documented independently of the candidate?
+
+The third is \emph{judgment}: how does the actual response compare with the frozen evidence and the rubric?
+
+\section{Prompt Context Extraction}
+
+The first semantic stage receives the prompt only. It extracts a structured \texttt{ContextFrame} containing:
+
+\begin{itemize}
+\item setting;
+\item participants;
+\item relationships;
+\item explicit location;
+\item temporal context;
+\item explicit constraints;
+\item user goal.
+\end{itemize}
+
+Every non-empty extracted fact must be connected to an exact prompt span. The verifier is explicitly instructed not to infer religion, nationality, ethnicity, preferences, or location from a name.
+
+This stage exists because many cultural errors come from unsupported context assumptions. If a user says "my colleague Ahmed," the verifier cannot assume that the colleague is Muslim. If the user says "my Muslim colleague who is fasting during Ramadan," the religious context is explicit and can be used.
+
+The implementation also has a conservative structural fallback. If context extraction itself fails validation, an empty context frame is used instead of carrying unsupported facts forward.
+
+The core planning code is short:
+
+\begin{lstlisting}[language=Python,caption={Prompt context and applicability planning from src/cultverify/planner.py.}]
+context = session.call(
+    "context_planner_v1",
+    {"prompt": prompt},
+    ContextFrame,
+    lambda c: validate_context(c, prompt),
+)
+
+applicability = session.call(
+    "cultural_applicability_v1",
+    {"prompt": prompt,
+     "context": context.model_dump(mode="json")},
+    CulturalApplicability,
+)
+
+if not applicability.applicable:
+    return context, DimensionPlan(
+        dimensions=(),
+        reasoning=applicability.reason,
+    )
+\end{lstlisting}
+
+\section{Cultural-Applicability Gate}
+
+Not every prompt that mentions a place or group requires cultural evaluation. A prompt such as "What is the population of Japan?" contains a country but is primarily a factual question. Running the complete cultural pipeline on such cases would add noise.
+
+The applicability gate therefore asks whether culturally situated reasoning is materially required. If the answer is no, the final outcome is \texttt{not\_culturally\_applicable} and D01--D10 scoring is skipped.
+
+This distinction became important during development. Earlier versions could spend retrieval and scoring calls on prompts whose cultural context was incidental.
+
+\section{Prompt-Level Dimension Planning}
+
+If the prompt is culturally applicable, the same prompt context and runtime rubric are used to choose the smallest sufficient D01--D10 set.
+
+Exactly one dimension is marked primary when at least one dimension is selected. Additional dimensions can be secondary. The role indicates relevance only; primary dimensions do not receive a larger score weight.
+
+In the old Best-of-4 development design, prompt-level planning was shared across candidates. In the final single-response design, there is only one candidate, but the architectural separation remains useful because the dimension plan is created before target-specific evidence work.
 
 \section{Response Assessability}
-For culturally applicable prompts, a pure refusal or empty non-answer returns \texttt{not\_assessable}. This avoids treating a refusal as a culturally correct substantive answer.
 
-\section{Material Targets}
-The response is divided into deterministic spans. Up to three decision-relevant targets are selected and classified as external fact, descriptive cultural norm, context-dependent recommendation, response-internal quality, or non-verifiable value statement. Only externally checkable categories are routed to retrieval.
+A culturally applicable prompt can receive a response that contains no substantive answer. This happens often in red-team prompts because aligned generators may refuse.
+
+The final verifier therefore has a separate response-assessability gate. It receives the prompt, response, context, and planned dimension IDs. If there is no substantive content to evaluate, the final outcome becomes \texttt{not\_assessable}.
+
+This is not the same as \texttt{culturally\_appropriate}. A refusal may avoid a harmful statement, but it does not demonstrate that the model can answer the cultural question appropriately.
+
+This distinction is also useful in analysis because refusal behavior can then be reported by corpus.
+
+\section{Deterministic Response Spans}
+
+The material-target stage must quote the response exactly. Asking a generative model to reproduce a long exact quotation can fail for trivial formatting reasons. The implementation therefore gives ownership of the text to Python.
+
+The response is split into deterministic sentence-like spans. The semantic model selects only span IDs.
+
+\begin{lstlisting}[language=Python,caption={Deterministic response spans from src/cultverify/targets.py.}]
+def response_spans(response):
+    spans = []
+    for line in response.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        pieces = tuple(
+            piece.strip()
+            for piece in _SENTENCE_BOUNDARY.split(line)
+            if piece.strip()
+        )
+        for piece in pieces or (line,):
+            spans.append({
+                "span_id": f"S{len(spans) + 1:03d}",
+                "text": piece,
+            })
+    if response and not spans:
+        spans.append({"span_id": "S001", "text": response})
+    return tuple(spans)
+\end{lstlisting}
+
+The selected span ID is then mapped back to the original text. This means the LLM decides \emph{which} span matters, while Python guarantees that the stored quotation is actually present in the response.
+
+\section{Material Target Extraction}
+
+A long response can contain dozens of factual statements. Verifying every sentence would make the method expensive and would dilute attention away from the claims that affect the cultural judgment.
+
+The target extractor is therefore limited to at most three material targets. A target must be decision-relevant to one of the planned dimensions.
+
+Each target receives an epistemic type:
+
+\begin{itemize}
+\item \texttt{external\_fact};
+\item \texttt{descriptive\_cultural\_norm};
+\item \texttt{context\_dependent\_recommendation};
+\item \texttt{response\_internal\_quality};
+\item \texttt{non\_verifiable\_value\_statement}.
+\end{itemize}
+
+Only the first three types enter external retrieval.
+
+The routing decision is enforced in Python:
+
+\begin{lstlisting}[language=Python,caption={Deterministic retrieval routing from src/cultverify/targets.py.}]
+retrieval_appropriate = target.epistemic_type in {
+    EpistemicType.EXTERNAL,
+    EpistemicType.NORM,
+    EpistemicType.RECOMMENDATION,
+}
+\end{lstlisting}
+
+This is an important boundary. The model cannot decide that an external factual claim should skip retrieval simply because it feels confident.
 
 \section{Neutral Verification Questions}
-Each retrievable target receives two initial questions: a baseline/descriptive question and a scope/variation question. The target is visible during question generation. Candidate blindness therefore begins after the questions are generated.
 
-\section{Retrieval and Source Handling}
-LIVE uses Tavily. Queries are generated from the neutral questions and prompt context. Results are filtered for duplicates and configured exclusions before evidence synthesis. Sources are classified by provenance category, but this classification is not treated as a universal quality score.
+For every retrieval-appropriate target, Vericult generates exactly two initial questions.
 
-\section{Evidence Memo and Follow-Up}
-The evidence memo records the answer supported by retrieved documents, relevant scope and variation, and evidence sufficiency. Factual memo statements must be grounded in exact quotations. If evidence remains conflicting or insufficient, one gap-specific follow-up question can be searched. The process then stops.
+The first is a baseline or descriptive question. It asks what is documented about the relevant fact, practice, or recommendation.
 
-\section{Evidence Freeze and Target Comparison}
-After evidence gathering, the memo is frozen before the response target is reintroduced. Comparison can return supported, contradicted, mixed, or insufficient. Missing evidence is not contradiction.
+The second is a scope or variation question. It asks how the issue varies across region, group, generation, institution, or other relevant context.
 
-\section{Dimension Scoring and Outcomes}
-The scorer applies the rubric to the prompt, response, structured target verdicts, and frozen support quotations. Single-response outcomes include \texttt{not\_culturally\_applicable}, \texttt{not\_assessable}, \texttt{insufficient\_evidence}, \texttt{culturally\_inappropriate}, \texttt{partially\_culturally\_appropriate}, and \texttt{culturally\_appropriate}.
+The questions must be neutral. They should not ask "Why is this claim wrong?" or "Find evidence supporting this advice." They should ask what is documented.
 
-\section{LIVE and REPLAY}
-LIVE performs search and stores evidence. An audit checks and freezes the required evidence artifacts. REPLAY uses those snapshots without live-search fallback. The thesis reports REPLAY as the primary Vericult result.
+The target itself is visible to this stage. Complete end-to-end blindness is therefore not claimed. The candidate-blind boundary starts after question generation.
 
-\section{Implementation Examples}
-\begin{lstlisting}[language=Python,caption={Single-response verification call.}]
+The function explicitly exports only question objects:
+
+\begin{lstlisting}[language=Python,caption={Question construction from src/cultverify/targets.py.}]
+pair = session.call(
+    "verification_question_v1",
+    {
+        "target": {
+            "response_quote": target.response_quote,
+            "epistemic_type": target.epistemic_type,
+            "dimension_ids": target.dimension_ids,
+        },
+        "context": context.model_dump(mode="json"),
+    },
+    InitialQuestions,
+)
+
+# No target ID, response, verdict, candidate position,
+# or enclosing result is exported.
+\end{lstlisting}
+
+\section{Candidate-Blind Evidence Engine}
+
+After the questions are produced, evidence construction is handled by \texttt{BlindEvidenceEngine}.
+
+Its public interface accepts only:
+
+\begin{itemize}
+\item a tuple containing the two verification questions;
+\item the prompt-derived \texttt{ContextFrame}.
+\end{itemize}
+
+It does not accept the response, the material target, the candidate ID, a score, or an expected verdict.
+
+The implementation checks exact object types to reject lookalike containers that could carry extra fields:
+
+\begin{lstlisting}[language=Python,caption={Blind evidence boundary from src/cultverify/evidence.py.}]
+def evaluate(
+    self,
+    questions: tuple[
+        VerificationQuestion,
+        VerificationQuestion,
+    ],
+    context: ContextFrame,
+) -> EvidenceBundle:
+    require(type(context) is ContextFrame,
+            "Exact context schema required")
+    require(
+        type(questions) is tuple
+        and len(questions) == 2
+        and all(type(q) is VerificationQuestion
+                for q in questions),
+        "Exact neutral-question schemas required",
+    )
+\end{lstlisting}
+
+This does not make the evidence objectively unbiased. Search engines and source availability have their own biases. The design only enforces a structural rule: after neutral questions have been formed, evidence synthesis cannot directly inspect the candidate response.
+
+\section{Query Rewriting}
+
+Each neutral question is rewritten into one search query using the explicit context. The query rewriter is not allowed to add a verdict.
+
+The code also contains a deterministic safety check for pathological rewrites that collapse to one isolated context fact. If this occurs, the original neutral question can be retained instead.
+
+The purpose is practical: natural-language verification questions are not always effective search queries, but query optimization should not transform a neutral question into a confirmation query.
+
+\section{LIVE Retrieval}
+
+The final LIVE run uses Tavily with advanced search depth. The frozen configuration accepts the top three documents per query after filtering.
+
+The retrieval timeout is 45 seconds. Search itself is external to the semantic backbone.
+
+For each search result, the snapshot stores enough information to identify the query and documents. These snapshots later become the fixed input to REPLAY.
+
+\section{Leakage and Contamination Filtering}
+
+The final experiment uses prompts derived partly from public datasets. The verifier should not retrieve the benchmark item, released answer, or thesis repository as evidence.
+
+The frozen configuration excludes:
+
+\begin{itemize}
+\item \texttt{huggingface.co};
+\item the thesis repository \texttt{chebbi24/cultural-verification-thesis};
+\item \texttt{UpstageAI/ThaiCLI\_H6};
+\item annotation and result paths matching configured exclusion patterns.
+\end{itemize}
+
+The External120 benchmark hosting locations are therefore blocked from evidence synthesis.
+
+Redteam120 follows a different policy. Its source documents are public real-world evidence sources used to ground newly written red-team prompts. They are not answer repositories. Those domains remain eligible unless caught by a general exclusion rule.
+
+\section{Source Classification}
+
+Retrieved documents are classified into source types such as official/legal, academic, statistical/survey, institutional/professional, community, general explanatory, commercial/lifestyle, or unknown.
+
+The source class is not a numeric truth score. Its purpose is to help the evidence memo reason about source suitability.
+
+For example:
+
+\begin{itemize}
+\item a binding visa rule should preferably use an official government source;
+\item a dialect claim may need linguistic research or strong language references;
+\item lived social practices may require community or empirical evidence;
+\item a commercial travel blog alone should not establish a high-confidence universal cultural norm.
+\end{itemize}
+
+The implementation also downgrades unsupported strong classifications. A Wikipedia page, for example, cannot be relabeled as an official primary source simply because the model describes it that way.
+
+\section{Evidence Memo}
+
+The evidence memo is the main output of the blind evidence stage.
+
+It contains:
+
+\begin{itemize}
+\item a concise answer to the verification questions;
+\item the scope of the evidence;
+\item documented variation;
+\item agreement or disagreement across sources;
+\item sufficiency: \texttt{sufficient}, \texttt{conflicting}, or \texttt{insufficient};
+\item confidence: low, medium, or high;
+\item evidence statements with exact document support.
+\end{itemize}
+
+The memo prompt explicitly distinguishes a tendency, context-sensitive practice, institutional rule, and universal claim. It also tells the model not to convert "often" into "always."
+
+Evidence statements require source support. Separate validation code checks that quoted support exists in the retrieved document text.
+
+\section{Bounded Follow-Up}
+
+If the first evidence memo is conflicting or insufficient, Vericult can generate one additional gap-specific follow-up question.
+
+This is the second and final retrieval round. The system cannot continue searching until it finds a desired conclusion.
+
+Bounding the search serves four purposes:
+
+\begin{enumerate}
+\item it limits runtime and API cost;
+\item it improves comparability between cases;
+\item it reduces the opportunity for confirmation seeking;
+\item it makes the retrieval schedule reproducible.
+\end{enumerate}
+
+The final configuration sets \texttt{max\_retrieval\_rounds = 2}: the initial pair of questions plus at most one follow-up question.
+
+\section{Evidence Schedule and REPLAY}
+
+For every target, LIVE stores the final question/query schedule together with snapshot identifiers and hashes.
+
+In REPLAY, this schedule must exist. The engine checks that:
+
+\begin{itemize}
+\item the initial questions match;
+\item there are only two or three questions;
+\item any third question is a valid follow-up;
+\item query count, question count, snapshot count, and hash count agree;
+\item every loaded snapshot matches its frozen hash.
+\end{itemize}
+
+There is no live fallback when a REPLAY snapshot is missing. Missing evidence is a reproducibility error, not an invitation to silently search again.
+
+\section{Evidence Freeze}
+
+After the final memo is created, Vericult computes its digest before response comparison.
+
+The target is compared with the memo, and then the memo digest is checked again. Any mutation raises an error.
+
+The core implementation is:
+
+\begin{lstlisting}[language=Python,caption={Evidence freeze in src/cultverify/pipeline.py.}]
+memo = bundle.memos[-1]
+events.append(f"memo_frozen:{memo.memo_id}")
+
+before = digest(memo)
+verdicts.append(compare_target(session, target, memo))
+
+if digest(memo) != before:
+    raise ValueError("Frozen memo changed")
+\end{lstlisting}
+
+This is one of the main methodological differences from a direct LLM judge. The model cannot rewrite the evidence memo after seeing that it would otherwise contradict the candidate.
+
+\section{Target Comparison}
+
+Only after evidence is frozen is the response target reintroduced.
+
+The comparator receives a small target view containing the target ID and exact response quote, together with the frozen memo.
+
+Possible verdicts are:
+
+\begin{itemize}
+\item \texttt{supported};
+\item \texttt{contradicted};
+\item \texttt{mixed};
+\item \texttt{insufficient}.
+\end{itemize}
+
+If memo sufficiency is \texttt{insufficient}, Python directly enforces an insufficient verdict. The comparator is not allowed to invent directional evidence.
+
+\begin{lstlisting}[language=Python,caption={Insufficient-evidence rule from src/cultverify/scoring.py.}]
+if memo.sufficiency == "insufficient":
+    return TargetVerdict(
+        target_id=target.target_id,
+        memo_id=memo.memo_id,
+        verdict="insufficient",
+        reasoning=(
+            "Frozen evidence memo is insufficient; "
+            "no directional verdict is permitted."
+        ),
+    )
+\end{lstlisting}
+
+\section{Dimension Scoring}
+
+After target comparison, the scorer receives:
+
+\begin{itemize}
+\item the full prompt and response;
+\item prompt context;
+\item the selected dimension IDs;
+\item material targets;
+\item target verdicts;
+\item frozen memo evidence views;
+\item the runtime rubric.
+\end{itemize}
+
+The scorer must return every and only the planned dimensions.
+
+Each result contains:
+
+\begin{itemize}
+\item dimension ID;
+\item score 0, 1, 2, or abstain;
+\item short rationale;
+\item exact response quotations;
+\item target IDs;
+\item memo IDs.
+\end{itemize}
+
+These links make it possible to follow a final score back to the response and evidence.
+
+\section{Forced Abstention}
+
+If all retrieval-appropriate targets for one dimension are unresolved and there is no directly assessable target, that dimension is forced to abstain.
+
+This is enforced in Python rather than delegated to the semantic model.
+
+The purpose is epistemic consistency: a model cannot give a confident cultural score for an external factual issue after its own evidence stage concluded that the necessary evidence is insufficient.
+
+\section{Selective Contextual Fallback}
+
+One narrow exception exists for context-dependent recommendations.
+
+Sometimes external retrieval cannot establish whether a recommendation is factually optimal, but the response itself still shows observable cultural handling. For example, it may explicitly acknowledge household variation and advise following the host's cues.
+
+In such a case, the contextual fallback can score only the observable handling of the recommendation. It cannot validate the unresolved external fact.
+
+This fallback is not available for unresolved external facts or descriptive cultural norms. Those remain eligible for abstention.
+
+\section{Aggregation and Public Score}
+
+For all non-abstained dimension scores, the internal aggregate is the exact equal-weight mean.
+
+The code uses Python's \texttt{Fraction} type to avoid floating-point tie artifacts:
+
+\begin{lstlisting}[language=Python,caption={Exact aggregation from src/cultverify/scoring.py.}]
+def exact_score(scores):
+    values = [
+        s.score for s in scores
+        if s.score != "abstain"
+    ]
+    return (
+        Fraction(sum(values), 2 * len(values))
+        if values else None
+    )
+\end{lstlisting}
+
+The public 0--100 Vericult score is only exposed when all applicable dimensions are scored.
+
+\begin{lstlisting}[language=Python,caption={Public score suppression under abstention.}]
+def vericult_score(scores):
+    if any(s.score == "abstain" for s in scores):
+        return None
+    score = exact_score(scores)
+    return (
+        float(score * 100)
+        if score is not None else None
+    )
+\end{lstlisting}
+
+This prevents a response with unresolved cultural dimensions from being summarized by a deceptively precise percentage.
+
+\section{Categorical Outcome}
+
+The final single-response outcome is deterministic once dimension scores and special gates are known.
+
+The scoring logic is:
+
+\begin{lstlisting}[language=Python,caption={Final cultural-appropriateness label.}]
+def cultural_appropriateness(scores):
+    scored = [
+        s.score for s in scores
+        if s.score != "abstain"
+    ]
+    if not scored:
+        return "insufficient_evidence"
+    if any(value == 0 for value in scored):
+        return "culturally_inappropriate"
+    if (
+        all(value == 2 for value in scored)
+        and all(s.score != "abstain" for s in scores)
+    ):
+        return "culturally_appropriate"
+    return "partially_culturally_appropriate"
+\end{lstlisting}
+
+The complete decision space is therefore:
+
+\begin{itemize}
+\item \texttt{culturally\_appropriate};
+\item \texttt{partially\_culturally\_appropriate};
+\item \texttt{culturally\_inappropriate};
+\item \texttt{insufficient\_evidence};
+\item \texttt{not\_culturally\_applicable};
+\item \texttt{not\_assessable}.
+\end{itemize}
+
+\section{Trace Structure}
+
+Every call writes a structured \texttt{RunTrace}. The trace contains:
+
+\begin{itemize}
+\item run ID;
+\item pipeline version;
+\item Git commit;
+\item timestamp and mode;
+\item serialized configuration;
+\item prompt and response hashes;
+\item rubric and template hashes;
+\item semantic call records;
+\item target/evidence links;
+\item pipeline events;
+\item final result.
+\end{itemize}
+
+The trace does not store human gold labels because those labels are not part of inference.
+
+Important lifecycle events such as \texttt{questions\_ready}, \texttt{memo\_frozen}, and \texttt{target\_compared} are also recorded. These make error analysis easier because a failed run can be localized to a stage.
+
+\section{Final Experiment Runner}
+
+The final runner loads all three generated datasets, validates exact canonical item IDs, checks prompt and response SHA-256 values, confirms generator metadata, verifies the semantic dataset hashes, checks the frozen code/configuration, and then calls:
+
+\begin{lstlisting}[language=Python,caption={Final evaluation API.}]
 result = verifier.verify(prompt, response)
 \end{lstlisting}
 
-\begin{lstlisting}[language=bash,caption={Final execution sequence.}]
-python scripts/run_final_experiment.py --mode LIVE
-python scripts/audit_final_evidence.py
-python scripts/run_final_experiment.py --mode REPLAY
-\end{lstlisting}
+One JSONL record is appended for every result. Completed items are checkpointed and skipped on resume. A process interruption therefore does not require re-running successful items.
 
-\placeholder{CODE AUDIT: insert short verbatim excerpts from the frozen implementation for target extraction, evidence freezing and scoring, with exact commit and line references.}
+The runner does not load human annotations.
 
-\section{Testing and Traceability}
-Structured traces contain identifiers, configuration, prompt and response hashes, semantic calls, questions, evidence, memo links, verdicts, and scores. Unit and integration tests validate software contracts. Passing software tests establishes implementation conformance, not cultural accuracy.
+\section{Software Verification}
 
-\placeholder{INSERT FINAL FREEZE COMMIT, TEST COUNT, LIVE SMOKE RESULT AND PREFLIGHT STATUS.}
+The semantic freeze commit recorded in the final manifest is:
+
+\begin{center}
+\texttt{099e4116a809ee004c1cdea04d1bcc2a14e7d142}
+\end{center}
+
+The corresponding GitHub Actions validation run passed 143 tests with one skipped credential-gated case, together with compilation, Ruff lint, and Ruff formatting checks.
+
+These tests cover software properties such as valid schemas, evidence links, replay behavior, target limits, and leakage controls. They are not evidence that a cultural judgment is correct. The empirical run is required for that analysis.
+
+\section{Methodological Summary}
+
+Vericult is intentionally more complicated than a one-call direct judge. The extra stages exist to expose where a cultural decision comes from.
+
+The key boundaries are:
+
+\begin{enumerate}
+\item context comes from the prompt, not inferred identity;
+\item dimensions are planned before detailed evidence work;
+\item response text is grounded through deterministic spans;
+\item externally checkable targets are routed to evidence;
+\item candidate blindness begins after neutral question generation;
+\item retrieval is bounded;
+\item evidence is frozen before comparison;
+\item insufficient evidence can force abstention;
+\item final scores link back to response quotes and memo IDs;
+\item LIVE evidence is audited before the primary REPLAY run.
+\end{enumerate}
+
+These mechanisms improve traceability and reproducibility, but they do not guarantee cultural correctness. Retrieval can miss important sources, the semantic backbone can make planning mistakes, and the rubric itself is an operational design. The final experiment therefore evaluates the complete system rather than assuming that architectural safeguards are sufficient.
