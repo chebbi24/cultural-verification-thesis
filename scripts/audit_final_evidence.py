@@ -8,6 +8,9 @@ import json
 from pathlib import Path
 from typing import Any
 
+from scripts.run_final_experiment import experiment_identity, load_final_rows
+from cultverify.trace import digest
+
 
 FINAL_CORPUS_ORDER = ("plt120", "external120", "redteam120")
 
@@ -70,6 +73,8 @@ def main(argv: list[str] | None = None) -> int:
     experiment_manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
     expected_ids = expected_item_ids(experiment_manifest)
     records = latest_records(args.live_output)
+    execution_id = experiment_identity(experiment_manifest)
+    frozen_rows = {row["item_id"]: row for row in load_final_rows(experiment_manifest, "all")}
 
     expected_set = set(expected_ids)
     if set(records) != expected_set or len(records) != len(expected_ids):
@@ -80,6 +85,14 @@ def main(argv: list[str] | None = None) -> int:
         )
     if any(record.get("mode") != "LIVE" or record.get("status") != "completed" for record in records.values()):
         raise RuntimeError("Every final LIVE item must be completed before evidence is frozen")
+    for item_id, record in records.items():
+        row = frozen_rows[item_id]
+        if (
+            record.get("execution_id") != execution_id
+            or record.get("prompt_sha256") != row["prompt_sha256"]
+            or record.get("response_sha256") != row["response_sha256"]
+        ):
+            raise RuntimeError(f"LIVE checkpoint belongs to a different frozen execution: {item_id}")
 
     trace_paths: list[Path] = []
     referenced_snapshots: set[str] = set()
@@ -89,7 +102,12 @@ def main(argv: list[str] | None = None) -> int:
         if not trace_path.is_file():
             raise RuntimeError(f"Missing response trace for {item_id}: {trace_path}")
         trace = json.loads(trace_path.read_text(encoding="utf-8"))
-        if trace.get("mode") != "LIVE" or trace.get("run_id") != record.get("run_id"):
+        if (
+            trace.get("mode") != "LIVE"
+            or trace.get("run_id") != record.get("run_id")
+            or trace.get("prompt_hash") != digest(frozen_rows[item_id]["prompt"])
+            or trace.get("response_hash") != digest(frozen_rows[item_id]["response"])
+        ):
             raise RuntimeError(f"Trace mismatch for {item_id}")
         result = trace.get("result", {})
         if result.get("trace_path") != str(trace_path.resolve()):
@@ -113,13 +131,15 @@ def main(argv: list[str] | None = None) -> int:
     dataset_hashes = {
         name: {
             "path": experiment_manifest["dataset"]["corpora"][name]["path"],
-            "sha256": experiment_manifest["dataset"]["corpora"][name]["sha256"],
+            "semantic_sha256": experiment_manifest["dataset"]["corpora"][name]["semantic_sha256"],
+            "sha256": sha256_file(Path(experiment_manifest["dataset"]["corpora"][name]["path"])),
         }
         for name in FINAL_CORPUS_ORDER
     }
 
     manifest = {
-        "schema_version": "final-evidence-freeze-v2",
+        "schema_version": "final-evidence-freeze-v3",
+        "execution_id": execution_id,
         "experiment_id": experiment_manifest["experiment_id"],
         "live_output": {
             "path": str(args.live_output),
