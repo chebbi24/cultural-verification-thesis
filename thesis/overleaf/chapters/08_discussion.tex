@@ -1,30 +1,283 @@
 \chapter{Discussion and Error Analysis}
 \label{chap:discussion}
 
-\section{Purpose}
-A final label alone does not show whether the verifier handled a cultural issue well. The trace allows the analysis to inspect earlier stages and locate the first visible problem.
+This chapter explains how the final results are interpreted. The quantitative values and final selected cases are inserted only after the frozen REPLAY run is complete. The analytical procedure itself can be defined in advance. This avoids selecting only examples that make the verifier look strong.
 
-\section{Cases Where Evidence Helps}
-\placeholder{INSERT TRACE-BACKED EXAMPLES where evidence clarified a factual, institutional, linguistic, historical or cultural-practice question.}
+\section{Purpose of the Discussion}
 
-\section{Cases Where Evidence Does Not Settle the Question}
-Values, personal practices and within-community variation may remain unresolved after retrieval.
-\placeholder{INSERT AN EXAMPLE OF LEGITIMATE VARIATION OR APPROPRIATE ABSTENTION.}
+A single final label is not enough to understand a verifier. If Vericult marks a response as culturally inappropriate, several different things may have happened.
 
-\section{Pipeline Failure Modes}
-The analysis considers context extraction, cultural applicability, dimension planning, target selection, verification-question quality, retrieval, source classification, memo grounding, target comparison, and final scoring.
-\placeholder{INSERT ONLY FAILURE TYPES ACTUALLY OBSERVED IN THE FINAL TRACES.}
+The response may contain a genuinely problematic cultural claim. The retrieval stage may have found strong contradictory evidence. The target extractor may have selected the wrong sentence. The evidence memo may have summarized a source too broadly. The scorer may have interpreted a mixed case too harshly. A technical timeout may also prevent the complete pipeline from finishing.
 
-\section{Refusals and Assessability}
-A refusal can be safe while still providing no substantive answer. For this reason, \texttt{not\_assessable} remains separate from culturally appropriate responses.
-\placeholder{INSERT COUNTS BY CORPUS.}
+For this reason, the discussion uses the trace as the main unit of qualitative analysis. The final outcome is examined together with the earlier stages that produced it.
 
-\section{Baseline Disagreements}
-If independent baselines are available, disagreements should be discussed with concrete examples. Without a valid human reference for the same response, disagreement does not prove which system is correct.
-\placeholder{INSERT BASELINE DISAGREEMENT EXAMPLES.}
+The analysis follows a simple rule:
 
-\section{Relation to Prior Work}
-Final findings should be discussed alongside cultural benchmark research, CARB, reward-model evaluation, and pluralistic alignment. Scores from incompatible datasets must not be described as direct head-to-head results.
+\begin{quote}
+When a final judgment appears surprising or wrong, identify the earliest stage in the trace where the information needed for a better decision was lost or distorted.
+\end{quote}
 
-\section{Answers to Research Questions}
-\placeholder{INSERT FINAL ANSWERS TO RQ1--RQ4, EACH LINKED TO A TABLE, FIGURE OR TRACE.}
+This rule prevents every error from being blamed on the final scorer.
+
+\section{Case-Selection Procedure}
+
+Final qualitative examples are selected after the complete result tables have been calculated. The selection is not based only on visually interesting prompts.
+
+Cases are drawn from the following groups:
+
+\begin{enumerate}
+\item clearly culturally appropriate outcomes with strong evidence coverage;
+\item culturally inappropriate outcomes with at least one score-0 dimension;
+\item partial outcomes where the trace shows genuine nuance rather than a simple error;
+\item insufficient-evidence outcomes;
+\item not-assessable refusals;
+\item disagreements between Vericult and an independent baseline;
+\item technical or semantic failures, if any remain;
+\item at least one case from each of PLT120, External120, and Redteam120.
+\end{enumerate}
+
+The final discussion should include both successful and unsuccessful verifier behavior. A trace is useful even when it reveals that Vericult made a poor decision.
+
+\section{What Counts as Evidence Helping}
+
+Evidence is considered useful when it changes the basis of the judgment in a way that can be inspected.
+
+One example would be a regional-language claim. Suppose a response says that one greeting is used naturally everywhere in Germany. The evidence stage may find that the greeting is strongly regional and that different greetings are common in Bavaria. In this case, retrieval provides information that can directly support a D02 judgment.
+
+A second example would be an institutional claim. If a response says that German quiet hours have one fixed nationwide decibel limit, the relevant issue is not merely etiquette. The claim may depend on local law, tenancy rules, or building policy. Retrieval can reveal that the response has turned a complex institutional situation into a false universal rule.
+
+A third example would be a historical-memory question. RT004 asks whether criticism of Yasukuni Shrine can be dismissed as anti-Japanese resentment and whether the shrine is purely religious. A useful evidence process should separately document the shrine's religious role, the enshrinement of convicted wartime leaders, and the political and historical controversy. The final judgment should then reflect both factual evidence and the response's framing.
+
+These examples illustrate an important point: evidence helps most when there is an external proposition that is material to cultural appropriateness.
+
+\placeholder{FINAL RESULTS: insert 2--4 trace-backed cases where retrieved evidence materially improved the judgment. Include item IDs, short response quotations, memo IDs, and source types.}
+
+\section{When Evidence Cannot Settle the Question}
+
+Not every cultural issue is a factual verification problem.
+
+Consider EXT044, where a young person feels uncomfortable participating in a family's religious wedding ceremony. External sources can describe religious practices or social expectations, but no web page can objectively determine how much personal discomfort the user should accept for family harmony.
+
+A useful verifier should recognize this difference. The response can still be assessed for whether it respects autonomy, avoids insulting the family's beliefs, and offers constructive options. However, the evidence stage should not pretend that one search result establishes the morally correct choice.
+
+This is one reason Vericult distinguishes external facts and descriptive norms from non-verifiable value statements. It is also why D04 focuses on plural viewpoints instead of majority conformity.
+
+Another difficult category is within-community variation. A source can document that a practice is common without proving that a particular household follows it. In such a case, good advice often uses qualified language: "commonly," "in many families," or "ask your host if unsure."
+
+\placeholder{FINAL RESULTS: insert at least one case where uncertainty, a partial score, or abstention was more appropriate than a categorical judgment.}
+
+\section{Understanding Partial Cultural Appropriateness}
+
+The middle category, \texttt{partially\_culturally\_appropriate}, is important because many realistic responses are not simply correct or incorrect.
+
+A response may have the right overall advice but include one broad generalization. It may recognize variation but still omit a material local detail. It may be respectful but factually imprecise. It may give good practical advice while conflating a cultural norm with a legal requirement.
+
+PLT004 is a good example of the type of case where a partial outcome can be meaningful. The generated answer correctly explains that "Moin" is northern and not the most locally natural greeting in Munich. At the same time, it contains many additional region-by-region claims. A verifier should not reduce the whole response to either "correct" or "wrong" without examining which claims are material.
+
+The score-1 anchor is therefore not intended as uncertainty. It is a substantive judgment that the response is mixed, incomplete, or insufficiently adapted. If the system lacks enough basis to judge, it should abstain instead.
+
+\section{Refusals and the Meaning of Not Assessable}
+
+Red-team prompts often produce refusals. The final dataset deliberately retains these responses instead of regenerating until the model provides a substantive answer.
+
+This matters for two reasons.
+
+First, refusal behavior is part of real model behavior. If a generator refuses many culturally sensitive questions, a verifier benchmark that silently replaces those responses gives an unrealistic picture.
+
+Second, refusals create an evaluation ambiguity. A refusal can be safe and responsible, but it may provide no answer to the user's cultural question.
+
+PLT001 demonstrates the issue. The prompt contains a deliberately insensitive menu scenario, while the fixed generator answers only:
+
+\begin{quote}
+I'm sorry, but I can't help with that.
+\end{quote}
+
+Calling this response culturally appropriate would mix two different ideas: avoiding harmful assistance and successfully answering a culturally situated question. The final framework keeps them separate with \texttt{not\_assessable}.
+
+The final analysis should therefore report not-assessable outcomes separately by corpus rather than grouping them with either successful or failed cultural responses.
+
+\placeholder{FINAL RESULTS: insert refusal/not-assessable counts for PLT120, External120, and Redteam120.}
+
+\section{Pipeline Error Taxonomy}
+
+The final error analysis uses the pipeline stages themselves as an error taxonomy.
+
+\subsection{Context-Extraction Error}
+
+A context-extraction error occurs when explicit prompt information is missed or unsupported information is added.
+
+A serious example would be inferring religion from a person's name. This could affect later dimensions, retrieval, and scoring even if every later stage behaves consistently.
+
+The trace makes this easy to inspect because the context frame appears before the dimension plan.
+
+\subsection{Applicability Error}
+
+An applicability error occurs when a materially cultural prompt is rejected as non-cultural, or when an ordinary factual task is unnecessarily sent through the cultural pipeline.
+
+False negatives are especially important because no dimensions are planned after the gate. They prevent the rest of the verifier from running.
+
+\subsection{Dimension-Planning Error}
+
+The prompt can be culturally applicable but mapped to an incomplete or unsuitable D01--D10 set.
+
+For example, a Yasukuni Shrine question treated only as religion could miss its historical-memory and intergroup dimensions. Conversely, selecting six dimensions for a simple greeting question would make scoring noisy and harder to interpret.
+
+The planner is therefore evaluated for sufficiency and restraint rather than for selecting as many dimensions as possible.
+
+\subsection{Target-Selection Error}
+
+The target extractor may miss the sentence that contains the material problem or may spend the three-target budget on less important claims.
+
+This failure becomes more likely in long GPT-OSS answers that contain tables, background information, examples, and recommendations. The target budget is intentionally small, so materiality matters.
+
+The \texttt{targets\_truncated} field helps identify responses where more potentially relevant units existed than the budget allowed.
+
+\subsection{Question-Formation Error}
+
+Even though retrieval is candidate-blind after question generation, the questions are derived from candidate targets. A poorly neutralized question can therefore carry the response's framing into retrieval.
+
+For example, a target that says "Koreans object because of anti-Japanese resentment" should not become the search query "why Korean anti-Japanese resentment causes Yasukuni objections." A neutral version should ask what reasons are documented for Korean objections to Yasukuni Shrine.
+
+This is one of the most important residual limitations of the candidate-blind design.
+
+\subsection{Retrieval Error}
+
+The query can be good while the search results are weak, repetitive, commercially oriented, or geographically mismatched.
+
+Retrieval quality is not identical to source-classification quality. A perfectly classified weak source remains weak evidence.
+
+The final analysis should distinguish missing evidence from wrong evidence.
+
+\subsection{Evidence-Memo Error}
+
+The evidence memo can overstate what the documents say, merge different contexts, or ignore disagreement.
+
+The implementation validates exact support quotations, but quotation existence does not prove that the memo's interpretation is perfect. Trace review must therefore compare the memo text with its support.
+
+\subsection{Target-Comparison Error}
+
+The memo may be correct while the comparator misreads the response target. A cautious sentence can be incorrectly treated as a strong universal claim, or a mixed claim can be forced into support or contradiction.
+
+The four target verdicts provide a useful intermediate layer for diagnosing this problem.
+
+\subsection{Dimension-Scoring Error}
+
+The final scorer may assign the wrong 0/1/2 level even when the targets and evidence are reasonable.
+
+This is especially possible when a response has one factual error but the dimension concerns broader cultural handling. A contradicted target is not automatically a score of 0. The error has to be materially relevant under the dimension rubric.
+
+\section{Evidence Coverage Versus Accuracy}
+
+One of the most important interpretation rules is that evidence coverage is not accuracy.
+
+A target can have excellent source coverage and still be compared incorrectly.
+
+A target can also have limited web evidence while the response is culturally sensible.
+
+For this reason, the thesis reports evidence coverage as a separate diagnostic variable. The final discussion can ask whether insufficient-evidence and abstention outcomes concentrate in certain dimensions, languages, or corpora, but it should not present high coverage as proof of correctness.
+
+\placeholder{FINAL RESULTS: insert observed evidence-coverage patterns, including dimensions or corpora with notably high or low coverage.}
+
+\section{Cross-Corpus Interpretation}
+
+PLT120, External120, and Redteam120 should not be expected to produce the same outcome distribution.
+
+PLT includes controlled challenge prompts, including an early refusal-heavy stratum.
+
+External120 contains multilingual and multicultural prompts drawn from six external datasets. Many are ordinary cultural questions or advice scenarios rather than explicit attacks.
+
+Redteam120 intentionally includes loaded assumptions and sensitive historical, minority, religious, gender, and identity issues.
+
+If Redteam120 produces more culturally inappropriate or not-assessable responses than External120, that is not automatically evidence that Vericult performs better on one corpus. It can simply reflect different generator behavior and prompt difficulty.
+
+The same applies to evidence coverage. Institutional or historical red-team topics can sometimes have strong public documentation, while everyday household customs can be harder to verify from reliable sources.
+
+\placeholder{FINAL RESULTS: insert the observed corpus-level differences and interpret them in light of corpus construction.}
+
+\section{Comparison with the Reward Model}
+
+The Skywork reward model represents a different evaluator family.
+
+It produces a learned scalar preference signal. It does not use Vericult's evidence memo and does not contribute to Vericult's score.
+
+There are three useful kinds of comparison.
+
+The first is \emph{agreement}: do the systems order or label the same response similarly under a documented mapping?
+
+The second is \emph{diagnostic difference}: when they disagree, does Vericult's trace reveal a concrete cultural claim that can be checked?
+
+The third is \emph{failure difference}: are there cases where evidence retrieval introduces an error that the reward model avoids?
+
+The analysis should report all three directions. It should not assume that an evidence-grounded system wins every disagreement.
+
+A raw reward score also requires careful interpretation. Unless a validated cultural-appropriateness threshold exists, the score is not automatically a binary cultural label.
+
+\placeholder{FINAL RESULTS: insert Skywork coverage/score statistics and selected disagreements only after the single-response baseline is frozen and executed.}
+
+\section{Comparison with the Direct LLM Judge}
+
+The direct judge is the closest simplicity baseline.
+
+It receives the prompt and response and makes a cultural judgment without web retrieval or intermediate evidence stages.
+
+If the direct judge and Vericult agree on most items, the extra pipeline may still be useful for traceability, but a claim of better accuracy would require independent reference labels.
+
+If they disagree, the evidence trace helps analyze the cause. The disagreement may show that external evidence corrected a model assumption, or it may show that retrieval introduced noise.
+
+The direct judge comparison is therefore valuable even when no system can be declared universally correct.
+
+\placeholder{FINAL RESULTS: insert direct-judge agreement and trace-backed disagreement examples.}
+
+\section{Human Disagreement and Ground Truth}
+
+The development annotation study already showed that cultural appropriateness can produce genuine human disagreement. Five students did not reach a majority winner on every old Best-of-4 item.
+
+Those labels cannot be used for the new GPT-OSS responses, but the experience remains methodologically important: cultural evaluation should not casually treat one annotator or one majority as objective cultural truth.
+
+If new human labels are collected for the final responses, the thesis should report both the aggregate reference and disagreement. If they are not collected, the thesis should avoid the term accuracy for comparisons between automated evaluators.
+
+\section{Relation to CARB}
+
+CARB and Vericult share the motivation that generic evaluator quality does not guarantee cultural awareness \parencite{zhang2026carb}. CARB evaluates reward models in a Best-of-N setting and shows that spurious surface features can influence cultural preference scoring.
+
+Vericult takes a different route. It does not train a culture-aware reward model. Instead, it attempts to make one response assessment explicit through decomposition, external evidence, and traceability.
+
+The two approaches are therefore complementary rather than directly interchangeable.
+
+CARB asks whether a reward model ranks culturally appropriate answers correctly across its benchmark.
+
+Vericult asks whether one answer can be inspected after generation and whether the verifier can expose the basis of its cultural judgment.
+
+Because the datasets and tasks differ, the thesis does not state that Vericult "beats CARB."
+
+\section{What Would Count as Success}
+
+The thesis does not require Vericult to label every item confidently.
+
+A useful outcome would be a verifier that:
+
+\begin{itemize}
+\item completes most cases without technical failure;
+\item distinguishes refusals from substantive cultural answers;
+\item retrieves suitable evidence for externally checkable targets;
+\item abstains when evidence is insufficient;
+\item exposes material cultural failures with traceable response quotes and evidence;
+\item avoids converting all cultural variation into universal rules;
+\item produces enough structured information for a human reviewer to inspect disagreements.
+\end{itemize}
+
+A high abstention rate would reduce practical coverage, but forcing a label on unsupported cases would also be undesirable. The final result therefore has to be interpreted as a trade-off between coverage and defensibility.
+
+\section{Answers to the Research Questions}
+
+The final version of this section will answer RQ1--RQ4 directly from the frozen result tables.
+
+For RQ1, the answer will summarize the six final outcome categories and assessability.
+
+For RQ2, it will summarize target-level evidence sufficiency, abstention, and coverage patterns.
+
+For RQ3, it will identify the most common or most consequential failure modes observed in traces.
+
+For RQ4, it will state only comparisons that have a valid common basis and will distinguish automated-system agreement from human-grounded accuracy.
+
+\placeholder{FINAL RESULTS: replace this paragraph with the final four RQ answers and references to the corresponding tables and trace examples.}
