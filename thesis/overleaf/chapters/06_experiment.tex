@@ -382,7 +382,7 @@ This makes the evidence freeze a concrete technical boundary rather than a docum
 
 \section{Independent Reward-Model Baseline}
 
-The planned reward-model baseline is:
+The reward-model baseline is:
 
 \begin{center}
 \texttt{Skywork/Skywork-Reward-V2-Qwen3-4B}
@@ -394,29 +394,38 @@ at revision:
 \texttt{fd958fe}
 \end{center}
 
-The baseline remains completely separate from \texttt{src/cultverify}. Reward scores never enter Vericult.
+The baseline remains completely separate from \texttt{src/cultverify}. Reward scores never enter Vericult. For the final single-response task, the adapter applies the reward model once to every frozen prompt--response pair and stores the raw scalar reward.
 
-The original repository baseline was written for Best-of-4 ranking. The final comparison requires a single-response adapter so that all 360 fixed prompt--response pairs receive a raw reward score under the same frozen model.
+The thesis deliberately does not invent a universal reward threshold for cultural appropriateness. Skywork was trained as a preference reward model, and a raw value such as 2.0 or -1.0 has no model-independent cultural interpretation. The primary single-response RM analysis therefore reports the score distribution and, on the subset where Vericult has a fully scored numeric result, the association between reward and Vericult score. If a final human reference for the same responses becomes available, reward-model discrimination can additionally be measured against that reference.
 
-A reward score has no universal threshold that automatically means "culturally appropriate." For this reason, raw score distributions and any categorical mapping must be documented explicitly before a classification comparison is made.
+This treatment preserves the reward model as a genuine independent baseline without forcing its native scalar output into an arbitrary categorical label.
 
 \section{Direct LLM Judge Baseline}
 
-The second baseline is a direct cultural judge with no external retrieval.
+The second baseline is a direct cultural judge with no external retrieval. To isolate the effect of the Vericult pipeline from raw model capability, the direct judge uses the same semantic backbone as Vericult:
 
-It receives:
+\begin{center}
+\texttt{vllm/qwen3.6:35b-a3b-fp8}
+\end{center}
+
+through L3S at temperature 0.
+
+The judge receives only:
 
 \begin{itemize}
-\item the prompt;
-\item the fixed response;
-\item the same D01--D10 rubric or a clearly frozen cultural-appropriateness instruction.
+\item the user prompt;
+\item the fixed GPT-OSS response;
+\item the frozen D01--D10 rubric;
+\item a short instruction defining the same six final outcome labels.
 \end{itemize}
 
-It returns a direct cultural judgment without target extraction, retrieval, evidence memos, or LIVE/REPLAY.
+It does not receive retrieved documents, Vericult targets, evidence memos, Vericult scores, reward-model scores, benchmark answers, or human labels.
 
-This baseline tests whether the additional Vericult pipeline provides useful behavior beyond simply asking a capable LLM to judge the response.
+The direct judge first decides whether the prompt is culturally applicable. For a culturally applicable prompt, it then decides whether the response is a substantive answer. If both gates pass, it directly applies the D01--D10 rubric and returns one of the same cultural-appropriateness categories used by Vericult. The exact baseline instruction is reproduced in Appendix~\ref{app:semantic-prompts}.
 
-As with the reward model, the final model ID, prompt text, and output mapping are frozen before the baseline result is interpreted.
+Using the same backbone creates a controlled comparison: differences between the direct judge and Vericult cannot be explained simply by one system using a stronger semantic model. The main methodological difference is the explicit Vericult decomposition and evidence pipeline.
+
+Direct-judge exact label agreement with Vericult is reported descriptively. It is called agreement rather than accuracy unless an independent human reference exists for the same final responses.
 
 \section{Human Annotation Boundary}
 
