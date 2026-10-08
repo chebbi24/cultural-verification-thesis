@@ -17,7 +17,7 @@ The prompt planner tries to choose the smallest sufficient set, but there is no 
 
 A second construct problem is that cultural appropriateness itself can be contested. Two people from the same community may disagree about whether advice is respectful, modern, traditional, or appropriate. This is not always annotation noise. It can represent genuine pluralism.
 
-The verifier therefore should not be interpreted as measuring an objective latent variable called "true culture." It implements a documented rubric and evidence process.
+The verifier should not be read as a measure of a hidden variable called "true culture." It applies a documented rubric and evidence process.
 
 \section{Cultural Essentialism Risk}
 
@@ -49,7 +49,7 @@ For example, an official legal procedure may have a clear government page, while
 
 The source classifier does not solve this asymmetry. It can identify a source type, but it cannot create missing community representation.
 
-The final evidence-coverage results must therefore be interpreted partly as a property of retrieval availability.
+Evidence coverage also depends on what the retriever can find.
 
 \section{Search-Engine Bias}
 
@@ -73,7 +73,7 @@ A community source can provide valuable first-hand perspective while being diffi
 
 A commercial source can sometimes contain accurate practical information.
 
-Vericult therefore avoids one universal numerical source-quality score. The memo is instructed to consider source suitability for the question.
+Vericult does not use one universal source-quality number. The memo instead considers whether a source is suitable for the specific question.
 
 This still leaves judgment to the semantic backbone. Misclassification or overconfidence is possible.
 
@@ -123,7 +123,7 @@ If the model misunderstands a cultural concept during planning, the same model f
 
 External retrieval provides independent information, but the semantic model still decides how to summarize and use it.
 
-The thesis therefore evaluates Vericult as a complete system built around this backbone, not as a model-independent algorithm.
+The thesis evaluates the complete system with this backbone. It does not claim model-independent performance.
 
 \section{Temperature and Determinism}
 
@@ -133,7 +133,7 @@ Server implementations, model revisions, numerical kernels, request handling, an
 
 REPLAY freezes evidence, not every semantic token.
 
-A strict reproducibility claim should therefore be limited to code, configuration, frozen inputs, and evidence artifacts rather than promising identical semantic outputs on every future server.
+The reproducibility claim is limited to the code, configuration, frozen inputs, and evidence artifacts. The thesis does not promise identical semantic outputs on every future server.
 
 \section{Generator Dependence}
 
@@ -203,7 +203,7 @@ First, the annotator pool was small and not intended to represent every culture 
 
 Second, the evaluated texts are not the final GPT-OSS responses.
 
-Therefore, those labels are not reused as final gold labels.
+Those labels are not reused as final gold labels.
 
 If no new human reference is collected for the 360 final responses, the thesis cannot make strong claims about final classification accuracy against humans.
 
@@ -286,7 +286,7 @@ The final study demonstrates behavior on 360 fixed cases.
 
 Generalization beyond these cases depends on whether future prompts resemble the covered settings and whether the same evidence infrastructure remains available.
 
-The strongest external-validity claim is therefore modest: the architecture can be applied to arbitrary prompt--response text in principle, but the empirical quality observed in the thesis is established only for the frozen evaluation set.
+The external-validity claim is limited. The architecture can accept other prompt--response pairs, but this thesis only measures its behavior on the frozen evaluation set.
 
 \section{Summary of Limitations}
 
