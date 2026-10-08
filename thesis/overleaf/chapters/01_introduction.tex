@@ -1,34 +1,217 @@
 \chapter{Introduction}
-\section{Motivation}
-Large language models are now used for information seeking, writing assistance, workplace communication, education, and everyday advice. In many situations, response quality depends on more than grammar and factual correctness. A response may also need to fit a local social setting, religious practice, form of address, institutional procedure, or historically sensitive topic.
 
-A response can sound fluent and reasonable while still being culturally inappropriate. It may present a regional custom as a national rule, assume that all members of a religion follow the same practice, or use an unsuitable level of formality. Culture cannot be reduced to nationality. People within one country can differ by region, language, religion, generation, social group, and personal preference \parencite{adilazuarda2024culture,sorensen2024pluralistic}.
+\section{Motivation}
+
+Large language models are increasingly used for everyday tasks. People ask them to explain information, write messages, plan travel, prepare for work situations, answer sensitive questions, and give advice. In many of these tasks, a response can only be useful if it fits the user's cultural context.
+
+A simple example is language. The German greeting "Moin" is strongly associated with northern Germany. A model that describes it as a universally natural greeting for every region may sound fluent but still miss an important cultural detail. The same problem can appear in much more sensitive areas, such as religion, gender roles, family expectations, historical memory, minority identities, or legal and institutional rules.
+
+This makes cultural evaluation difficult. A response can be grammatically correct and factually plausible while still being inappropriate in context. It can also make a correct statement but present it too broadly. For example, saying that a practice is common is different from saying that everybody follows it. Saying that something is traditional is different from saying that people are required to do it.
+
+Current research confirms that culture is not one simple variable. Adilazuarda et al. show that work on culture in LLMs uses many different proxies, including language, nationality, values, customs, and other semantic domains \parencite{adilazuarda2024culture}. Liu et al. similarly describe culture as a multi-part concept and show that culturally aware NLP covers knowledge, language, values, social groups, and adaptation \parencite{liu2025culturally}.
+
+This thesis therefore does not treat nationality as a complete cultural label. A culturally relevant prompt can instead contain a region, religion, language variety, institution, family role, workplace relationship, historical topic, or identity group.
+
+\section{Why Existing Evaluation Is Not Enough}
+
+Most modern LLM systems already use some form of evaluation during training or deployment. Reward models can score responses. LLM judges can compare candidates. Safety classifiers can block harmful content. Cultural benchmarks can test specific cultural knowledge.
+
+These methods are useful, but they do not all answer the same question.
+
+A reward model estimates preference. It can tell us that one answer receives a higher reward than another, but the score does not normally expose which cultural statement is wrong or which external source supports the judgment.
+
+An LLM judge can provide a direct explanation, but it still relies mainly on the judge model's internal knowledge. Prior work has also shown that LLM judges can be affected by response order and other evaluator effects \parencite{zheng2023judging,wang2024fair}.
+
+A cultural benchmark can measure whether a model knows a predefined answer. BLEnD, CulturalBench, NormAd, SafeWorld, and CARB all make important contributions, but they use their own task formats and fixed benchmark designs \parencite{myung2024blend,chiu2025culturalbench,rao2025normad,yin2024safeworld,zhang2026carb}.
+
+The practical question in this thesis is different:
+
+\begin{quote}
+A model has already produced one response. Can that response be checked in a transparent way for cultural appropriateness?
+\end{quote}
+
+The output should ideally explain not only the final judgment but also what cultural dimensions were relevant, which response claims were checked, what evidence was retrieved, where variation exists, and where the verifier did not have enough basis to decide.
 
 \section{Problem Statement}
-This thesis studies the post-hoc evaluation of cultural appropriateness in a generated response. Given a prompt (p) and a response (r), the system should determine whether culturally situated reasoning is relevant, which cultural dimensions matter, whether important claims or recommendations can be checked against external evidence, and whether the final response is culturally appropriate for the stated context.
 
-General-purpose reward scores do not directly explain which cultural issue is present or what evidence supports the judgment. A direct LLM judge can explain its decision, but its reasoning may remain unsupported by external sources. Prior work has also reported evaluator effects in LLM-as-a-judge settings \parencite{zheng2023judging,wang2024fair}.
+The technical task can be stated as follows.
+
+Given a prompt (p) and one generated response (r), the verifier should:
+
+\begin{enumerate}
+\item determine whether culturally situated reasoning is materially required;
+\item extract only the cultural context explicitly supported by the prompt;
+\item identify the relevant D01--D10 cultural dimensions;
+\item decide whether the response contains substantive assessable content;
+\item identify a small number of material response targets;
+\item retrieve evidence for targets that are externally checkable;
+\item preserve uncertainty and cultural variation;
+\item compare the response with a frozen evidence basis;
+\item produce a traceable cultural-appropriateness outcome.
+\end{enumerate}
+
+Several difficulties make this harder than ordinary fact checking.
+
+First, cultural information is context dependent. A greeting, gift, dress practice, family expectation, or historical symbol can have different meanings in different settings.
+
+Second, not every cultural statement is factual. A value conflict cannot always be solved by finding one web page.
+
+Third, evidence can be biased or incomplete. Online sources overrepresent some languages, countries, institutions, and communities.
+
+Fourth, the response itself can influence retrieval. If the system searches directly for the candidate's wording, it may unintentionally search for confirmation.
+
+Fifth, final evaluation data must remain independent from system tuning. A verifier that is adjusted after seeing final outcomes is harder to evaluate fairly.
+
+\section{Research Gap}
+
+The related literature addresses many parts of the problem.
+
+CulturalBench and BLEnD provide cultural knowledge benchmarks. NormAd evaluates cultural adaptability. SafeWorld studies geo-diverse safety and legal standards. CultureLLM and ValuesRAG attempt to improve culturally aligned generation. CARB focuses on the cultural awareness of reward models.
+
+However, the literature does not directly provide the exact evaluation layer investigated here: a standalone post-hoc verifier that combines explicit cultural dimensions, bounded external evidence, a structural separation between evidence construction and final candidate comparison, abstention, frozen retrieval artifacts, and complete traceability for one arbitrary prompt--response pair.
+
+This is the gap that Vericult is designed to explore.
+
+The thesis does not claim that these design choices are automatically better than existing evaluators. They are implemented as a testable architecture. The final experiment then examines how the architecture behaves on 360 fixed responses and how its decisions can be interpreted.
 
 \section{Research Questions}
-\begin{description}[leftmargin=1.5cm,style=nextline]
-\item[RQ1] What cultural-appropriateness outcomes does Vericult assign to the 360 fixed responses, and how often can it reach an assessable decision?
-\item[RQ2] How often does Vericult obtain sufficient external evidence for selected response targets, and how does evidence availability affect its decisions?
-\item[RQ3] What errors and limitations can be identified by examining the verifier's traces, dimensions, abstentions, and retrieval results?
-\item[RQ4] Where a valid common reference is available, how do Vericult's judgments compare with an independent reward model and a direct LLM judge?
+
+The final thesis is organized around four research questions.
+
+\begin{description}[leftmargin=1.7cm,style=nextline]
+
+\item[RQ1] \textbf{What cultural-appropriateness outcomes does Vericult assign to the 360 fixed responses, and how often can it reach an assessable decision?}
+
+This question studies the basic behavior of the complete verifier. It includes the frequencies of culturally appropriate, partially appropriate, inappropriate, insufficient-evidence, not-culturally-applicable, and not-assessable outcomes.
+
+\item[RQ2] \textbf{How often does Vericult obtain sufficient external evidence for selected response targets, and how does evidence availability affect its decisions?}
+
+This question focuses on the evidence pipeline. It examines target-level evidence coverage, conflicting evidence, insufficiency, and abstention.
+
+\item[RQ3] \textbf{What errors and limitations can be identified by examining the verifier's traces, dimensions, abstentions, and retrieval results?}
+
+This question uses the diagnostic information that a scalar evaluator does not expose. The goal is to identify whether mistakes begin in context extraction, planning, target selection, retrieval, evidence synthesis, target comparison, or scoring.
+
+\item[RQ4] \textbf{Where a valid common reference is available, how do Vericult's judgments compare with an independent reward model and a direct LLM judge?}
+
+This question places Vericult next to simpler or more established evaluator types. It is deliberately conditional because automated systems disagreeing with each other does not establish which one is correct.
+
 \end{description}
 
+The wording of the questions is non-directional. None of them assumes that Vericult will outperform the baselines.
+
 \section{Contributions}
+
+The thesis makes five main contributions.
+
+\subsection{An Operational D01--D10 Cultural Framework}
+
+The thesis develops a ten-dimensional rubric covering:
+
 \begin{itemize}
-\item a ten-dimensional operational framework for cultural appropriateness;
-\item a standalone verifier for one prompt--response pair;
-\item selective external evidence;
-\item a candidate-blind evidence stage after question generation;
-\item frozen evidence memos before target comparison;
-\item explicit abstention and evidence-coverage reporting;
-\item a LIVE/REPLAY mechanism;
-\item structured diagnostic traces;
-\item a final evaluation on 360 fixed prompt--response pairs.
+\item everyday life and material culture;
+\item language, discourse and pragmatics;
+\item social etiquette and interpersonal norms;
+\item values, ethics and moral pluralism;
+\item law, policy and institutional rules;
+\item religion, ritual and taboo;
+\item family, kinship, gender and generations;
+\item work, education and civic participation;
+\item cultural heritage, history, arts and collective memory;
+\item identity, diversity and intergroup relations.
 \end{itemize}
 
+The framework is literature-grounded but operational. It is not presented as a universal theory of culture.
+
+\subsection{A Standalone Evidence-Grounded Verifier}
+
+Vericult takes a fixed prompt and response and evaluates them independently from the generator. It separates prompt context, dimension planning, material targets, neutral verification questions, external evidence, frozen memos, target comparison, and final scoring.
+
+\subsection{A Candidate-Blind Evidence Boundary}
+
+After neutral questions have been generated, the evidence engine no longer receives the response or target object. It receives only the questions and validated prompt context.
+
+This does not eliminate search-engine bias, and the question generator can still transmit framing. It does provide a concrete structural separation between evidence gathering and candidate comparison.
+
+\subsection{Explicit Uncertainty and Reproducibility}
+
+The verifier can abstain when the basis is insufficient. LIVE retrieval artifacts are stored, audited, and then reused in REPLAY.
+
+The final thesis reports REPLAY as the primary Vericult execution because it uses a fixed external evidence basis.
+
+\subsection{A Controlled 360-Pair Evaluation}
+
+The final experiment contains:
+
+\begin{itemize}
+\item 120 PLT prompts;
+\item 120 prompts selected from six external cultural datasets;
+\item 120 externally grounded red-team prompts.
+\end{itemize}
+
+Every prompt receives one response from the same frozen GPT-OSS generator. This avoids mixing final responses from different model sources.
+
+\section{Development History and Final Scope}
+
+The project went through several designs before the final experiment.
+
+The first version used Best-of-4 ranking on 30 PLT prompts. Four responses were compared for each prompt, and five human annotators selected the most culturally appropriate candidate.
+
+That stage was useful for developing the rubric, target extraction, ranking behavior, and annotation workflow. It also showed an important limitation: the main goal of the project is not necessarily to choose the best of four answers. A real user may already have only one answer that needs verification.
+
+The supervisor also emphasized that the verifier should be evaluated on responses from a stronger and consistent generator and that the verifier backbone should be strong enough for the task.
+
+The final design therefore changed in three important ways:
+
+\begin{enumerate}
+\item Best-of-4 is replaced by one response per prompt.
+\item All final responses are regenerated with one fixed GPT-OSS model.
+\item The final Vericult semantic backbone is Qwen3.6 35B-A3B through L3S.
+\end{enumerate}
+
+The old human labels remain in the repository for development provenance but are not reused as labels for the new responses.
+
+\section{Final Experiment at a Glance}
+
+The experiment can be summarized as:
+
+\begin{figure}[ht]
+\centering
+\fbox{\parbox{0.9\textwidth}{\centering
+360 fixed prompts \\
+\(downarrow\) \\
+One GPT-OSS response per prompt \\
+\(downarrow\) \\
+Vericult LIVE evidence acquisition \\
+\(downarrow\) \\
+Evidence audit and freeze \\
+\(downarrow\) \\
+Vericult REPLAY on the same evidence \\
+\(downarrow\) \\
+Outcome, evidence, dimension, and trace analysis
+}}
+\caption{Final thesis experiment in simplified form.}
+\label{fig:experiment-overview}
+\end{figure}
+
+The full protocol is described in Chapter~\ref{chap:experiment}.
+
 \section{Thesis Structure}
-\Cref{chap:background} explains the foundations, \Cref{chap:related} reviews related work, \Cref{chap:framework} presents D01--D10, and \Cref{chap:verifier} describes Vericult. \Cref{chap:experiment} defines the final experiment. Results, discussion, limitations, and conclusions follow.
+
+Chapter~\ref{chap:background} introduces reward models, LLM-as-a-judge evaluation, cultural appropriateness, external evidence, abstention, and replay.
+
+Chapter~\ref{chap:related} reviews cultural benchmarks, culturally adapted generators, CARB, reward-model evaluation, and direct LLM judges. It then derives the research gap.
+
+Chapter~\ref{chap:framework} presents the D01--D10 rubric and explains how scoring works.
+
+Chapter~\ref{chap:verifier} describes the complete Vericult pipeline with implementation excerpts from the frozen repository.
+
+Chapter~\ref{chap:experiment} explains the 360-pair dataset, generator, verifier configuration, leakage controls, execution order, and evaluation quantities.
+
+Chapter~\ref{chap:results} contains the final quantitative results from the frozen run.
+
+Chapter~\ref{chap:discussion} interprets the results through trace-backed examples and failure analysis.
+
+Chapter~\ref{chap:limitations} discusses construct, data, retrieval, model, human-evaluation, and reproducibility limitations.
+
+Finally, Chapter~\ref{chap:conclusion} summarizes the work, answers the research questions using the final results, and gives directions for future work.
