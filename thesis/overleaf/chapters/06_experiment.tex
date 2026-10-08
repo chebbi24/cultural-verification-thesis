@@ -95,55 +95,50 @@ I'm sorry, but I can't help with that.
 
 This case motivated the response-assessability gate. A refusal may avoid endorsing the problematic request, but it does not provide a substantive cultural answer. The final system can therefore return \texttt{not\_assessable} rather than scoring the refusal as culturally appropriate.
 
-\section{External120}
+\section{External120: 120 Prompts from Public Datasets}
 
-External120 contains 20 prompts from each of six datasets:
+External120 is the first external part of the final dataset. It contains 120 prompts taken from six public datasets, with exactly 20 prompts from each source. These prompts were selected before the final GPT-OSS generation and are stored with their original source IDs and metadata.
 
-\begin{itemize}
-\item CARE;
-\item Community Alignment;
-\item PLURAL;
-\item PACT;
-\item ThaiCLI;
-\item PRISM.
-\end{itemize}
+\begin{table}[ht]
+\centering
+\small
+\caption{Composition and provenance of External120.}
+\label{tab:external120-sources}
+\begin{tabularx}{\textwidth}{p{0.17\textwidth}p{0.08\textwidth}p{0.25\textwidth}X}
+\toprule
+Source & $n$ & Original resource & Selected coverage in External120 \\
+\midrule
+CARE \parencite{guo2025care} & 20 & Multilingual cultural questions and human-preference data. & Arabic, Chinese and Japanese prompts covering Arab/Arabic-speaking, Chinese and Japanese contexts. The final thesis uses the prompt only and generates a new response. \\
+Community Alignment \parencite{zhang2026community} & 20 & Multilingual human preference comparisons collected across countries. & Selected rows from United States, India, Italy and Brazil; languages in the frozen subset are English, Italian and Portuguese. \\
+PLURAL \parencite{agarwal2026plural} & 20 & Value-focused preference data derived from survey responses. & The frozen thesis subset contains 20 English prompts from the Brazil portion of the release. \\
+PACT \parencite{borah2026pact} & 20 & Social scenarios where cultural norms and personal preferences can conflict. & Twenty English prompts from twenty country contexts, including India, Japan, Saudi Arabia, Thailand, Brazil, Canada and others. \\
+ThaiCLI \parencite{kim2025thaicli} & 20 & Thai cultural and linguistic intelligence benchmark with culturally appropriate and inappropriate response examples. & Twenty Thai prompts from the Thai cultural benchmark. \\
+PRISM \parencite{kirk2024prism} & 20 & Diverse human--LLM conversations linked to participant feedback and background. & Twenty English prompts linked to participants from twelve country contexts in the frozen subset. \\
+\bottomrule
+\end{tabularx}
+\end{table}
 
-The archived source-selection file records the original dataset, split/configuration, row ID, language or culture metadata when available, source URL, and prompt text. The final generator does not reuse the original response. It generates a new response for every selected prompt under the same fixed model configuration used for PLT and Redteam.
+The source file \texttt{data/final/external\_120/multicultural\_120\_prompts.csv} records, for every selected prompt, the source dataset, source split or configuration, row identifier, source URL, language, culture metadata, and the exact prompt text. The final generated file keeps those identifiers next to the new GPT-OSS response.
 
-This is important for comparability. Without regeneration, External120 would mix responses from many unknown or different model configurations.
+\subsection{Selection and Transformation}
 
-The archived pre-freeze External120 run used original reference, preferred, or culture-following responses and is retained only as provenance. It is not the final External120 result reported in this thesis.
+The final subset is a fixed curated set of 20 prompts per source. The repository preserves the selected rows and their source IDs, but it does not contain a separate final sampling script that would justify calling the subset a random sample. For that reason, this thesis does not describe External120 as random or statistically representative of the six original datasets.
 
-\subsection{Example: PLURAL}
+No prompt rewriting is applied during final generation. The frozen manifest sets prompt transformation to \texttt{none}. The original response, preferred response, or benchmark answer is not used as the final candidate. Instead, the same GPT-OSS generator that is used for PLT120 and ExternalRedteam120 generates one new response for every External120 prompt.
 
-One External120 item asks a Brazilian student for advice about participating in a religious ceremony despite not sharing the family's beliefs:
+This regeneration is needed for a fair comparison across the three parts of the final dataset. If External120 kept responses produced by many different original models, a difference in Vericult outcomes could come from the response model rather than from the prompt source.
 
-\begin{lstlisting}[caption={Example External120 prompt, EXT044 from PLURAL.}]
-I'm 17 and live in a small town in Sao Paulo.
-My family is very religious, but I've never felt
-connected to their beliefs. My older sister is
-getting married soon, and she wants a traditional
-religious ceremony, which means I'd have to
-participate and pretend I'm devout. I'm uncomfortable
-with that, but my family says it's important to
-respect our culture. What should I do?
-\end{lstlisting}
+\subsection{Source Licenses and Use}
 
-This prompt can involve D04 (values and pluralism), D06 (religion), and D07 (family and generations), depending on planning. It is useful because there is no simple factual answer. The verifier should not search the web for proof that one personal value is universally correct. Instead, the response's treatment of autonomy, respect, and variation becomes central.
+The thesis uses only the selected prompt text and source metadata needed for research provenance. CARE-eval is released under the MIT license. Community Alignment is released under CC-BY-4.0. PRISM licenses human-written prompts under CC-BY-4.0 and applies separate conditions to model-generated responses; those original model responses are not used as final candidates here. The ThaiCLI authors release the benchmark and evaluation code publicly. Where a source card does not state a simple single license for all fields, the thesis keeps the original source reference rather than assigning a license by assumption.
 
-\subsection{Example: Community Alignment}
+\subsection{Interpretation}
 
-EXT021 asks:
+External120 is not a balanced accuracy benchmark. The six sources were created for different research questions: cultural knowledge, human preferences, value alignment, norm-versus-preference trade-offs, Thai cultural intelligence, and participatory alignment. In this thesis they serve one narrower purpose: they provide 120 prompts that were created outside this project and that add language, country, and task variation to the final evaluation.
 
-\begin{lstlisting}[caption={Example External120 prompt, EXT021.}]
-In what ways could the rise of lab-grown meat
-reshape culinary tourism in regions where
-traditional meat dishes are central to cultural
-and national identity?
-\end{lstlisting}
+One example is EXT044 from PLURAL. It asks a Brazilian teenager how to handle a family religious ceremony when personal beliefs differ from family expectations. This can involve values, religion, and family relations. There is no simple fact that decides the whole answer. A good verifier must separate any factual claims from the value conflict.
 
-This item is broader and more analytical. It tests whether the applicability gate and target extractor can identify when cultural reasoning is relevant without forcing every statement into one local etiquette rule.
-
+Another example is EXT021 from Community Alignment, which asks how lab-grown meat could change culinary tourism in places where traditional meat dishes are part of cultural identity. This prompt is broader and tests whether the verifier can identify cultural relevance without reducing the question to a single etiquette rule.
 \section{Redteam120}
 
 Redteam120 is an externally grounded challenge set. Its prompts are written to expose culturally problematic assumptions such as forced assimilation, identity stereotyping, historical trivialization, minority misrepresentation, inappropriate etiquette advice, and universalization of contested norms.
