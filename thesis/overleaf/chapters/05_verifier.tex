@@ -693,6 +693,28 @@ This is a deliberate trade-off. A small target budget improves traceability and 
 
 The extractor selects span IDs rather than rewriting response text. The Python implementation reconstructs the original span. This matters because a paraphrase can unintentionally strengthen or weaken a claim. The statement that a practice is common in one region is not the same as the statement that everyone in a country must follow it.
 
+\section{What External Evidence Can and Cannot Resolve}
+
+The verifier does not assume that every cultural question becomes objective once a web search is added. The role of evidence depends on the epistemic type of the target.
+
+\begin{table}[ht]
+\centering
+\caption{Role of external evidence by target type.}
+\label{tab:evidence-role}
+\begin{tabularx}{\textwidth}{p{0.23\textwidth}X X}
+\toprule
+Target type & What evidence can establish & Remaining limitation \\
+\midrule
+External fact & Dates, formal rules, documented events, definitions, institutional procedures. & Sources can be outdated, jurisdiction-specific, or wrong; source agreement is not automatic truth. \\
+Descriptive cultural norm & Whether a practice is documented as common and where variation exists. & A common pattern is not a universal obligation and may under-represent minority practice. \\
+Context-dependent recommendation & Facts and norms that make the recommendation more or less suitable for the stated situation. & Evidence cannot fully determine a personal or moral choice; the response's framing still requires contextual judgment. \\
+Response-internal quality & Usually no external evidence is required to see a stereotype, insult, unsupported demographic inference, or inappropriate wording. & The semantic judge can itself misread tone or context. \\
+Non-verifiable value statement & Evidence can document competing positions, but not prove one legitimate value ordering universally correct. & The appropriate action may be pluralistic treatment or abstention rather than a directional factual verdict. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+This division is the reason Vericult uses selective retrieval rather than searching for every sentence. Evidence is strongest when the question is externally checkable. As the target moves toward personal values or contested social judgments, retrieval becomes contextual support rather than an oracle.
 \section{Which Targets Need External Search?}
 
 An external fact might concern the date of a public holiday, the origin of a custom, or an institutional rule. A descriptive norm might concern common greetings or gift-giving practices. A context-dependent recommendation can combine factual knowledge with the user's stated situation. These are suitable candidates for evidence retrieval.
