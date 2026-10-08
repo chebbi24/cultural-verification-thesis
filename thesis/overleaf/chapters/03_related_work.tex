@@ -84,6 +84,25 @@ Vericult & Post-hoc evidence-grounded single response evaluation & Proposed meth
 \end{tabularx}
 \end{table}
 
+\section{Intercultural Pragmatics}
+
+Culture also affects how language is used in a situation. Kecskes describes intercultural pragmatics as the study of language use between people who bring different linguistic and cultural backgrounds into the same interaction \parencite{kecskes2014intercultural}. This matters for Vericult because a sentence can be grammatically correct but still use the wrong register, form of address, level of directness, or regional expression.
+
+This supports a separate language and pragmatics dimension in the rubric. It also supports the use of prompt context. A greeting, joke, request, or disagreement cannot always be judged without knowing who is speaking, where the interaction takes place, and what relationship the speakers have.
+
+\section{Human Disagreement Is Not Always Noise}
+
+Cultural judgments can be subjective. Plank argues that disagreement between annotators is often treated as annotation noise even when several answers are reasonable \parencite{plank2022labelvariation}. This is relevant for culture, values, identity, and etiquette.
+
+Inter-annotator agreement is still useful because it shows how consistently people apply a labeling task. Artstein and Poesio review common agreement measures and explain why the choice of measure depends on the annotation setup \parencite{artstein2008agreement}. Krippendorff gives a broader framework for reliability in content analysis and for handling different measurement scales \parencite{krippendorff2018content}.
+
+For this thesis, disagreement has two consequences. First, the old five-person pilot is not treated as perfect ground truth. Second, the final verifier is allowed to abstain when the available basis is too weak. A low-agreement human case should not be hidden behind a single majority label without discussion.
+
+\section{Abstention and Selective Prediction}
+
+Abstention is also supported by work on selective classification. Geifman and El-Yaniv study classifiers that can reject uncertain cases instead of forcing a prediction for every input \parencite{geifman2017selective}. Their setting is different from cultural verification, but the basic idea is useful here: a system can trade coverage for more reliable decisions.
+
+Vericult does not copy their method. It uses a simpler rule. If the evidence needed for a cultural dimension is unresolved, that dimension can abstain. The public score is then suppressed instead of presenting a precise number that would hide the uncertainty.
 \section{Research Gap and Scope of the Contribution}
 
 The contribution is not that no previous research has evaluated culture, used retrieval, or designed rubrics. The narrower gap addressed here is an inspectable post-hoc pipeline for one fixed response that combines explicit cultural dimensions, selected externally checkable targets, neutral verification questions, candidate-blind evidence collection after question generation, frozen evidence memos, abstention, and replayable traces.
