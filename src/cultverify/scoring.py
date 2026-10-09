@@ -335,13 +335,21 @@ def vericult_score(scores):
 
 
 def cultural_appropriateness(scores):
-    """Deterministic label derived from the existing 0/1/2 dimension rubric."""
+    """Quality label only when the evidence supports that conclusion.
+
+    Abstention represents unresolved cultural assessment, never a score of 1.
+    A demonstrated material violation (score 0) remains a violation even if
+    other dimensions cannot be assessed. Otherwise incomplete coverage is
+    explicitly reported as insufficient evidence instead of a partial defect.
+    """
     scored = [s.score for s in scores if s.score != "abstain"]
     if not scored:
         return "insufficient_evidence"
     if any(value == 0 for value in scored):
         return "culturally_inappropriate"
-    if all(value == 2 for value in scored) and all(s.score != "abstain" for s in scores):
+    if any(s.score == "abstain" for s in scores):
+        return "insufficient_evidence"
+    if all(value == 2 for value in scored):
         return "culturally_appropriate"
     return "partially_culturally_appropriate"
 

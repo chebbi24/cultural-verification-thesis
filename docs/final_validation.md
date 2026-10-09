@@ -1,79 +1,76 @@
-# Final repository validation — restored Vericult 1.1 thesis freeze
+# Final repository validation — Vericult 1.1 launch-safety freeze
 
-Frozen semantic/code revision: `286598d5eb642c3d632e7b756ccf1954fb922a13`.
+## Authoritative semantic revision
 
-GitHub Actions validation run: `37608290712` (**Verifier tests**, success) on Python 3.12.
+- Freeze code commit: `d9f63f195d0d79c1fc884567c16225b3f048a977`
+- GitHub Actions "Verifier tests": run `37714526309`, **success**
+- Python 3.12: **168 tests passed, 1 skipped**
+- Compile, Ruff lint and Ruff format: **passed**
+- Manifest: `experiments/final_manifest.json`; config:
+  `experiments/final_vericult_config.json`
 
-This freeze restores the verifier semantics that had already been validated on
-October 5 on branch `fix/cultural120-result-semantics` at
-`c1944bb1df47a8668689c316e62563bdc700fbf3` (CI run `37336670390`), but were
-never merged into `main`. Those semantics were used for the final failed-item rerun
-of the 120-case cross-dataset experiment. The restoration was applied selectively
-onto the cleaned thesis repository; retired challenge builders/datasets were not
-reintroduced.
+Only the manifest and this metadata validation note may be changed after the
+above semantic freeze without establishing a new revision.
 
-Validated gates:
+## Verified semantic corrections
 
-- dependency installation from `requirements.lock` — passed;
-- `python -m compileall -q src scripts tests` — passed;
-- full `python -m pytest -q` unit/integration suite — passed;
-- `ruff check src scripts tests` — passed;
-- `ruff format --check src scripts tests` — passed;
-- current repository-scope guards — passed.
+- An applicable cultural prompt cannot silently produce an empty dimension plan.
+  Invalid structured planning is retried once, then fails as a technical problem.
+- Scored 2 together with an abstention means `insufficient_evidence`,
+  **not** `partially_culturally_appropriate`. The public score remains null.
+  A material score-0 finding remains culturally inappropriate.
+- Final trace validation is synchronized with those same labels.
+- PLT002 LIVE completed with D01/D02/D03=2.
+- PLT003 LIVE completed with D01=2 and D08=abstain and now validates correctly.
+- PLT001 LIVE still fails at L3S `dimension_planner_v1: transport ReadTimeout`;
+  the cause is not established. No case-specific heuristic or model change was introduced.
 
-## Restored final semantics
+## Launch-safety and evidence fixes
 
-The frozen verifier now contains the full validated October 5 result semantics:
+- Every output record carries a deterministic execution ID from the frozen code,
+  verifier model/config and semantic dataset hashes.
+- Resume skips only the latest valid completed record with matching execution ID,
+  prompt and response hashes, and an intact matching trace.
+- Unexpected per-item exceptions become failed checkpoints so later items proceed;
+  keyboard interrupts and system exits are not swallowed.
+- A torn final JSONL line is backed up and removed without discarding valid records.
+  Earlier checkpoint corruption remains a hard failure.
+- The evidence auditor reads the manifest's actual `semantic_sha256` fields,
+  verifies LIVE record identity and prompt/response traces, and freezes hashes.
+- REPLAY checks its evidence execution identity and the frozen LIVE output hash.
+- Preflight and the runner reject silent model, provider or L3S endpoint changes.
+- Direct invocation of `python scripts/preflight_final_experiment.py` imports both frozen-model validation and execution-identity helpers, including the script-mode fallback. A regression subprocess test forces that import path.
 
-- prompt-level `cultural_applicability_v1` before D01–D10 planning;
-- `not_culturally_applicable` when cultural reasoning is not materially required;
-- `response_assessability_v1` for culturally applicable prompts;
-- `not_assessable` for pure refusals/non-answers with no substantive assessable answer;
-- deterministic response-span selection with Python-owned exact quotations;
-- normalization of equivalent span IDs while retaining the exact-span invariant;
-- deterministic retrieval routing from epistemic type;
-- per-dimension structural recovery when batch scoring remains invalid after bounded retry;
-- dimension outcomes 0, 1, 2 or `abstain`;
-- `insufficient_evidence` only for culturally applicable, assessable responses with no defensible scored basis;
-- selective `contextual_fallback_v1` only for unresolved context-dependent recommendations;
-- unresolved external facts and descriptive cultural norms remaining eligible for abstention;
-- public `vericult_score=null` whenever any applicable dimension abstains;
-- a score-0 material cultural failure remaining `culturally_inappropriate` even with partial abstention;
-- expanded Best-of-4/direct-judge outcomes including `not_culturally_applicable` and `not_assessable`.
+## Recent branch reconciliation and independent baselines
 
-These distinctions keep three different cases separate: the task is not materially
-cultural, the response contains no assessable answer, or the task is cultural and
-assessable but the verifier lacks sufficient evidence.
+The last-48-hour branch review compared `main`, `agent/final-experiment-ready`,
+`thesis/full-report-rewrite`, the external-120 archive, and the restored
+contextual-scoring/deterministic-span branches. The active branch retains the
+full latest common Vericult core and all subsequent planner, abstention,
+trace-validation and launch-safety fixes. No missing executable core verifier
+implementation was identified in those branches.
 
-## Repository-scope cleanup
+The previous Skywork and direct-judge source entrypoints were built for
+Best-of-4; the 360x1 protocol required single-response adapters. These are
+now provided independently by `scripts/run_final_baselines.py`. Skywork returns
+raw scalar reward scores, while a no-retrieval direct L3S/Qwen judge returns
+one of the six final labels. Neither baseline touches Vericult or loads
+human labels. The adapters have deterministic mocked tests but **have not
+been exercised with the live L3S inference endpoint or a local Skywork GPU**.
+The final CI also executes all four supported runner entrypoints with `--help`
+and verifies the actual checked-in 360-row corpus hashes, not just test fixtures.
 
-The earlier cleanup remains intact. Retired root-level cultural prompt exports,
-historical model-output files, obsolete generators/runners, temporary retest logs,
-and abandoned challenge artifacts are not restored to the active tree. The frozen
-PLT input, Human Gold provenance, D01–D10 research assets, independent baselines,
-smoke cases, experiment protocols/manifests, research documentation and
-external-validation protocol remain tracked.
+## Required local steps before official LIVE
 
-## Freeze metadata policy
+1. Use a clean checkout of the fix branch and run `python -m pytest -q`.
+2. Archive previous experimental artifacts (results, traces, cached evidence,
+   runtime/evidence manifests) separately. Do not combine old experimental freezes.
+3. Run `python scripts/preflight_final_experiment.py`, which checks all 360
+   generated pairs and captures the runtime identity.
+4. Run `python scripts/run_final_experiment.py --mode LIVE`.
+5. Rerun the same command to retry only failed/unresolved items. Then run the
+   evidence audit and REPLAY.
 
-`experiments/final_manifest.json` identifies the semantic/code revision above as
-`freeze_code_commit`. Only the manifest itself and this validation document are
-allowed to differ in the post-freeze metadata commit; the final experiment runner
-rejects other tracked semantic changes relative to the frozen revision.
-
-## Required local provider gate
-
-CI does not have the local Ollama runtime or Tavily credentials. Before final LIVE
-evidence acquisition, run on the frozen checkout:
-
-```bash
-CULTVERIFY_RUN_LIVE=1 python -m pytest -q -m live
-python scripts/preflight_final_experiment.py
-```
-
-The provider gate must use the final local `qwen3:4b` installation and Tavily
-credential. The preflight captures the exact Ollama digest and runtime versions in
-`artifacts/final_experiment/runtime_manifest.json`.
-
-Software validation establishes implementation conformance and reproducibility
-guards; it does not by itself establish cultural accuracy or empirical superiority.
+The remote L3S identifier is recorded as a model identity string, not an
+independently verified immutable weights digest. CI uses deterministic fixtures;
+provider reliability and cultural accuracy remain empirical evaluation concerns.

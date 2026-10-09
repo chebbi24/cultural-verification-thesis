@@ -1,73 +1,49 @@
 # Final Experiment Execution Status
 
-This file is the operational checkpoint for the final Bachelor-thesis experiment.
-It does not redefine the frozen verifier semantics or datasets.
+This is an operational overview. The machine-readable authority is
+`experiments/final_manifest.json` and `experiments/final_vericult_config.json`.
 
-## Frozen inputs
+## Active final experiment: 360 independent prompt–response pairs
 
-| Block | Size | Status |
+| Corpus | Items | Role |
 |---|---:|---|
-| External cross-dataset validation | 120 | Existing corpus and prior Vericult results restored under `data/final/external_120/` |
-| Red-team challenge set | 90 | Frozen under `data/final/vericult_redteam_90_final_selection.csv` |
-| PLT Best-of-4 | 30 | Frozen under `data/evaluation/best_of4_v1.csv` |
-| Total | 240 | Frozen package |
+| PLT120 | 120 | Custom challenge set, including PLT001–PLT030 development-origin cases |
+| External120 | 120 | External multicultural evaluation cases |
+| Redteam120 | 120 | Externally grounded cultural challenge cases |
+| **Total** | **360** | One frozen GPT-OSS response per prompt |
 
-## What is already completed
+Generator: `gpt-oss:120b-mxfp4`, temperature 0.8, top-p 0.95,
+maximum 1,200 completion tokens.
 
-### External 120
-Existing empirical run is preserved in:
-`data/final/external_120/results_final_merged.jsonl`
+Verifier: standalone Vericult 1.1 with L3S `vllm/qwen3.6:35b-a3b-fp8`,
+temperature 0. RM and direct-judge outputs do not enter the verifier.
 
-Completion:
-- 116/120 completed
-- 4 unresolved execution failures
-- IDs: 028, 034, 076, 084
+## Latest development-origin LIVE diagnostics
 
-Do not rerun the 116 successful rows unless a separate sensitivity/reproduction run is explicitly requested.
+- PLT001: provider `ReadTimeout` in `dimension_planner_v1`; not a cultural judgment.
+- PLT002: completed, three dimensions scored 2, culturally appropriate.
+- PLT003: completed, D01=2 and D08=abstain; correctly reports
+  `insufficient_evidence` with public score null.
 
-### PLT 30
-Input:
-`data/evaluation/best_of4_v1.csv`
+These are smoke diagnostics, **not** proof that the final 360-case LIVE run
+has completed. Preserve their traces separately from the official execution.
 
-Human reference material already exists:
-- `data/evaluation/human_annotations_raw.xlsx`
-- `data/evaluation/human_gold_candidates.csv`
-- `data/evaluation/human_gold_manifest.json`
-- `data/evaluation/human_gold_summary.json`
+## Final execution order
 
-Machine execution path already exists:
-1. `scripts/preflight_final_experiment.py`
-2. `scripts/run_final_experiment.py --mode LIVE`
-3. `scripts/audit_final_evidence.py`
-4. `scripts/run_final_experiment.py --mode REPLAY`
-5. `src/baseline_rm.py`
-6. `src/baseline_direct_judge.py`
+1. Check out the approved frozen code revision and clean working tree.
+2. Run tests and credential-gated smoke checks.
+3. Run `python scripts/preflight_final_experiment.py` to create the matching
+   execution identity and runtime manifest.
+4. Run `python scripts/run_final_experiment.py --mode LIVE`; only valid
+   completed records of the same execution identity are skipped on resume.
+5. Retry technical failures with unchanged semantic settings.
+6. Run `python scripts/audit_final_evidence.py`, then
+   `python scripts/run_final_experiment.py --mode REPLAY`.
+7. Run independent single-response baselines and analyze results.
 
-### Red-team 90
-Selection and provenance are frozen:
-- `data/final/vericult_redteam_90_final_selection.csv`
-- `data/final/vericult_redteam_90_freeze_manifest.txt`
+Do not mix completed outputs from old and new freezes. Keep the entire
+`artifacts/` directory and the JSONL checkpoints in the thesis archive.
 
-No selection/reconstruction work should be repeated.
-
-## Authoritative model/config freeze
-
-Use:
-- `experiments/final_manifest.json`
-- `experiments/final_vericult_config.json`
-- `experiments/backbone_freeze.json`
-
-Do not use conversationally proposed replacement model names unless a new experiment configuration is intentionally created.
-
-## Next execution tasks
-
-1. Preserve the 116 completed external-120 results; rerun only the four failed external rows if needed.
-2. Run the frozen PLT30 LIVE -> evidence freeze -> REPLAY pipeline.
-3. Run Skywork and direct-LLM baselines on the same PLT30.
-4. Join machine predictions with the already-built human gold only after machine outputs are persisted.
-5. Run the red-team90 as a separate challenge evaluation once each source-addressed record is available to the runtime; do not alter the frozen selection.
-6. Produce final comparison tables, coverage/abstention analysis, confidence intervals, and error analysis.
-
-## Rule
-
-Do not reconstruct or resample any of the three frozen blocks. Any execution fix must preserve the frozen prompt/response identities and must not use human labels for inference.
+Legacy Best-of-4, PLT30 human annotations, external 120 historical runs, and
+the earlier 90-record challenge selection remain **development provenance**,
+not the frozen 360-pair final machine evaluation.

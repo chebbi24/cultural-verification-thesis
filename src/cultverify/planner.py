@@ -30,9 +30,18 @@ def plan_prompt(session, prompt, rubric):
     )
     if not applicability.applicable:
         return context, DimensionPlan(dimensions=(), reasoning=applicability.reason)
+
+    def require_dimensions(plan):
+        # Applicability was already established independently from the prompt.
+        # An empty plan is therefore structurally contradictory, not a negative
+        # cultural judgment. SemanticSession retries invalid decisions once.
+        if not plan.dimensions:
+            raise ValueError("applicable=true requires at least one D01-D10 dimension")
+
     plan = session.call(
         "dimension_planner_v1",
         {"prompt": prompt, "context": context.model_dump(mode="json"), "rubric": rubric},
         DimensionPlan,
+        require_dimensions,
     )
     return context, plan

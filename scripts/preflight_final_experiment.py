@@ -14,20 +14,25 @@ from urllib.parse import urlsplit, urlunsplit
 
 import requests
 from dotenv import load_dotenv
+from cultverify import Config
 
 try:
     from scripts.run_final_experiment import (
         assert_frozen_checkout,
+        experiment_identity,
         load_final_rows,
         sha256_file,
         validate_freeze_files,
+        validate_frozen_model,
     )
 except ModuleNotFoundError:
     from run_final_experiment import (
         assert_frozen_checkout,
+        experiment_identity,
         load_final_rows,
         sha256_file,
         validate_freeze_files,
+        validate_frozen_model,
     )
 
 
@@ -67,6 +72,10 @@ def main(argv: list[str] | None = None) -> int:
     provider = os.getenv("CULTVERIFY_PROVIDER", config["verifier_model_provider"])
     model_id = os.getenv("CULTVERIFY_MODEL", config["verifier_model_id"])
     l3s_api_url = os.getenv("L3S_API_URL", config.get("l3s_api_url", ""))
+    effective = Config.model_validate(
+        {**config, "verifier_model_provider": provider, "verifier_model_id": model_id, "l3s_api_url": l3s_api_url}
+    )
+    validate_frozen_model(effective, manifest)
     if not os.getenv("TAVILY_API_KEY"):
         raise RuntimeError("TAVILY_API_KEY is not set")
 
@@ -109,7 +118,9 @@ def main(argv: list[str] | None = None) -> int:
         raise RuntimeError(f"Unsupported final-experiment provider: {provider}")
 
     runtime = {
-        "schema_version": "final-runtime-v2",
+        "schema_version": "final-runtime-v3",
+        "execution_id": experiment_identity(manifest),
+        "freeze_code_commit": manifest["freeze_code_commit"],
         "captured_at_utc": datetime.now(timezone.utc).isoformat(),
         "git_head": __import__("subprocess")
         .run(["git", "rev-parse", "HEAD"], check=True, capture_output=True, text=True)

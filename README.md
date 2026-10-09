@@ -222,9 +222,12 @@ hierarchy:
 - substantive assessment with no defensible scored cultural basis →
   `insufficient_evidence`;
 - any scored dimension 0 → `culturally_inappropriate`;
+- any other unresolved (`abstain`) dimension → `insufficient_evidence`,
+  even if all observed scores are 2;
 - all applicable dimensions scored 2 with no abstention →
   `culturally_appropriate`;
-- otherwise → `partially_culturally_appropriate`.
+- a complete assessment with at least one score 1 and no score 0 →
+  `partially_culturally_appropriate`.
 
 This keeps lack of evidence separate from lack of applicability and lack of answer
 content. Partial abstention cannot be presented as a perfect public score, while a

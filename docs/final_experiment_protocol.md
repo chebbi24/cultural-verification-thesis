@@ -79,7 +79,7 @@ The order is fixed:
    - verify canonical IDs and non-empty prompt/response fields;
    - verify prompt and response hashes stored in each generated CSV;
    - verify the same frozen GPT-OSS model/sampling settings for all three corpora;
-   - verify the three whole-file SHA-256 hashes from the final manifest;
+   - verify the three frozen semantic SHA-256 hashes from the final manifest;
    - require Tavily and the frozen L3S verifier credentials;
    - record Python/package/runtime identity.
 
@@ -117,7 +117,13 @@ The order is fixed:
 `scripts/run_final_experiment.py` appends one JSONL record per item. A rerun skips
 only item IDs already recorded as `completed` for the requested mode. A failed item
 may be rerun only after an execution-only problem (provider outage, timeout, local
-storage issue, etc.) is corrected with unchanged frozen semantics.
+storage issue, etc.) is corrected with unchanged frozen semantics. For final
+execution, resume requires matching the code/config/dataset/model execution ID,
+the prompt and response hashes, and an intact completed trace. Unexpected
+per-item exceptions produce failed checkpoints and do not terminate the batch.
+A torn final JSONL line is backed up and removed before resuming; corruption
+in an earlier record is a hard failure. Never use --no-resume against a
+nonempty result file. Keep previous-version output as a separately archived run.
 
 No prompt, generated response, rubric, model, target/search budget, leakage policy,
 or decision rule may be tuned in response to final Vericult outcomes.
@@ -149,3 +155,40 @@ python scripts/preflight_final_experiment.py
 
 The credential-gated smoke test must use development smoke cases, not any of the
 360 final prompt–response pairs.
+
+## Post-fix execution identity
+
+The final runner and preflight use the same SHA-256 execution identity covering
+the frozen code commit, experiment, verifier model/provider/config, and three
+semantic dataset hashes. The LIVE evidence audit requires matching input hashes,
+execution identity, traces, and source files before evidence can be frozen.
+REPLAY rejects a different evidence execution identity. A remote L3S model name
+is recorded as an identity string, **not** a verified immutable weights digest.
+
+## Independent single-response baselines
+
+The original `src/baseline_rm.py` and `src/baseline_direct_judge.py`
+remain the historical Best-of-4 tools, not valid entrypoints for the 360x1
+experiment. The frozen single-response experiment instead uses:
+
+```bash
+python scripts/run_final_baselines.py --baseline direct-judge
+python scripts/run_final_baselines.py --baseline reward-model
+```
+
+The direct judge uses the **same frozen L3S/Qwen backbone**, temperature zero,
+the D01-D10 rubric, and the explicitly specified no-retrieval direct
+single-response instruction. It never receives Vericult predictions,
+evidence, reward scores, or labels. Outputs contain one of the six final
+cultural outcome categories and a short rationale.
+
+The Skywork runner applies the frozen Skywork model and revision to each
+prompt-response pair and records **only its raw scalar reward**, without
+inventing a cultural threshold. Install the optional PyTorch/Transformers
+dependencies via `pip install -e '.[rm]'` on a suitable machine.
+
+Each baseline uses independent JSONL checkpoints, the same final input
+hashes/freeze identity, and a hash of the baseline's own model/prompt
+protocol. Re-running its command retries only its failed items.
+Neither baseline reads human gold or influences the verifier. These
+post-verifier runs are not required to start LIVE evidence acquisition.

@@ -2,13 +2,13 @@
   "schema_version": "thesis-final-v4-single-response",
   "experiment_id": "thesis-final-v4-360x1",
   "pipeline_version": "cultverify-1.1.0",
-  "freeze_code_commit": "099e4116a809ee004c1cdea04d1bcc2a14e7d142",
+  "freeze_code_commit": "d9f63f195d0d79c1fc884567c16225b3f048a977",
   "validation": {
-    "status": "unit_ci_passed_pending_live_smoke_and_preflight",
+    "status": "full_ci_passed_local_credentials_and_live_inference_pending",
     "local_live_smoke_required": true,
     "ci_workflow": "Verifier tests",
-    "note": "Unit tests, compile, Ruff lint, and Ruff format passed on the semantic freeze commit. Final LIVE must not start until the credential-gated live smoke and local preflight also pass.",
-    "github_actions_run_id": 37701437713,
+    "note": "GitHub CI success for the final branch reconciliation and baseline adapters: 168 passed, 1 skipped; compile, Ruff lint, and formatting passed. New integration tests validate actual final 360-row hashes and direct script --help for the preflight, LIVE, audit, and baseline scripts. PLT002/PLT003 LIVE passed on unchanged verifier code; PLT001 L3S timeout remains an execution-risk, and full LIVE/REPLAY and baseline inference must be run on the user's machine.",
+    "github_actions_run_id": 37714526309,
     "required_status": "success"
   },
   "dataset": {
@@ -94,7 +94,8 @@
     "contextual_fallback_policy": "only evidence-unresolved context_dependent_recommendation targets may use contextual fallback to judge observable cultural handling; unresolved external facts/descriptive norms may abstain",
     "public_score_policy": "vericult_score is null whenever any applicable dimension abstains; exact internal aggregation remains available in traces",
     "api_endpoint": "https://inference.kbs.uni-hannover.de/v1/chat/completions",
-    "credentials": "L3S_API_KEY from local .env; never committed"
+    "credentials": "L3S_API_KEY from local .env; never committed",
+    "partial_abstention_policy": "If any dimension abstains, label insufficient_evidence unless a scored dimension has a material score-0 cultural failure; all-2 observed scores with an abstention are not partially inappropriate."
   },
   "leakage_controls": {
     "thesis_repository": "chebbi24/cultural-verification-thesis",
@@ -110,13 +111,20 @@
   "reward_model_baseline": {
     "model": "Skywork/Skywork-Reward-V2-Qwen3-4B",
     "revision": "fd958fe",
-    "script": "src/baseline_rm.py",
-    "status": "pending_single_response_adapter",
-    "role": "independent comparison only; scores never enter Vericult"
+    "script": "scripts/run_final_baselines.py --baseline reward-model",
+    "status": "single_response_adapter_implemented_pending_gpu_inference",
+    "role": "independent comparison only; scores never enter Vericult",
+    "output_interpretation": "raw scalar reward only; no invented cultural threshold"
   },
   "direct_llm_judge_baseline": {
-    "status": "pending_single_response_adapter",
-    "role": "independent no-retrieval cultural judge on the same fixed prompt-response pairs"
+    "status": "single_response_adapter_implemented_pending_l3s_inference",
+    "role": "independent no-retrieval cultural judge on the same fixed prompt-response pairs",
+    "script": "scripts/run_final_baselines.py --baseline direct-judge",
+    "provider": "l3s",
+    "model": "vllm/qwen3.6:35b-a3b-fp8",
+    "temperature": 0,
+    "retrieval": "none",
+    "prompt_definition": "scripts/run_final_baselines.py:DIRECT_PROMPT; equivalent protocol also documented in thesis/full-report-rewrite branch, appendix C"
   },
   "execution_order": [
     "runtime_preflight",
