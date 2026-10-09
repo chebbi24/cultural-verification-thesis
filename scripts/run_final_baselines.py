@@ -268,7 +268,7 @@ def evaluate_one(
     execution_id,
     protocol_hash,
     *,
-    model_id: str,
+    model_id: str = "",
     model_revision: str | None = None,
     rubric=None,
 ):
@@ -281,8 +281,9 @@ def evaluate_one(
         "item_id": row["item_id"],
         "prompt_sha256": row["prompt_sha256"],
         "response_sha256": row["response_sha256"],
-        "model": model_id,
     }
+    if model_id:
+        result["model"] = model_id
     if model_revision is not None:
         result["model_revision"] = model_revision
 
