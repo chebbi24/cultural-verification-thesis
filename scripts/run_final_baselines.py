@@ -239,7 +239,7 @@ def direct_decision(llm, row, rubric, attempts: int = 2):
     for attempt in range(attempts):
         try:
             raw = llm.complete(
-                stage="direct_single_response_judge_v2",
+                stage="direct_single_response_judge_v1",
                 system=DIRECT_PROMPT,
                 payload={
                     "prompt": row["prompt"],
