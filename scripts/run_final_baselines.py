@@ -127,9 +127,7 @@ class SkyworkRewardModel:
             import torch
             from transformers import AutoModelForSequenceClassification, AutoTokenizer
         except ImportError as exc:
-            raise RuntimeError(
-                "Reward-model dependencies are missing. Install with: pip install -e '.[rm]'"
-            ) from exc
+            raise RuntimeError("Reward-model dependencies are missing. Install with: pip install -e '.[rm]'") from exc
 
         self.torch = torch
         self.max_length = max_length
@@ -361,8 +359,7 @@ def print_summary(output: Path, expected: int) -> None:
     completed = sum(record.get("status") == "completed" for record in latest.values())
     failed = sum(record.get("status") == "failed" for record in latest.values())
     print(
-        f"Summary: {len(latest)}/{expected} items recorded; "
-        f"{completed} completed; {failed} failed.",
+        f"Summary: {len(latest)}/{expected} items recorded; {completed} completed; {failed} failed.",
         flush=True,
     )
 
@@ -436,17 +433,13 @@ def main(argv=None):
             or config.verifier_model_id != manifest["vericult"]["backbone"]
             or config.l3s_api_url != manifest["vericult"]["api_endpoint"]
         ):
-            raise RuntimeError(
-                "Direct judge must use the frozen verifier backbone and endpoint"
-            )
+            raise RuntimeError("Direct judge must use the frozen verifier backbone and endpoint")
         if config.verifier_model_provider != "l3s":
             raise RuntimeError("Frozen direct judge requires L3S")
 
         api_key = os.getenv("L3S_API_KEY")
         if not api_key:
-            raise RuntimeError(
-                "L3S_API_KEY is missing. Load it from .env before running the direct judge."
-            )
+            raise RuntimeError("L3S_API_KEY is missing. Load it from .env before running the direct judge.")
 
         model_id = config.verifier_model_id
         model_revision = None
@@ -454,9 +447,7 @@ def main(argv=None):
         rubric = load_rubric()
         protocol_hash = baseline_protocol_hash(args.baseline, model_id)
 
-    output = args.output or Path(
-        f"artifacts/final_experiment/results/{args.baseline.replace('-', '_')}.jsonl"
-    )
+    output = args.output or Path(f"artifacts/final_experiment/results/{args.baseline.replace('-', '_')}.jsonl")
     output.parent.mkdir(parents=True, exist_ok=True)
 
     completed = load_baseline_completed(
@@ -489,9 +480,7 @@ def main(argv=None):
                 model_revision=model_revision,
                 rubric=rubric,
             )
-            handle.write(
-                json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n"
-            )
+            handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
             handle.flush()
             os.fsync(handle.fileno())
 
@@ -505,8 +494,7 @@ def main(argv=None):
 
     if failed_this_run:
         print(
-            f"{failed_this_run} baseline item(s) failed in this run; "
-            "rerun the same command to retry only failures.",
+            f"{failed_this_run} baseline item(s) failed in this run; rerun the same command to retry only failures.",
             file=sys.stderr,
         )
         return 2
