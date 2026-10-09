@@ -26,7 +26,7 @@ from dotenv import load_dotenv
 from pydantic import Field
 
 from cultverify import Config
-from cultverify.llm import HTTPModel
+from cultverify.llm import HTTPModel, StageError
 from cultverify.planner import load_rubric
 from cultverify.schemas import Record
 from cultverify.trace import digest
@@ -255,7 +255,7 @@ def direct_decision(llm, row, rubric, attempts: int = 2):
                 "judge_label": decision.label,
                 "judge_rationale": decision.rationale,
             }
-        except (requests.RequestException, ValueError) as exc:
+        except (requests.RequestException, StageError, ValueError) as exc:
             if attempt + 1 == attempts:
                 raise RuntimeError(f"direct-judge:{type(exc).__name__}") from exc
     raise RuntimeError("No direct-judge output")
